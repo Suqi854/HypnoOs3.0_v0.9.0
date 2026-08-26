@@ -493,10 +493,10 @@ async function openPhone(viewport, screenshotPrefix) {
   await frame.locator('.st-timetable-app [data-lite-action="back"]').click();
   await frame.waitForFunction(() => document.body?.innerText?.includes('本轮输入'));
 
-  await frame.locator('[aria-label="打开MC匿名版"]').click();
+  await frame.locator('[aria-label="打开混沌心海"]').click();
   await frame.waitForSelector('.st-mchan-internal-app .st-mchan-boards');
   assert.match(await frame.locator('.st-mchan-internal-app').innerText(), /校园新学期见闻/);
-  assert.equal(await frame.locator('.st-adaptive-world-app').count(), 0, 'MC匿名版被统一卡片页覆盖');
+  assert.equal(await frame.locator('.st-adaptive-world-app').count(), 0, '混沌心海被统一卡片页覆盖');
   await page.screenshot({ path: `docs/screenshots/${screenshotPrefix}-mchan-original-ui.png`, fullPage: true });
   await frame.locator('.st-mchan-internal-app .st-mchan-back').click();
   await frame.waitForFunction(() => document.body?.innerText?.includes('本轮输入'));

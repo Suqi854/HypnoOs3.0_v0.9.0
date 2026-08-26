@@ -4,9 +4,9 @@
   "js": "index.js",
   "css": "style.css",
   "author": "Suqi854；原催眠APP作者与二改作者见 NOTICE.md",
-  "version": "0.9.0",
+  "version": "1.0.0",
   "minimum_client_version": "1.18.0",
-  "homePage": "https://github.com/Suqi854/HypnoOS3.0",
+  "homePage": "https://github.com/Suqi854/HypnoOs3.0_v0.9.0",
   "auto_update": false,
   "hooks": {
     "enable": "enable",

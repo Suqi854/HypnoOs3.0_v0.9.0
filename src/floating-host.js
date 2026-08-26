@@ -48,6 +48,25 @@ export class FloatingHost {
     this.store.addEventListener('change', onStore);
     this.disposers.push(() => this.store.removeEventListener('change', onStore));
 
+    const emitBridgeEvent = (eventName, payload) => {
+      for (const listener of this.listeners.get(eventName) || []) {
+        try { listener(payload); } catch (error) { console.warn('[HypnoOS3] 前端事件监听失败', error); }
+      }
+    };
+    const context = this.host.context;
+    const receivedEvent = context?.eventTypes?.MESSAGE_RECEIVED;
+    const chatChangedEvent = context?.eventTypes?.CHAT_CHANGED;
+    if (receivedEvent && context?.eventSource) {
+      const onDialogueRoundEnded = (...args) => emitBridgeEvent('HYPNOOS3_DIALOGUE_ROUND_ENDED', { args });
+      context.eventSource.on(receivedEvent, onDialogueRoundEnded);
+      this.disposers.push(() => context.eventSource.removeListener(receivedEvent, onDialogueRoundEnded));
+    }
+    if (chatChangedEvent && context?.eventSource) {
+      const onChatChanged = (...args) => emitBridgeEvent('HYPNOOS3_CHAT_CHANGED', { args });
+      context.eventSource.on(chatChangedEvent, onChatChanged);
+      this.disposers.push(() => context.eventSource.removeListener(chatChangedEvent, onChatChanged));
+    }
+
     const onMessage = async (event) => {
       const frame = phoneFrame();
       if (!frame || event.source !== frame.contentWindow || event.origin !== location.origin || !event.data || typeof event.data !== 'object') return;

@@ -20,7 +20,7 @@ for (const path of [manifest.js, manifest.css, 'capability-contract.json']) {
 const ui = await readFile(new URL('ui/index.html', root));
 const uiText = ui.toString('utf8');
 const uiHash = createHash('sha256').update(uiText.replace(/\r\n/g, '\n')).digest('hex');
-expect(uiHash === '19e64cebf4668d54dbb5ad1aa6c51de7572085c11b11532085d2dd7b211f1f71', `UI 基线哈希变化：${uiHash}`);
+expect(uiHash === '83ea591ebfe50ab7ab3538cbb2aeadb1f3c52e74d2931211398a37ae005028ed', `UI 基线哈希变化：${uiHash}`);
 const hypnosisRulesSource = await readFile(new URL('src/hypnosis-rules.js', root), 'utf8');
 expect(uiText.includes('html,body,#app{width:100%;height:100%;min-height:0;margin:0;overflow:hidden!important;overscroll-behavior:none}#app{contain:strict}'), '手机前端缺少满屏滚动锁');
 expect(uiText.includes('window.__ST_OPEN_PENDING_INPUT_APP__'), '手机前端缺少本轮输入应用入口');
@@ -49,14 +49,16 @@ expect(uiText.includes('const PERSON_PROFILE_CONFIDENTIAL_TABS = ["sensitivity",
 expect(!uiText.includes('row: 2, enter: "hospital"') && !uiText.includes('hospital: settingsLineStageValue(ST_HOSPITAL_LINE_KEY)'), '医院线或改造室入口仍在地图/设置运行路径中');
 expect(uiText.includes('specialLocations: { title: "特殊地点"') && uiText.includes('function adaptiveSpecialLocationItems()'), '世界书适配合同缺少特殊地点数据');
 expect(uiText.includes('const items = adaptiveSpecialLocationItems();') && !uiText.includes('const items = SPECIAL_LOCATION_STATIC_ITEMS.concat(specialLocationDynamicItems());'), '特殊地点目录仍回退4.3固定数据');
-expect(uiText.includes('区域地图与特殊地点必须从同一批世界书事实中共同生成'), '区域地图与特殊地点没有同源生成约束');
+expect(uiText.includes('区域地图、特殊地点和监控地点必须从同一批世界书事实中共同生成'), '区域地图、特殊地点与监控地点没有同源生成约束');
 expect(uiText.includes('normalizeHomeLayoutOrder') && uiText.includes('bindHomeLayoutDrag'), '桌面缺少自动补位或拖动排序');
 expect(uiText.includes('rewardFemaleArchiveEntries') && uiText.includes('rewardItemFemaleArchiveTarget'), '成就任务没有限定女性档案角色');
 expect(uiText.includes('adaptiveTimetableBase()') && uiText.includes('adaptiveCalendarDays()'), '原始日历/课程表没有接入世界书适配数据');
-expect(uiText.includes('openMchanPage(tile)') && uiText.includes('adaptiveMchanState(defaultState())'), 'MC匿名版没有保持原UI并接入适配帖子');
+expect(uiText.includes('openMchanPage(tile)') && uiText.includes('adaptiveMchanState(defaultState())'), '混沌心海没有保持原UI并接入适配帖子');
+expect(uiText.includes('CHAOS_FORUM_THREAD_LIMIT = 20') && uiText.includes('refreshChaosForumFromModel({ manual: false })') && uiText.includes('data-mchan-action="refresh"'), '混沌心海缺少自动/手动模型更新或20帖上限');
 expect(uiText.includes('openRewardPage(null)') && uiText.includes('adaptiveRewardConfig()'), '任务与成就没有保持原UI并接入适配数据');
 expect(uiText.includes('openWorkPage(null)') && uiText.includes('activeWorkJobs()'), '打工没有保持原UI并接入适配数据');
-expect(uiText.includes('openMonitorPage(null)') && uiText.includes('adaptiveRecordsSync("monitor")[0]'), '监控没有保持原UI并接入适配数据');
+expect(uiText.includes('openMonitorPage(null)') && uiText.includes('monitorRecordForGate(index, monitorRecords)') && uiText.includes('工作地点: monitorPlan.location'), '监控没有保持原UI并按门位接入适配数据');
+expect(!uiText.includes('工作地点: "私立斋明学园男厕（学校男生很少，平时基本没人）"'), '监控派遣仍写死旧学校男厕');
 expect(uiText.includes('data-settings-worldbook-picker="adaptive"') && uiText.includes('type="checkbox"') && uiText.includes('generateAdaptiveWorldbookProfile(worldbookNames)'), '通用适配没有支持下拉多选世界书合并');
 expect(uiText.includes('data-settings-worldbook-picker="profile"') && uiText.includes('data-settings-profile-worldbooks') && uiText.includes('importProfileRolesFromWorldbooks'), '设置缺少下拉多选世界书档案导入');
 expect(uiText.includes('renderSettingsHelpSection(page)') && uiText.includes('data-settings-action="toggle-help"') && uiText.includes('function removeHomeHelpTile()'), '帮助应用没有迁入世界书适配数据下方的折叠按钮');

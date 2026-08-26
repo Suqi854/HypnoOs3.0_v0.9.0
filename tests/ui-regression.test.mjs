@@ -74,3 +74,27 @@ test('help moves below worldbook adaptation data and keeps the requested notice'
   assert.ok(html.includes('body: "本插件基于二创改编，原作者：Ramiel；二改作者：louisHM；本插件作者SuQi"'));
   assert.ok(!html.includes('title: "社区提醒"'));
 });
+
+test('chaos forum keeps the original surface with bounded model-driven updates', () => {
+  const app = PHONE_APPS.find((item) => item.id === 'mc-anon');
+  assert.equal(app?.label, '混沌心海');
+  assert.ok(html.includes('data-mchan-action="refresh"'));
+  assert.ok(html.includes('aria-label="手动更新混沌心海"'));
+  assert.ok(html.includes('CHAOS_FORUM_THREAD_LIMIT = 20'));
+  assert.ok(html.includes('CHAOS_FORUM_ROUND_EVENT = "HYPNOOS3_DIALOGUE_ROUND_ENDED"'));
+  assert.ok(html.includes('refreshChaosForumFromModel({ manual: false })'));
+  assert.ok(html.includes('globalThis.generateRaw({ prompt, systemPrompt: system'));
+  assert.ok(html.includes('.slice(0, CHAOS_FORUM_THREAD_LIMIT)'));
+});
+
+test('monitor preserves three gates while consuming generated worldbook locations and arrangements', () => {
+  const monitor = functionBody('renderMonitorPage');
+  assert.ok(monitor.includes('const monitorRecords = monitorAdaptiveRecords()'));
+  assert.ok(monitor.includes('monitorRecordForGate(index, monitorRecords)'));
+  assert.ok(monitor.includes('placeholder="\' + escapeAttr(monitorPlan.arrangement)'));
+  assert.ok(html.includes('工作地点: monitorPlan.location'));
+  assert.ok(html.includes('地点安排: monitorPlan.arrangement'));
+  assert.ok(html.includes('normalizeMonitorDispatchWorkText(rawWorkText, monitorPlan.arrangement)'));
+  assert.ok(!html.includes('工作地点: "私立斋明学园男厕（学校男生很少，平时基本没人）"'));
+  assert.ok(html.includes('监控必须生成3至6个彼此不同的地点'));
+});

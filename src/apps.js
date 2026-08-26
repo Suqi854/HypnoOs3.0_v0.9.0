@@ -21,7 +21,7 @@ export const PHONE_APPS = Object.freeze([
   define('clock', '时钟', 'world', ['time'], ['time']),
   define('achievements', '成就和任务', 'social', ['achievements', 'tasks'], ['achievements', 'tasks', 'resources']),
   define('inventory', '库存', 'control', ['inventory'], ['inventory']),
-  define('mc-anon', 'MC匿名版', 'social', ['roles', 'custom.mchan'], ['operationQueue'], ['model-optional']),
+  define('mc-anon', '混沌心海', 'social', ['roles', 'custom.mchan'], ['operationQueue'], ['model-optional']),
   define('map', '地图', 'world', ['location'], ['location']),
   define('camera', '照相', 'system', ['roles'], ['roles'], ['avatars']),
   define('wallpaper', '墙纸', 'system', ['custom.wallpaper'], ['custom.wallpaper']),
