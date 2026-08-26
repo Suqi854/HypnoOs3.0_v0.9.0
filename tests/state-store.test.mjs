@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import { CHAT_STATE_KEY } from '../src/constants.js';
 import { createDefaultRole, createDefaultState } from '../src/contracts.js';
+import { AppDataService } from '../src/app-data-service.js';
 import { createStateBridge } from '../src/floating-host.js';
 import { HostAdapter } from '../src/host-adapter.js';
 import { getRegionPack } from '../src/regions.js';
@@ -80,6 +81,27 @@ test('startup migrates legacy runtime data once when HypnoState is absent', asyn
   assert.equal(host.saved.schema, 'HypnoState/v1');
 });
 
+test('saved compatibility fields leave the runtime namespace and empty fixed dispatch slots are removed', async () => {
+  const saved = savedState({ money: 1200, roleName: '迁移角色', location: '迁移地点' });
+  saved.custom.policeLine = 2;
+  saved.custom.hospitalLine = 1;
+  saved.custom.workValue = 9;
+  saved.dispatches = [
+    { 角色名: '', 派遣工作: '', 派遣开始时间: '', 派遣结束时间: '' },
+    { 角色名: '迁移角色', 派遣工作: '便利店', 派遣开始时间: '10:00', 派遣结束时间: '12:00' },
+  ];
+  const store = new StateStore(new StubHost({ saved }), new MemorySettings());
+  const state = await store.initialize();
+  assert.equal('policeLine' in state.custom, false);
+  assert.equal('hospitalLine' in state.custom, false);
+  assert.equal('workValue' in state.custom, false);
+  assert.equal(state.custom.legacyVariables.系统._警视厅线, 2);
+  assert.equal(state.custom.legacyVariables.系统._医院线, 1);
+  assert.equal(state.custom.legacyVariables.系统._社畜值, 9);
+  assert.equal(state.dispatches.length, 1);
+  assert.equal(state.dispatches[0].派遣工作, '便利店');
+});
+
 test('saved HypnoState wins over conflicting optional runtime snapshots', async () => {
   const saved = savedState({ money: 1200, roleName: '权威角色', location: '权威地点' });
   const host = new StubHost({
@@ -122,7 +144,7 @@ test('phone bridge reads and writes HypnoState even when external runtimes disag
     readMvu: () => ({ stat_data: { 系统: { 持有零花钱: 8888 } } }),
     getMvuEvents: () => ({ VARIABLE_UPDATE_ENDED: 'external-event' }),
   };
-  const bridge = createStateBridge(host, store);
+  const bridge = createStateBridge(host, new AppDataService(host, store));
 
   assert.equal(bridge.getVariables({ type: 'message', message_id: 3 }).系统.持有零花钱, 1200);
   assert.equal(bridge.Mvu.getMvuData({ type: 'chat' }).stat_data.系统.持有零花钱, 1200);

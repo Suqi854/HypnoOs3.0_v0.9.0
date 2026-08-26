@@ -1,6 +1,6 @@
 {
   "name": "hypnoos3",
-  "version": "0.8.3",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "description": "通用、可适配世界书的 SillyTavern 催眠手机 UI Extension",

@@ -1,6 +1,5 @@
-import { toLegacyVariables } from './contracts.js';
+import { AppDataService } from './app-data-service.js';
 import { HYPNOSIS_RULES_API } from './hypnosis-rules.js';
-import { clone } from './utils.js';
 
 const BRIDGE_KEY = '__HYPNOOS3_CORE_BRIDGE__';
 const SINGLETON_KEY = '__HYPNOOS3_EXTENSION_FLOATING_SINGLETON__';
@@ -10,25 +9,14 @@ function phoneFrame() {
   return document.querySelector(`#${HOST_ID}`)?.shadowRoot?.querySelector('iframe.phone') || null;
 }
 
-export function createStateBridge(host, store) {
-  const getVariables = () => toLegacyVariables(store.state);
+export function createStateBridge(host, dataService) {
   return {
-    getVariables,
-    updateVariablesWith(updater) {
-      const current = getVariables();
-      const draft = clone(current);
-      const candidate = typeof updater === 'function' ? updater(draft) : updater;
-      const next = candidate && typeof candidate === 'object' ? candidate : draft;
-      store.importLegacyVariables(next).catch((error) => console.error('[HypnoOS3] 手机变量写入失败', error));
-      return next;
-    },
+    getVariables: () => dataService.readLegacyVariables(),
+    updateVariablesWith: (updater) => dataService.updateLegacyVariables(updater),
     Mvu: {
       get events() { return host.getMvuEvents(); },
-      getMvuData() { return { stat_data: getVariables() }; },
-      replaceMvuData(value) {
-        const stat = value?.stat_data && typeof value.stat_data === 'object' ? value.stat_data : value;
-        return store.importLegacyVariables(stat);
-      },
+      getMvuData: () => dataService.readMvuData(),
+      replaceMvuData: (value) => dataService.replaceMvuData(value),
     },
   };
 }
@@ -37,6 +25,7 @@ export class FloatingHost {
   constructor(host, store) {
     this.host = host;
     this.store = store;
+    this.dataService = new AppDataService(host, store);
     this.listeners = new Map();
     this.disposers = [];
   }
@@ -95,8 +84,9 @@ export class FloatingHost {
   #createBridge() {
     const store = this.store;
     const host = this.host;
+    const dataService = this.dataService;
     const listeners = this.listeners;
-    const stateBridge = createStateBridge(host, store);
+    const stateBridge = createStateBridge(host, dataService);
     const bridge = {
       getVariables: stateBridge.getVariables,
       updateVariablesWith: stateBridge.updateVariablesWith,
@@ -117,9 +107,10 @@ export class FloatingHost {
           if (!listeners.get(key)?.size) listeners.delete(key);
         } };
       },
-      getWorldbookNames() { return host.getWorldbookNames(); },
-      getCharWorldbookNames() { return host.getCharacterWorldbookNames(); },
-      getWorldbook(name) { return host.loadWorldbook(name); },
+      getHypnoAppData(appId) { return dataService.readAppData(appId); },
+      getWorldbookNames() { return dataService.getWorldbookNames(); },
+      getCharWorldbookNames() { return dataService.getCharacterWorldbookNames(); },
+      getWorldbook(name) { return dataService.getWorldbook(name); },
       generateRaw(options) { return host.generateRaw(options || {}); },
       getHypnosisRules(version) { return HYPNOSIS_RULES_API.get(version); },
       listHypnosisRuleVersions() { return HYPNOSIS_RULES_API.listVersions(); },

@@ -1,4 +1,4 @@
-import { createDefaultRole } from './role-contract.js';
+import { createDefaultRole, normalizeRolePack } from './role-contract.js';
 import { normalizeState } from './state-contract.js';
 import { clone, isRecord, makeId, sanitizeName } from './utils.js';
 
@@ -26,6 +26,23 @@ export function mergeLegacyVariables(current, incoming) {
   return result;
 }
 
+export function migrateStateCompatibility(value) {
+  if (!isRecord(value)) return value;
+  const next = clone(value);
+  const custom = isRecord(next.custom) ? next.custom : {};
+  const legacyVariables = isRecord(custom.legacyVariables) ? custom.legacyVariables : {};
+  const system = isRecord(legacyVariables.系统) ? legacyVariables.系统 : {};
+  for (const [field, legacyKey] of [['policeLine', '_警视厅线'], ['hospitalLine', '_医院线'], ['workValue', '_社畜值']]) {
+    if (custom[field] !== undefined && system[legacyKey] === undefined) system[legacyKey] = clone(custom[field]);
+    delete custom[field];
+  }
+  if (Object.keys(system).length) legacyVariables.系统 = system;
+  if (Object.keys(legacyVariables).length) custom.legacyVariables = legacyVariables;
+  next.custom = custom;
+  if (Array.isArray(next.dispatches)) next.dispatches = next.dispatches.filter((item) => isRecord(item) && Object.values(item).some((itemValue) => String(itemValue ?? '').trim()));
+  return next;
+}
+
 export function toLegacyVariables(state) {
   const recordBy = (items, prefix) => Object.fromEntries((Array.isArray(items) ? items : []).map((item, index) => {
     const value = isRecord(item) ? clone(item) : { value: item };
@@ -35,12 +52,15 @@ export function toLegacyVariables(state) {
   const roles = {};
   for (const role of Object.values(state.roles || {})) {
     if (!role?.name) continue;
+    const runtime = role.variables?.runtime || {};
+    const compatibility = role.variables?.compatibility || role.variables?.core || {};
+    const extensions = role.variables?.extensions || role.variables?.custom || {};
     roles[role.name] = {
-      好感度: role.variables?.core?.favor ?? 0,
-      可疑度: role.variables?.core?.suspicion ?? 0,
-      催眠状态: role.variables?.core?.hypnosis ?? { active: [], permanent: [] },
-      人物档案: role.variables?.core?.profile ?? {},
-      自定义: role.variables?.custom ?? {},
+      好感度: compatibility.favor ?? 0,
+      可疑度: compatibility.suspicion ?? 0,
+      催眠状态: runtime.hypnosis ?? compatibility.hypnosis ?? { active: [], permanent: [] },
+      人物档案: compatibility.profile ?? {},
+      自定义: extensions,
       _hypnoos角色ID: role.id,
       _头像资源ID: role.avatarAssetId,
     };
@@ -63,15 +83,8 @@ export function toLegacyVariables(state) {
       当前出场角色: Array.isArray(state.custom?.presentRoles) ? clone(state.custom.presentRoles) : [],
       _课程表: state.timetable,
       催眠APP订阅等级: String(state.custom?.subscriptionLevel || 'VIP0'),
-      _警视厅线: Number(state.custom?.policeLine || 0),
-      _医院线: Number(state.custom?.hospitalLine || 0),
-      派遣岗位: {
-        '1号门': clone(state.dispatches?.[0] || { 角色名: '', 派遣工作: '', 派遣开始时间: '', 派遣结束时间: '' }),
-        '2号门': clone(state.dispatches?.[1] || { 角色名: '', 派遣工作: '', 派遣开始时间: '', 派遣结束时间: '' }),
-        '3号门': clone(state.dispatches?.[2] || { 角色名: '', 派遣工作: '', 派遣开始时间: '', 派遣结束时间: '' }),
-      },
+      派遣岗位: Object.fromEntries((state.dispatches || []).map((item, index) => [`${index + 1}号门`, clone(item)])),
       持有物品: recordBy(state.inventory, 'item'),
-      _社畜值: Number(state.custom?.workValue || 0),
       _buff: String(state.custom?.buff || ''),
       _buff结束时间: String(state.custom?.buffEndTime || ''),
       _user身份: isRecord(state.custom?.userIdentity) ? clone(state.custom.userIdentity) : {},
@@ -80,7 +93,9 @@ export function toLegacyVariables(state) {
     角色: roles,
     任务: recordBy(state.tasks, 'task'),
   };
-  return mergeLegacyVariables(state.custom?.legacyVariables, projected);
+  const merged = mergeLegacyVariables(state.custom?.legacyVariables, projected);
+  merged.系统.派遣岗位 = projected.系统.派遣岗位;
+  return merged;
 }
 
 export function fromLegacyVariables(legacy, current, regionPack) {
@@ -111,9 +126,6 @@ export function fromLegacyVariables(legacy, current, regionPack) {
     currentEvent: String(system.当前事件 ?? next.custom.currentEvent ?? ''),
     presentRoles: Array.isArray(system.当前出场角色) ? clone(system.当前出场角色) : next.custom.presentRoles || [],
     subscriptionLevel: String(system.催眠APP订阅等级 ?? next.custom.subscriptionLevel ?? 'VIP0'),
-    policeLine: number(system._警视厅线, next.custom.policeLine || 0),
-    hospitalLine: number(system._医院线, next.custom.hospitalLine || 0),
-    workValue: number(system._社畜值, next.custom.workValue || 0),
     buff: String(system._buff ?? next.custom.buff ?? ''),
     buffEndTime: String(system._buff结束时间 ?? next.custom.buffEndTime ?? ''),
     userIdentity: isRecord(system._user身份) ? clone(system._user身份) : next.custom.userIdentity || {},
@@ -122,21 +134,24 @@ export function fromLegacyVariables(legacy, current, regionPack) {
   for (const [name, value] of Object.entries(isRecord(legacy.角色) ? legacy.角色 : {})) {
     if (!isRecord(value)) continue;
     const id = String(value._hypnoos角色ID || Object.values(next.roles).find((role) => role.name === name)?.id || makeId('role'));
-    const existing = next.roles[id] || createDefaultRole(name);
+    const existing = normalizeRolePack(next.roles[id] || createDefaultRole(name));
     next.roles[id] = {
       ...existing,
       id,
       name: sanitizeName(name),
       avatarAssetId: value._头像资源ID || existing.avatarAssetId || null,
       variables: {
-        core: {
-          ...existing.variables?.core,
-          favor: number(value.好感度, existing.variables?.core?.favor || 0),
-          suspicion: number(value.可疑度, existing.variables?.core?.suspicion || 0),
-          hypnosis: isRecord(value.催眠状态) ? clone(value.催眠状态) : existing.variables?.core?.hypnosis,
-          profile: isRecord(value.人物档案) ? clone(value.人物档案) : existing.variables?.core?.profile,
+        runtime: {
+          ...existing.variables.runtime,
+          hypnosis: isRecord(value.催眠状态) ? clone(value.催眠状态) : existing.variables.runtime.hypnosis,
         },
-        custom: isRecord(value.自定义) ? clone(value.自定义) : existing.variables?.custom || {},
+        compatibility: {
+          ...existing.variables.compatibility,
+          favor: number(value.好感度, existing.variables.compatibility.favor || 0),
+          suspicion: number(value.可疑度, existing.variables.compatibility.suspicion || 0),
+          profile: isRecord(value.人物档案) ? clone(value.人物档案) : existing.variables.compatibility.profile || {},
+        },
+        extensions: isRecord(value.自定义) ? clone(value.自定义) : existing.variables.extensions,
       },
     };
   }
@@ -148,6 +163,7 @@ export function fromLegacyVariables(legacy, current, regionPack) {
   if (Array.isArray(legacy.库存) || isRecord(legacy.库存)) next.inventory = values(legacy.库存);
   if (Array.isArray(legacy.任务) || isRecord(legacy.任务)) next.tasks = values(legacy.任务);
   if (Array.isArray(legacy.成就) || isRecord(legacy.成就)) next.achievements = values(legacy.成就);
+  next.dispatches = next.dispatches.filter((item) => isRecord(item) && Object.values(item).some((itemValue) => String(itemValue ?? '').trim()));
   next.custom.rules = isRecord(legacy.规则) ? clone(legacy.规则) : next.custom.rules;
   next.custom.legacyVariables = clone(legacy);
   return normalizeState(next, regionPack);

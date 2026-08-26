@@ -1,4 +1,5 @@
 import { SCHEMA_IDS } from './constants.js';
+import { normalizeRolePack } from './role-contract.js';
 import { clamp, clone, isRecord } from './utils.js';
 
 export function createDefaultState(regionPack) {
@@ -57,7 +58,10 @@ export function normalizeState(value, regionPack) {
       money: clamp(resources.money ?? base.resources.money, 0, 1_000_000_000_000),
       suspicion: clamp(resources.suspicion ?? base.resources.suspicion, 0, 100),
     },
-    roles: isRecord(source.roles) ? source.roles : {},
+    roles: isRecord(source.roles) ? Object.fromEntries(Object.entries(source.roles).filter(([, role]) => isRecord(role)).map(([id, role]) => {
+      const normalized = normalizeRolePack({ ...role, id: role.id || id });
+      return [normalized.id, normalized];
+    })) : {},
     timetable: Array.isArray(source.timetable) ? source.timetable : base.timetable,
     inventory: Array.isArray(source.inventory) ? source.inventory : [],
     tasks: Array.isArray(source.tasks) ? source.tasks : [],

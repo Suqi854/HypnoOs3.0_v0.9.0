@@ -11,13 +11,9 @@ export function createDefaultRole(name = '目标角色') {
     persona: '',
     avatarAssetId: null,
     variables: {
-      core: {
-        favor: 0,
-        suspicion: 0,
-        hypnosis: { active: [], permanent: [] },
-        profile: {},
-      },
-      custom: {},
+      runtime: { hypnosis: { active: [], permanent: [] } },
+      extensions: {},
+      compatibility: {},
     },
     worldbookFragments: [],
     provenance: { source: 'manual', importedAt: new Date().toISOString() },
@@ -29,6 +25,10 @@ export function normalizeRolePack(input) {
   const name = sanitizeName(input.name || input.data?.name || input.character?.name, '未命名角色');
   const role = createDefaultRole(name);
   const sourceVariables = isRecord(input.variables) ? input.variables : {};
+  const legacyCore = isRecord(sourceVariables.core) ? sourceVariables.core : {};
+  const legacyCompatibility = Object.fromEntries(Object.entries(legacyCore).filter(([key]) => key !== 'hypnosis'));
+  const runtime = isRecord(sourceVariables.runtime) ? clone(sourceVariables.runtime) : {};
+  if (!isRecord(runtime.hypnosis)) runtime.hypnosis = isRecord(legacyCore.hypnosis) ? clone(legacyCore.hypnosis) : role.variables.runtime.hypnosis;
   return {
     ...role,
     ...clone(input),
@@ -39,8 +39,12 @@ export function normalizeRolePack(input) {
     persona: String(input.persona || input.data?.personality || input.personality || ''),
     avatarAssetId: input.avatarAssetId ? String(input.avatarAssetId) : null,
     variables: {
-      core: isRecord(sourceVariables.core) ? sourceVariables.core : role.variables.core,
-      custom: isRecord(sourceVariables.custom) ? sourceVariables.custom : {},
+      runtime,
+      extensions: clone(isRecord(sourceVariables.extensions) ? sourceVariables.extensions : isRecord(sourceVariables.custom) ? sourceVariables.custom : {}),
+      compatibility: {
+        ...clone(legacyCompatibility),
+        ...(isRecord(sourceVariables.compatibility) ? clone(sourceVariables.compatibility) : {}),
+      },
     },
     worldbookFragments: Array.isArray(input.worldbookFragments) ? input.worldbookFragments : [],
     provenance: isRecord(input.provenance) ? input.provenance : role.provenance,

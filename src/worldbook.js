@@ -88,7 +88,7 @@ export async function buildCompanionPreview({ profile, state, adapter, existing 
   const owner = { schema: SCHEMA_IDS.companion, owner: 'hypnoos3', profileId: profile.id, adapterId: adapter?.id || null };
   entries[uid] = entry(uid++, '[HypnoOS]运行合同', ['HypnoOS', '催眠手机'], `当前地区模板：${pack.label}\n日期格式：${pack.dateFormat}\n货币：${pack.currency.label}\n此世界书由催眠手机管理；原世界书不会被修改。`, owner);
   for (const role of Object.values(state.roles || {})) {
-    entries[uid] = entry(uid++, `[HypnoOS]角色：${role.name}`, [role.name], `姓名：${role.name}\n简介：${role.summary || '未填写'}\n人设：${role.persona || '未填写'}\n自定义变量：${JSON.stringify(role.variables?.custom || {})}`, { ...owner, roleId: role.id });
+    entries[uid] = entry(uid++, `[HypnoOS]角色：${role.name}`, [role.name], `姓名：${role.name}\n简介：${role.summary || '未填写'}\n人设：${role.persona || '未填写'}\n自定义变量：${JSON.stringify(role.variables?.extensions || role.variables?.custom || {})}`, { ...owner, roleId: role.id });
     for (const fragment of (Array.isArray(role.worldbookFragments) ? role.worldbookFragments : []).slice(0, 50)) {
       const keys = Array.isArray(fragment.keys) && fragment.keys.length ? fragment.keys.map(String).slice(0, 20) : [role.name];
       entries[uid] = entry(uid++, `[HypnoOS]角色包：${String(fragment.title || role.name).slice(0, 80)}`, keys, inertText(fragment.content), { ...owner, roleId: role.id, fragmentId: String(fragment.id || '') });

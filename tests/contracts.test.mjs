@@ -34,13 +34,36 @@ test('region defaults and legacy round trip preserve core state', () => {
   const region = getRegionPack('jp');
   const state = createDefaultState(region);
   const role = createDefaultRole('テスト');
-  role.variables.core.favor = 42;
+  role.variables.compatibility.favor = 42;
   state.roles[role.id] = role;
   state.resources.money = 1234;
   const next = fromLegacyVariables(toLegacyVariables(state), state, region);
   assert.equal(next.region, 'jp');
   assert.equal(next.resources.money, 1234);
-  assert.equal(next.roles[role.id].variables.core.favor, 42);
+  assert.equal(next.roles[role.id].variables.compatibility.favor, 42);
+});
+
+test('new roles only require runtime data while legacy role variables migrate', () => {
+  const fresh = createDefaultRole('新角色');
+  assert.deepEqual(fresh.variables, {
+    runtime: { hypnosis: { active: [], permanent: [] } },
+    extensions: {},
+    compatibility: {},
+  });
+  const migrated = normalizeRolePack({
+    name: '旧角色',
+    variables: {
+      core: { favor: 12, suspicion: 4, hypnosis: { active: ['测试'], permanent: [] }, profile: { age: 20 } },
+      custom: { affinity: 'blue' },
+    },
+  });
+  assert.equal(migrated.variables.compatibility.favor, 12);
+  assert.equal(migrated.variables.compatibility.suspicion, 4);
+  assert.deepEqual(migrated.variables.compatibility.profile, { age: 20 });
+  assert.deepEqual(migrated.variables.runtime.hypnosis.active, ['测试']);
+  assert.equal(migrated.variables.extensions.affinity, 'blue');
+  assert.equal('core' in migrated.variables, false);
+  assert.equal('custom' in migrated.variables, false);
 });
 
 test('legacy adapter unwraps runtime snapshots and preserves unrelated nested fields', () => {
@@ -55,12 +78,17 @@ test('legacy adapter unwraps runtime snapshots and preserves unrelated nested fi
     系统: { 外部字段: '保留', MC能量: 25 },
     角色: { 甲: { 扩展字段: 9, 好感度: 3 } },
   });
+  const fresh = toLegacyVariables(createDefaultState(getRegionPack('cn')));
+  assert.equal('_警视厅线' in fresh.系统, false);
+  assert.equal('_医院线' in fresh.系统, false);
+  assert.equal('_社畜值' in fresh.系统, false);
+  assert.deepEqual(fresh.系统.派遣岗位, {});
 });
 
 test('contracts normalize custom namespace and operation metadata', () => {
   const role = normalizeRolePack({ name: '<A/B>', variables: { custom: { affinity: 'blue' } }, unknown: { keep: true } });
   assert.equal(role.name, 'A B');
-  assert.equal(role.variables.custom.affinity, 'blue');
+  assert.equal(role.variables.extensions.affinity, 'blue');
   assert.deepEqual(role.unknown, { keep: true });
   const operation = makeOperation({ sourceApp: 'work', command: '去打工', targetPaths: ['work'] });
   assert.equal(operation.schema, 'PendingOperation/v1');

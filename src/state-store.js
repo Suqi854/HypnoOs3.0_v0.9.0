@@ -1,6 +1,6 @@
 import { createDefaultState, fromLegacyVariables, makeOperation, normalizeState, toLegacyVariables } from './contracts.js';
 import { buildHypnosisRulePrompt } from './hypnosis-rules.js';
-import { findLegacyVariables, mergeLegacyVariables } from './legacy-adapter.js';
+import { findLegacyVariables, mergeLegacyVariables, migrateStateCompatibility } from './legacy-adapter.js';
 import { getRegionPack } from './regions.js';
 import { clone, stableStringify } from './utils.js';
 
@@ -29,7 +29,7 @@ export class StateStore extends EventTarget {
       const legacy = snapshots.map((snapshot) => findLegacyVariables(snapshot?.value ?? snapshot)).find(Boolean);
       if (legacy) initial = fromLegacyVariables(legacy, initial, region);
     }
-    this.#state = normalizeState(initial, region);
+    this.#state = normalizeState(migrateStateCompatibility(initial), region);
     await this.#persist(false);
     return this.state;
   }
@@ -38,7 +38,7 @@ export class StateStore extends EventTarget {
     const draft = clone(this.#state);
     const candidate = await mutator(draft);
     const region = getRegionPack(candidate?.region || draft.region || this.#settings.region);
-    const next = normalizeState(candidate || draft, region);
+    const next = normalizeState(migrateStateCompatibility(candidate || draft), region);
     next.revision = this.#state.revision + 1;
     this.#state = next;
     await this.#persist(true, reason);

@@ -5,12 +5,14 @@ import { fileURLToPath } from 'node:url';
 
 const root = new URL('../', import.meta.url);
 const manifest = JSON.parse(await readFile(new URL('manifest.json', root), 'utf8'));
+const packageJson = JSON.parse(await readFile(new URL('package.json', root), 'utf8'));
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
 const removedFeaturePattern = new RegExp(`gal${'game'}|\u4eba\u7269\u6f14\u51fa|\u56fd\u738b\u6e38\u620f`, 'i');
 
 expect(manifest.minimum_client_version === '1.18.0', 'minimum_client_version 必须锁定 1.18.0');
 expect(/^\d+\.\d+\.\d+$/.test(manifest.version), 'manifest 版本不是 SemVer');
+expect(manifest.version === packageJson.version, 'manifest 与 package 版本不一致');
 for (const path of [manifest.js, manifest.css, 'capability-contract.json']) {
   try { await stat(new URL(path, root)); } catch { failures.push(`缺少清单文件：${path}`); }
 }
