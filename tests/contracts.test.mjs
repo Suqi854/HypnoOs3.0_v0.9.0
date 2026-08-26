@@ -1,7 +1,34 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import * as contracts from '../src/contracts.js';
 import { createDefaultRole, createDefaultState, fromLegacyVariables, makeOperation, normalizeRolePack, toLegacyVariables } from '../src/contracts.js';
+import { fromLegacyVariables as fromLegacyVariablesDirect, toLegacyVariables as toLegacyVariablesDirect } from '../src/legacy-adapter.js';
+import { makeOperation as makeOperationDirect } from '../src/operation-contract.js';
+import { normalizeProfile as normalizeProfileDirect } from '../src/profile-contract.js';
 import { getRegionPack } from '../src/regions.js';
+import { createDefaultRole as createDefaultRoleDirect, normalizeRolePack as normalizeRolePackDirect } from '../src/role-contract.js';
+import { createDefaultState as createDefaultStateDirect, normalizeState as normalizeStateDirect } from '../src/state-contract.js';
+
+test('contracts barrel preserves the complete public API', () => {
+  assert.deepEqual(Object.keys(contracts).sort(), [
+    'createDefaultRole',
+    'createDefaultState',
+    'fromLegacyVariables',
+    'makeOperation',
+    'normalizeProfile',
+    'normalizeRolePack',
+    'normalizeState',
+    'toLegacyVariables',
+  ]);
+  assert.strictEqual(contracts.createDefaultRole, createDefaultRoleDirect);
+  assert.strictEqual(contracts.normalizeRolePack, normalizeRolePackDirect);
+  assert.strictEqual(contracts.createDefaultState, createDefaultStateDirect);
+  assert.strictEqual(contracts.normalizeState, normalizeStateDirect);
+  assert.strictEqual(contracts.normalizeProfile, normalizeProfileDirect);
+  assert.strictEqual(contracts.makeOperation, makeOperationDirect);
+  assert.strictEqual(contracts.toLegacyVariables, toLegacyVariablesDirect);
+  assert.strictEqual(contracts.fromLegacyVariables, fromLegacyVariablesDirect);
+});
 
 test('region defaults and legacy round trip preserve core state', () => {
   const region = getRegionPack('jp');
