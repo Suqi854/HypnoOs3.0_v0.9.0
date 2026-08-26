@@ -1,7 +1,8 @@
 import { createDefaultState, fromLegacyVariables, makeOperation, normalizeState, toLegacyVariables } from './contracts.js';
 import { buildHypnosisRulePrompt } from './hypnosis-rules.js';
+import { findLegacyVariables, mergeLegacyVariables } from './legacy-adapter.js';
 import { getRegionPack } from './regions.js';
-import { clone } from './utils.js';
+import { clone, stableStringify } from './utils.js';
 
 export class StateStore extends EventTarget {
   #host;
@@ -22,7 +23,13 @@ export class StateStore extends EventTarget {
     this.#settings = await this.#storage.getSettings();
     const region = getRegionPack(this.#settings.region);
     const saved = this.#host.loadChatState();
-    this.#state = normalizeState(saved || createDefaultState(region), region);
+    let initial = saved || createDefaultState(region);
+    if (!saved && typeof this.#host.readOptionalRuntimeState === 'function') {
+      const snapshots = await this.#host.readOptionalRuntimeState();
+      const legacy = snapshots.map((snapshot) => findLegacyVariables(snapshot?.value ?? snapshot)).find(Boolean);
+      if (legacy) initial = fromLegacyVariables(legacy, initial, region);
+    }
+    this.#state = normalizeState(initial, region);
     await this.#persist(false);
     return this.state;
   }
@@ -75,6 +82,18 @@ export class StateStore extends EventTarget {
   async importLegacyVariables(variables) {
     const pack = getRegionPack(this.#state.region);
     return this.replace(fromLegacyVariables(variables, this.#state, pack), 'legacy-bridge');
+  }
+
+  async syncOptionalRuntimeState(reason = 'runtime-adapter') {
+    if (typeof this.#host.readOptionalRuntimeState !== 'function') return this.state;
+    const snapshots = await this.#host.readOptionalRuntimeState();
+    const legacy = snapshots.map((snapshot) => findLegacyVariables(snapshot?.value ?? snapshot)).find(Boolean);
+    if (!legacy) return this.state;
+    const merged = mergeLegacyVariables(toLegacyVariables(this.#state), legacy);
+    const pack = getRegionPack(this.#state.region);
+    const next = fromLegacyVariables(merged, this.#state, pack);
+    if (stableStringify(toLegacyVariables(next)) === stableStringify(toLegacyVariables(this.#state))) return this.state;
+    return this.replace(next, reason);
   }
 
   async queueOperation(input) {

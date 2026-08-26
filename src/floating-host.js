@@ -1,5 +1,6 @@
 import { toLegacyVariables } from './contracts.js';
 import { HYPNOSIS_RULES_API } from './hypnosis-rules.js';
+import { clone } from './utils.js';
 
 const BRIDGE_KEY = '__HYPNOOS3_CORE_BRIDGE__';
 const SINGLETON_KEY = '__HYPNOOS3_EXTENSION_FLOATING_SINGLETON__';
@@ -7,6 +8,29 @@ const HOST_ID = 'hypnoos3-extension-floating-phone-host';
 
 function phoneFrame() {
   return document.querySelector(`#${HOST_ID}`)?.shadowRoot?.querySelector('iframe.phone') || null;
+}
+
+export function createStateBridge(host, store) {
+  const getVariables = () => toLegacyVariables(store.state);
+  return {
+    getVariables,
+    updateVariablesWith(updater) {
+      const current = getVariables();
+      const draft = clone(current);
+      const candidate = typeof updater === 'function' ? updater(draft) : updater;
+      const next = candidate && typeof candidate === 'object' ? candidate : draft;
+      store.importLegacyVariables(next).catch((error) => console.error('[HypnoOS3] 手机变量写入失败', error));
+      return next;
+    },
+    Mvu: {
+      get events() { return host.getMvuEvents(); },
+      getMvuData() { return { stat_data: getVariables() }; },
+      replaceMvuData(value) {
+        const stat = value?.stat_data && typeof value.stat_data === 'object' ? value.stat_data : value;
+        return store.importLegacyVariables(stat);
+      },
+    },
+  };
 }
 
 export class FloatingHost {
@@ -72,19 +96,10 @@ export class FloatingHost {
     const store = this.store;
     const host = this.host;
     const listeners = this.listeners;
+    const stateBridge = createStateBridge(host, store);
     const bridge = {
-      getVariables(option) {
-        const value = host.readVariables(option);
-        return value && typeof value === 'object' ? value : toLegacyVariables(store.state);
-      },
-      updateVariablesWith(updater) {
-        const external = host.readVariables({ type: 'message', message_id: 'latest' });
-        if (external && typeof external === 'object') return host.updateVariablesWith(updater, { type: 'message', message_id: 'latest' });
-        const current = toLegacyVariables(store.state);
-        const next = typeof updater === 'function' ? updater(structuredClone(current)) : updater;
-        if (next && typeof next === 'object') store.importLegacyVariables(next).catch((error) => console.error('[HypnoOS3] 手机变量写入失败', error));
-        return next || current;
-      },
+      getVariables: stateBridge.getVariables,
+      updateVariablesWith: stateBridge.updateVariablesWith,
       getChatMessages() { return host.getMessages(); },
       setChatMessages() { return false; },
       triggerSlash(command) {
@@ -114,19 +129,7 @@ export class FloatingHost {
       directSend(text) { return host.directSend(text); },
       destroy: () => this.destroy(),
     };
-    bridge.Mvu = {
-      get events() { return host.getMvuEvents(); },
-      getMvuData(option) {
-        const value = host.readMvu(option);
-        return value && typeof value === 'object' ? value : { stat_data: toLegacyVariables(store.state) };
-      },
-      replaceMvuData(value, option) {
-        const external = host.readMvu(option);
-        if (external && typeof external === 'object') return host.replaceMvuData(value, option);
-        const stat = value?.stat_data && typeof value.stat_data === 'object' ? value.stat_data : value;
-        return store.importLegacyVariables(stat);
-      },
-    };
+    bridge.Mvu = stateBridge.Mvu;
     return bridge;
   }
 

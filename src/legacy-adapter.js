@@ -2,6 +2,30 @@ import { createDefaultRole } from './role-contract.js';
 import { normalizeState } from './state-contract.js';
 import { clone, isRecord, makeId, sanitizeName } from './utils.js';
 
+export function findLegacyVariables(value) {
+  const pending = [value];
+  const seen = new Set();
+  while (pending.length) {
+    const current = pending.shift();
+    if (!isRecord(current) || seen.has(current)) continue;
+    seen.add(current);
+    if (isRecord(current.系统) || isRecord(current.角色) || isRecord(current.任务) || isRecord(current.规则)) return current;
+    for (const key of ['stat_data', 'variables', 'mvu']) {
+      if (isRecord(current[key])) pending.push(current[key]);
+    }
+  }
+  return null;
+}
+
+export function mergeLegacyVariables(current, incoming) {
+  if (!isRecord(incoming)) return isRecord(current) ? clone(current) : {};
+  const result = isRecord(current) ? clone(current) : {};
+  for (const [key, value] of Object.entries(incoming)) {
+    result[key] = isRecord(value) ? mergeLegacyVariables(result[key], value) : clone(value);
+  }
+  return result;
+}
+
 export function toLegacyVariables(state) {
   const recordBy = (items, prefix) => Object.fromEntries((Array.isArray(items) ? items : []).map((item, index) => {
     const value = isRecord(item) ? clone(item) : { value: item };
@@ -21,7 +45,7 @@ export function toLegacyVariables(state) {
       _头像资源ID: role.avatarAssetId,
     };
   }
-  return {
+  const projected = {
     系统: {
       MC能量: state.resources.mcEnergy,
       MC能量上限: state.resources.mcEnergyMax,
@@ -56,6 +80,7 @@ export function toLegacyVariables(state) {
     角色: roles,
     任务: recordBy(state.tasks, 'task'),
   };
+  return mergeLegacyVariables(state.custom?.legacyVariables, projected);
 }
 
 export function fromLegacyVariables(legacy, current, regionPack) {
@@ -124,5 +149,6 @@ export function fromLegacyVariables(legacy, current, regionPack) {
   if (Array.isArray(legacy.任务) || isRecord(legacy.任务)) next.tasks = values(legacy.任务);
   if (Array.isArray(legacy.成就) || isRecord(legacy.成就)) next.achievements = values(legacy.成就);
   next.custom.rules = isRecord(legacy.规则) ? clone(legacy.规则) : next.custom.rules;
+  next.custom.legacyVariables = clone(legacy);
   return normalizeState(next, regionPack);
 }

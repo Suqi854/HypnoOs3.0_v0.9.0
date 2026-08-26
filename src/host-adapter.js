@@ -1,4 +1,5 @@
 import { CHAT_STATE_KEY, EXTENSION_ID, PROMPT_ID } from './constants.js';
+import { mergeLegacyVariables } from './legacy-adapter.js';
 import { clone } from './utils.js';
 
 function findContext() {
@@ -308,14 +309,44 @@ export class HostAdapter {
     return runtimeMvu()?.events || {};
   }
 
-  async writeOptionalRuntimeState(legacyVariables, settings) {
-    if (settings.enableTavernHelperBridge && typeof globalThis.updateVariablesWith === 'function') {
-      try { globalThis.updateVariablesWith((vars) => ({ ...vars, ...clone(legacyVariables) }), { type: 'chat' }); } catch (error) { console.warn(`[${EXTENSION_ID}] TH 同步失败`, error); }
-    }
-    if (settings.enableMvuBridge && globalThis.Mvu?.replaceMvuData && globalThis.Mvu?.getMvuData) {
+  installOptionalRuntimeLifecycle(listener) {
+    if (typeof listener !== 'function') return;
+    const notify = () => Promise.resolve().then(listener).catch((error) => console.warn(`[${EXTENSION_ID}] 兼容状态导入失败`, error));
+    const subscribed = new Set();
+    const helper = runtimeFunction('eventOn');
+    const mvuEvents = this.getMvuEvents();
+    for (const key of ['VARIABLE_INITIALIZED', 'VARIABLE_UPDATE_ENDED']) {
+      const eventName = mvuEvents[key];
+      if (!eventName || subscribed.has(eventName) || !helper) continue;
       try {
-        const current = globalThis.Mvu.getMvuData({ type: 'chat' }) || {};
-        await globalThis.Mvu.replaceMvuData({ ...current, stat_data: clone(legacyVariables) }, { type: 'chat' });
+        const subscription = helper.fn.call(helper.view, eventName, notify);
+        subscribed.add(eventName);
+        this.#disposers.push(() => subscription?.stop?.());
+      } catch {}
+    }
+    const context = this.context;
+    for (const key of ['MESSAGE_RECEIVED', 'MESSAGE_UPDATED']) {
+      const eventName = context?.eventTypes?.[key];
+      if (!eventName || subscribed.has(eventName) || !context?.eventSource) continue;
+      context.eventSource.on(eventName, notify);
+      subscribed.add(eventName);
+      this.#disposers.push(() => context.eventSource.removeListener(eventName, notify));
+    }
+  }
+
+  async writeOptionalRuntimeState(legacyVariables, settings) {
+    const helper = runtimeFunction('updateVariablesWith');
+    if (settings.enableTavernHelperBridge && helper) {
+      try {
+        await Promise.resolve(helper.fn.call(helper.view, (vars) => mergeLegacyVariables(vars, legacyVariables), { type: 'chat' }));
+      } catch (error) { console.warn(`[${EXTENSION_ID}] TH 同步失败`, error); }
+    }
+    const mvu = runtimeMvu();
+    if (settings.enableMvuBridge && mvu?.replaceMvuData && mvu?.getMvuData) {
+      try {
+        const current = await Promise.resolve(mvu.getMvuData({ type: 'chat' })) || {};
+        const next = { ...clone(current), stat_data: mergeLegacyVariables(current.stat_data, legacyVariables) };
+        await mvu.replaceMvuData(next, { type: 'chat' });
       } catch (error) { console.warn(`[${EXTENSION_ID}] MVU 同步失败`, error); }
     }
   }

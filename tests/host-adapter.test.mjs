@@ -54,3 +54,63 @@ test('selects the active swipe variable snapshot from SillyTavern message storag
   assert.equal(host.readVariables({ type: 'message', message_id: 'latest' }).stat_data.系统.MC能量, 77);
   delete globalThis.SillyTavern;
 });
+
+test('optional TH and MVU mirrors preserve unrelated nested runtime fields', async () => {
+  const previousDocument = globalThis.document;
+  let th = { 第三方: { keep: true }, 系统: { 外部字段: '保留', MC能量: 1 } };
+  let mvu = { metadata: { keep: true }, stat_data: { 系统: { 外部字段: '保留', MC能量: 2 } } };
+  globalThis.document = { querySelectorAll: () => [] };
+  globalThis.updateVariablesWith = (updater) => { th = updater(th); return th; };
+  globalThis.Mvu = {
+    getMvuData: () => mvu,
+    replaceMvuData: (value) => { mvu = value; return true; },
+  };
+  try {
+    await new HostAdapter().writeOptionalRuntimeState(
+      { 系统: { MC能量: 25 }, 角色: {}, 任务: {}, 规则: {} },
+      { enableTavernHelperBridge: true, enableMvuBridge: true },
+    );
+    assert.deepEqual(th.第三方, { keep: true });
+    assert.equal(th.系统.外部字段, '保留');
+    assert.equal(th.系统.MC能量, 25);
+    assert.deepEqual(mvu.metadata, { keep: true });
+    assert.equal(mvu.stat_data.系统.外部字段, '保留');
+    assert.equal(mvu.stat_data.系统.MC能量, 25);
+  } finally {
+    delete globalThis.updateVariablesWith;
+    delete globalThis.Mvu;
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  }
+});
+
+test('optional runtime lifecycle forwards MVU updates and disposes subscriptions', async () => {
+  const previousDocument = globalThis.document;
+  const listeners = new Map();
+  let stopped = 0;
+  globalThis.document = { querySelectorAll: () => [] };
+  globalThis.eventOn = (name, listener) => {
+    listeners.set(name, listener);
+    return { stop() { stopped += 1; listeners.delete(name); } };
+  };
+  globalThis.Mvu = {
+    events: { VARIABLE_UPDATE_ENDED: 'mvu-update-ended' },
+    getMvuData: () => ({}),
+    replaceMvuData: () => true,
+  };
+  try {
+    let calls = 0;
+    const host = new HostAdapter();
+    host.installOptionalRuntimeLifecycle(() => { calls += 1; });
+    listeners.get('mvu-update-ended')();
+    await Promise.resolve();
+    assert.equal(calls, 1);
+    host.destroy();
+    assert.equal(stopped, 1);
+  } finally {
+    delete globalThis.eventOn;
+    delete globalThis.Mvu;
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  }
+});
