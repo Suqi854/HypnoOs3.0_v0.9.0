@@ -1,5 +1,5 @@
 const SCHEMA = 'HypnosisRules/v1';
-export const DEFAULT_HYPNOSIS_RULESET_VERSION = '4.3.0-hypnoos.2';
+export const DEFAULT_HYPNOSIS_RULESET_VERSION = '4.3.0-hypnoos.3';
 
 const SOURCE = Object.freeze({
   name: '催眠app二改 v4.3（louisHM 完全免费）',
@@ -24,6 +24,7 @@ const COMMANDS = Object.freeze([
   command('vip2_pain_to_pleasure', 'VIP2', '痛觉转化', { unit: 'mc', base: 10, factors: ['persons', 'minutes'] }, 'temporary-role', '把痛觉感知转换成快感，但不删除伤害、风险或身体后果。'),
   command('vip2_emperors_new_clothes', 'VIP2', '皇帝的新衣', { unit: 'mc', base: 10, factors: ['persons', 'minutes'] }, 'temporary-role', '目标没穿衣服时会认知为自己穿着衣服。'),
   command('vip2_new_emperor', 'VIP2', '新衣的皇帝', { unit: 'mc', base: 10, factors: ['persons', 'minutes'] }, 'temporary-role', '目标穿着衣服时会认知为自己没有穿衣服。'),
+  command('vip3_hypnosis_trigger', 'VIP3', '催眠扳机', { unit: 'mc', base: 1000, factors: ['persons'] }, 'permanent-hypnosis-trigger', '这是永久催眠效果。催眠者为每个被催眠者设定一个由特定词组、动作或姿势、特定物品等刺激触发的预设状态；目标无法察觉自身被设定，受到匹配刺激时进入本次填写的扳机效果。设定后无结束时间，直到明确解除。只写/角色/<目标>/效果/催眠扳机/<催眠扳机>，值严格为{催眠者,效果}。'),
   command('vip3_forced', 'VIP3', '强制高潮', { unit: 'mc', base: 100, factors: ['persons'] }, 'temporary-role', '直接触发一次高潮；不能据此扩写为永久人格、服从或持续催眠。'),
   command('vip3_orgasm_ban', 'VIP3', '绝顶禁止', { unit: 'mc', base: 300, factors: ['persons'] }, 'temporary-role', '让目标在效果有效期内无法高潮。'),
   command('vip3_visual_filter', 'VIP3', '幻视滤镜', { unit: 'mc', base: 25, factors: ['persons', 'minutes'] }, 'temporary-role', '让目标在视觉认知上把使用者看作指定对象；只改变视觉认知。'),
@@ -58,6 +59,7 @@ const CORE_RULES = Object.freeze([
   '只有无需目标名单的空间范围型指令才属于范围催眠。封闭空间指令只按单一封闭空间叙事合同生效；开放空间常识修改只写/规则/<规则ID>，绝不写角色临时或永久催眠效果。',
   '结算顺序是条件满足则成功；权限、余额、目标状态、指令强度、世界规则或强剧情阻碍不成立时失败或部分失败。不得为了制造风险无理由失败。失败不扣费、不产生效果，并须体现与侵入性、地点、旁人、关系和警戒度相符的后果。',
   '成功必须原子结算：角色指令的成功正文、实际MC扣除、每个成功目标唯一对应的临时或永久效果必须同轮成立；开放空间指令是成功正文、MC扣除和指定规则路径同轮成立。无法合法写入结果路径时正文必须失败或部分失败，禁止只写成功剧情、心理、好感或服从。',
+  '催眠扳机属于永久催眠效果，设定后无结束时间，只有明确解除或删除才消失。为兼容现有人物档案，每个成功目标只写专用路径/角色/<目标>/效果/催眠扳机/<催眠扳机>，条目值严格为{催眠者,效果}；催眠扳机文本作为动态键并按JSON Pointer转义。不得重复写入永久催眠效果通用表或临时催眠效果，不把目标无法察觉扩写成其他未填写效果。',
   '临时效果动态键必须是2至10字简洁中文语义名，值必须是{效果,结束时间}对象，结束时间逐字采用本轮绝对故事时间YYYY年M月D日 HH:MM；永久效果值必须是{效果}对象且禁止时效字段。禁止用ID、VIP、英文下划线、时间戳或随机数作键；同名并存用可读中文序号。',
   '角色只有两类催眠依据：本轮明确成功的启动/追加催眠，或变量中尚未到期的临时效果/仍存在的永久效果。主动配合、高好感、高服从、人设倾向、地点规则、普通诱导、曾经催眠或打工状态都不能倒推出当前催眠。',
   '有效效果只在自身文本范围内生效。临时效果到期或由前端删除后只保留合理事后反应，不能继续强制；永久效果只有明确解除或删除才消失。新效果优先于冲突旧效果，不冲突者可并存；不得自动改名、合并、延期、永久化、删除或复燃。',
@@ -99,7 +101,7 @@ function validateRuleset(ruleset) {
   if (!String(ruleset.version || '').trim()) throw new Error('催眠规则缺少版本号');
   if (!Array.isArray(ruleset.coreRules) || ruleset.coreRules.length < 20) throw new Error('催眠核心规则不完整');
   if (!Array.isArray(ruleset.parameterRules) || ruleset.parameterRules.length < 6) throw new Error('催眠参数规则不完整');
-  if (!Array.isArray(ruleset.commands) || ruleset.commands.length !== 35) throw new Error('催眠指令必须完整包含35项');
+  if (!Array.isArray(ruleset.commands) || ruleset.commands.length !== 36) throw new Error('催眠指令必须完整包含36项');
   const ids = new Set();
   for (const item of ruleset.commands) {
     if (!item?.id || ids.has(item.id)) throw new Error(`催眠指令ID缺失或重复：${item?.id || '空'}`);
@@ -176,6 +178,7 @@ export function buildHypnosisRulePrompt(version = activeVersion) {
     '<结果分类>',
     '- temporary-role：只写每个成功目标的/角色/<目标>/效果/临时催眠效果，并带合法绝对结束时间。',
     '- permanent-role：只写每个成功目标的/角色/<目标>/效果/永久催眠效果，禁止结束时间。',
+    '- permanent-hypnosis-trigger：属于永久催眠效果，无结束时间；只写每个成功目标的/角色/<目标>/效果/催眠扳机/<催眠扳机>，值严格为{催眠者,效果}，不重复写入永久催眠效果通用表。',
     '- temporary-closed-space：只按单一封闭空间临时叙事合同生效，不扩张为开放空间规则或永久角色效果。',
     '- temporary-open-space-rule：只写本指令指定的/规则/<规则ID>，禁止写角色效果。',
     '</结果分类>',

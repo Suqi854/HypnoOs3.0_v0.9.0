@@ -20,12 +20,14 @@ for (const path of [manifest.js, manifest.css, 'capability-contract.json']) {
 const ui = await readFile(new URL('ui/index.html', root));
 const uiText = ui.toString('utf8');
 const uiHash = createHash('sha256').update(uiText.replace(/\r\n/g, '\n')).digest('hex');
-expect(uiHash === '83ea591ebfe50ab7ab3538cbb2aeadb1f3c52e74d2931211398a37ae005028ed', `UI 基线哈希变化：${uiHash}`);
+expect(uiHash === '21fbab9e091e68071bad791208e40fce991bb3ccec967072d8ea8d534be17cf5', `UI 基线哈希变化：${uiHash}`);
 const hypnosisRulesSource = await readFile(new URL('src/hypnosis-rules.js', root), 'utf8');
 expect(uiText.includes('html,body,#app{width:100%;height:100%;min-height:0;margin:0;overflow:hidden!important;overscroll-behavior:none}#app{contain:strict}'), '手机前端缺少满屏滚动锁');
 expect(uiText.includes('window.__ST_OPEN_PENDING_INPUT_APP__'), '手机前端缺少本轮输入应用入口');
 expect(uiText.includes('玩家本轮输入'), '本轮输入应用没有采用玩家输入合同');
-expect(hypnosisRulesSource.includes("const SCHEMA = 'HypnosisRules/v1'") && hypnosisRulesSource.includes('commands.length !== 35'), '独立核心缺少已移除妊娠功能后的完整35项催眠规则合同');
+expect(hypnosisRulesSource.includes("const SCHEMA = 'HypnosisRules/v1'") && hypnosisRulesSource.includes('commands.length !== 36'), '独立核心缺少新增催眠扳机后的完整36项催眠规则合同');
+expect(hypnosisRulesSource.includes("command('vip3_hypnosis_trigger', 'VIP3', '催眠扳机'") && hypnosisRulesSource.includes("'permanent-hypnosis-trigger'"), '独立核心缺少VIP3永久催眠扳机合同');
+expect(uiText.indexOf('["vip3_hypnosis_trigger","VIP3","催眠扳机"') < uiText.indexOf('["vip3_forced","VIP3","强制高潮"') && uiText.includes('data-hypnosis-trigger-field="triggerEffects"'), '手机前端缺少VIP3首位催眠扳机或四段表单');
 expect(hypnosisRulesSource.includes('buildHypnosisRulePrompt') && hypnosisRulesSource.includes('calculateHypnosisCost') && hypnosisRulesSource.includes('calculateHypnosisBatchCost'), '独立核心缺少催眠规则提示词或单项/批次计费接口');
 expect(hypnosisRulesSource.includes("excludedFeatures: Object.freeze(['vip6_pregnancy_confirmation', 'role.子嗣'])"), '催眠规则合同没有登记妊娠与子嗣功能删除项');
 expect(!uiText.includes('pregnancyButton +') && !uiText.includes('childrenTabHtml +') && !uiText.includes('activeTab === "children"\n          ? renderProfileChildrenPanel'), '妊娠按钮或角色档案子嗣入口仍在运行路径中');

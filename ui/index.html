@@ -9499,6 +9499,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     ["vip2_pain_to_pleasure","VIP2","痛觉转化","将痛觉转换为快感。","PER_MINUTE",10,""],
     ["vip2_emperors_new_clothes","VIP2","皇帝的新衣","没穿衣服时觉得自己穿着衣服。","PER_MINUTE",10,""],
     ["vip2_new_emperor","VIP2","新衣的皇帝","穿着衣服时觉得自己没穿衣服。","PER_MINUTE",10,""],
+    ["vip3_hypnosis_trigger","VIP3","催眠扳机","催眠者可为被催眠者设定词组、动作姿势或物品扳机；目标不会察觉，受到刺激后进入预设状态。","ONE_TIME",1000,""],
     ["vip3_forced","VIP3","强制高潮","直接让被催眠者强制高潮。","ONE_TIME",100,""],
     ["vip3_orgasm_ban","VIP3","绝顶禁止","让目标无法高潮。","ONE_TIME",300,""],
     ["vip3_visual_filter","VIP3","幻视滤镜","让目标将使用者看作其他人。","PER_MINUTE",25,"看作谁"],
@@ -9536,6 +9537,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     vip2_pain_to_pleasure: "痛觉转化为快感；不删除伤害事实。",
     vip2_emperors_new_clothes: "没穿衣服时认知为穿着衣服。",
     vip2_new_emperor: "穿着衣服时认知为没穿衣服。",
+    vip3_hypnosis_trigger: "为每个被催眠者设置一个永久催眠扳机；只写该角色的效果/催眠扳机/<催眠扳机>，值为{催眠者,效果}。目标无法察觉自身被设定，扳机持续存在直到明确解除。",
     vip3_forced: "直接触发一次高潮。",
     vip3_orgasm_ban: "让目标无法高潮；写入对应限制效果。",
     vip3_visual_filter: "目标把使用者看作指定对象；只改视觉认知。",
@@ -11470,7 +11472,16 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     return (Array.isArray(features) ? features : []).some((feature) => hypnosisFeatureUsesPersonCount(feature));
   }
 
+  function hypnosisFeatureRequiresNamedRoles(feature) {
+    return feature?.id === "vip3_hypnosis_trigger";
+  }
+
+  function hypnosisDraftUsesSelectionMode(draft) {
+    return hypnosisSelectionMode(draft) || hypnosisLiteSelectedFeatures(draft).some(hypnosisFeatureRequiresNamedRoles);
+  }
+
   function hypnosisEffectiveDeliveryMode(draft, system = getSystemState(), selectedFeatures = null) {
+    if (Array.isArray(selectedFeatures) && selectedFeatures.some(hypnosisFeatureRequiresNamedRoles)) return "selection";
     const mode = hypnosisDeliveryMode(draft);
     return mode === "selection" ? "selection" : "number";
   }
@@ -11590,7 +11601,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
 
   function hypnosisTemporaryEffectEndTextByMinutes(featureId, durationMinutes) {
     const id = String(featureId || "").trim();
-    if (!id || ST_HYPNOSIS_PERMANENT_EFFECT_IDS.has(id) || ST_HYPNOSIS_NARRATIVE_RANGE_IDS.has(id) || id === "vip5_open_space_common_sense") return "";
+    if (!id || id === "vip3_hypnosis_trigger" || ST_HYPNOSIS_PERMANENT_EFFECT_IDS.has(id) || ST_HYPNOSIS_NARRATIVE_RANGE_IDS.has(id) || id === "vip5_open_space_common_sense") return "";
     const system = getSystemState();
     const parsed = parseStoryDate(systemStoryDateText(system));
     const currentMinutes = minutesFromTimeText(storyTimeOnly(system?.["当前时间"], "00:00"));
@@ -11620,6 +11631,10 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     });
   }
 
+  function hypnosisTriggerVariablePath(roleName, trigger) {
+    return rolePageVariablePath(roleName, "效果", "催眠扳机") + "/" + String(trigger || "").replace(/~/g, "~0").replace(/\//g, "~1");
+  }
+
   function hypnosisFeatureResultContract(feature, roleNames, personCount, effectEndText = "") {
     const id = String(feature?.id || "").trim();
     if (id === "vip5_open_space_common_sense") {
@@ -11640,6 +11655,13 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     const targetShape = names.length
       ? (names.length > 1 ? "多个指定角色逐人结算（不是群体或范围型）" : "单个指定角色")
       : "数字模式不预设姓名；人数=" + Math.max(1, Number(personCount || 1)) + "是成功目标上限。AI只能从本轮催眠执行剧情中明确出现、并实际接受本指令施术的角色里逐人确定目标，不得从变量或世界书中的其他角色任意挑选";
+    if (id === "vip3_hypnosis_trigger") {
+      return {
+        时效: "永久催眠效果；无结束时间，直到明确解除或删除",
+        作用域: targetShape,
+        写入: "仅每个成功目标的/效果/催眠扳机/<催眠扳机>；值严格为{催眠者,效果}，不得重复写入永久催眠效果通用表或临时催眠效果"
+      };
+    }
     if (ST_HYPNOSIS_PERMANENT_EFFECT_IDS.has(id)) {
       return {
         时效: "永久",
@@ -11665,7 +11687,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   }
 
   function hypnosisFeaturePersonCount(feature, draft) {
-    if (hypnosisSelectionMode(draft)) return Math.min(99, hypnosisSelectedRoleNames(feature, draft).length);
+    if (hypnosisDraftUsesSelectionMode(draft)) return Math.min(99, hypnosisSelectedRoleNames(feature, draft).length);
     return hypnosisLiteInt(hypnosisLiteMapValue(draft, "persons", feature.id, "1"), 1, 1, 99);
   }
 
@@ -11674,7 +11696,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   }
 
   function hypnosisFeaturePartCount(feature, draft) {
-    if (hypnosisSelectionMode(draft)) return Math.min(5, hypnosisSelectedPartIds(feature, draft).length);
+    if (hypnosisDraftUsesSelectionMode(draft)) return Math.min(5, hypnosisSelectedPartIds(feature, draft).length);
     return hypnosisLiteInt(hypnosisLiteMapValue(draft, "parts", feature.id, "1"), 1, 1, 5);
   }
 
@@ -11734,7 +11756,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       const options = available.length
         ? available.map((name) => '<label><input type="checkbox" data-hypnosis-select-option="role" data-feature-id="' + escapeAttr(featureId) + '" value="' + escapeAttr(name) + '"' + (selectedSet.has(name) ? " checked" : "") + '><span>' + escapeHtml(name) + '</span></label>').join("")
         : '<em>当前档案和变量里没有可选择角色</em>';
-      return '<div class="st-hypnosis-select"><span>目标角色</span>' +
+      return '<div class="st-hypnosis-select"><span>' + (hypnosisFeatureRequiresNamedRoles(feature) ? "被催眠者" : "目标角色") + '</span>' +
         '<button type="button" class="st-hypnosis-pick-button" data-hypnosis-picker-toggle data-picker-type="role" data-feature-id="' + escapeAttr(featureId) + '" aria-expanded="' + (open ? "true" : "false") + '"><i class="st-hypnosis-pick-plus">+</i><strong>' + escapeHtml(preview) + '</strong><small>' + selected.length + '人</small></button>' +
         (open ? '<div class="st-hypnosis-picker">' + options + '</div>' : '') +
       '</div>';
@@ -11751,8 +11773,20 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   }
 
   function renderHypnosisFeatureParams(feature, draft, page) {
+    if (hypnosisFeatureRequiresNamedRoles(feature)) {
+      const hypnotist = hypnosisLiteInputValue(draft, "triggerHypnotists", feature.id, "{{user}}");
+      const trigger = hypnosisLiteInputValue(draft, "triggerStimuli", feature.id, "");
+      const effect = hypnosisLiteInputValue(draft, "triggerEffects", feature.id, "");
+      const example = '示例：催眠者说出催眠扳机“性奴+名字”后，角色无论处于睡眠还是其他状态会立刻陷入催眠状态，清空自主意识，思想空白，不会有任何情感波动，双目无神，直视前方虚无，面朝催眠者站直身体后自然放松，如同人偶，说出“性爱奴隶+名字+听从主人的命令”，只能对催眠者的命令产生反应。';
+      return '<div class="st-hypnosis-param-grid">' +
+        '<label class="st-hypnosis-param"><span>催眠者</span><input type="text" value="' + escapeAttr(hypnotist) + '" data-hypnosis-trigger-field="triggerHypnotists" data-feature-id="' + escapeAttr(feature.id) + '" placeholder="输入催眠者"></label>' +
+        renderHypnosisChoicePicker(feature, draft, page, "role") +
+      '</div>' +
+      '<textarea data-hypnosis-trigger-field="triggerStimuli" data-feature-id="' + escapeAttr(feature.id) + '" placeholder="催眠扳机：特定词组、动作姿势、特定物品等">' + escapeHtml(trigger) + '</textarea>' +
+      '<textarea data-hypnosis-trigger-field="triggerEffects" data-feature-id="' + escapeAttr(feature.id) + '" placeholder="扳机效果：' + escapeAttr(example) + '">' + escapeHtml(effect) + '</textarea>';
+    }
     const items = [];
-    const selectionMode = hypnosisSelectionMode(draft);
+    const selectionMode = hypnosisDraftUsesSelectionMode(draft);
     if (hypnosisFeatureUsesPersonCount(feature)) {
       items.push(selectionMode
         ? renderHypnosisChoicePicker(feature, draft, page, "role")
@@ -11787,7 +11821,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       '</div>' +
       '<p>' + escapeHtml(feature.description) + '</p>' +
       (active ? renderHypnosisFeatureParams(feature, draft, page) +
-        '<textarea data-hypnosis-feature-note="' + escapeAttr(feature.id) + '" placeholder="' + escapeAttr(feature.placeholder || "补充目标、细节或限制...") + '">' + escapeHtml(notes[feature.id] || "") + '</textarea>' : "") +
+        (hypnosisFeatureRequiresNamedRoles(feature) ? "" : '<textarea data-hypnosis-feature-note="' + escapeAttr(feature.id) + '" placeholder="' + escapeAttr(feature.placeholder || "补充目标、细节或限制...") + '">' + escapeHtml(notes[feature.id] || "") + '</textarea>') : "") +
     '</article>';
   }
 
@@ -11797,6 +11831,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     const tiersOpen = draft.tiersOpen && typeof draft.tiersOpen === "object" ? draft.tiersOpen : {};
     const actionText = liteIslandHypnosisInfo() ? "追加催眠" : "启动催眠";
     const selectedFeatures = hypnosisLiteSelectedFeatures(draft);
+    const requiresNamedRoles = selectedFeatures.some(hypnosisFeatureRequiresNamedRoles);
     const currentRank = reactVipRank(reactCurrentVipTier(system));
     const deliveryMode = hypnosisEffectiveDeliveryMode(draft, system, selectedFeatures);
     const selectionMode = deliveryMode === "selection";
@@ -11825,7 +11860,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     return '<section class="st-lite-card st-graph-paper st-hypnosis-form">' +
       '<div class="st-graph-head"><strong>催眠指令</strong><span>每条指令独立设置参数</span></div>' +
       '<div class="st-hypnosis-mode-row"><span>按钮代表实际行动；声波仅对指定目标命令+100MC。</span><div class="st-hypnosis-mode-buttons">' +
-        '<button type="button" class="' + (deliveryMode === "number" ? "active" : "") + '" data-hypnosis-delivery-mode="number">数字</button>' +
+        '<button type="button" class="' + (deliveryMode === "number" ? "active" : "") + '" data-hypnosis-delivery-mode="number"' + (requiresNamedRoles ? " disabled" : "") + '>数字</button>' +
         '<button type="button" class="' + (selectionMode ? "active" : "") + '" data-hypnosis-delivery-mode="selection">选择</button>' +
         '<button type="button" class="' + (soundwaveWanted ? "active" : "") + '" data-hypnosis-soundwave-toggle' + (soundwaveUnlocked ? "" : " disabled") + '>声波</button>' +
       '</div></div>' +
@@ -12076,6 +12111,16 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
         return { ...draft, notes };
       });
     }));
+    page.querySelectorAll("[data-hypnosis-trigger-field]").forEach((input) => input.addEventListener("input", () => {
+      updateDraft((draft) => {
+        const mapKey = input.getAttribute("data-hypnosis-trigger-field") || "";
+        const featureId = input.getAttribute("data-feature-id") || "";
+        if (!mapKey || !featureId) return draft;
+        const values = { ...(draft[mapKey] || {}) };
+        values[featureId] = String(input.value || "");
+        return { ...draft, [mapKey]: values };
+      });
+    }));
     page.querySelectorAll("[data-hypnosis-feature-person]").forEach((input) => input.addEventListener("input", () => {
       updateDraft((draft) => {
         const persons = { ...(draft.persons || {}) };
@@ -12145,6 +12190,18 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
           return;
         }
       }
+      const triggerFeature = selected.find(hypnosisFeatureRequiresNamedRoles);
+      if (triggerFeature) {
+        const hypnotist = hypnosisLiteInputValue(draft, "triggerHypnotists", triggerFeature.id, "{{user}}").trim();
+        const trigger = hypnosisLiteInputValue(draft, "triggerStimuli", triggerFeature.id, "").trim();
+        const effect = hypnosisLiteInputValue(draft, "triggerEffects", triggerFeature.id, "").trim();
+        const missingTriggerField = !hypnotist ? "催眠者" : !trigger ? "催眠扳机" : !effect ? "扳机效果" : "";
+        if (missingTriggerField) {
+          page.dataset.hypnosisNotice = "请填写催眠扳机的「" + missingTriggerField + "」。";
+          rerenderPreservingScroll();
+          return;
+        }
+      }
       const notes = draft.notes && typeof draft.notes === "object" ? draft.notes : {};
       const soundwaveCost = hypnosisSoundwaveSurcharge(draft, system, selected);
       const totalCost = selected.reduce((sum, feature) => sum + hypnosisLiteFeatureCost(feature, draft), 0) + soundwaveCost;
@@ -12169,6 +12226,18 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
             detail["数字模式禁止扩张"] = "不得选择未在本轮出现、仅存在于变量/世界书、未看屏或未实际接受本指令施术的角色";
           }
         }
+        if (hypnosisFeatureRequiresNamedRoles(feature)) {
+          const roleNames = hypnosisSelectedRoleNames(feature, draft);
+          const hypnotist = hypnosisLiteInputValue(draft, "triggerHypnotists", feature.id, "{{user}}").trim();
+          const trigger = hypnosisLiteInputValue(draft, "triggerStimuli", feature.id, "").trim();
+          const effect = hypnosisLiteInputValue(draft, "triggerEffects", feature.id, "").trim();
+          detail["催眠者"] = hypnotist;
+          detail["被催眠者"] = roleNames.join("、");
+          detail["催眠扳机"] = trigger;
+          detail["扳机效果"] = effect;
+          detail["永久效果"] = "是；无结束时间，直到明确解除或删除";
+          detail["催眠扳机变量路径"] = roleNames.map((roleName) => hypnosisTriggerVariablePath(roleName, trigger));
+        }
         if (hypnosisFeatureUsesPartCount(feature)) {
           const partLabels = hypnosisSelectedPartLabels(feature, draft);
           detail["部位数量"] = hypnosisFeaturePartCount(feature, draft);
@@ -12188,6 +12257,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
 	        detail["效果时效"] = resultContract.时效;
 	        detail["作用域"] = resultContract.作用域;
 	        detail["唯一结果位置"] = resultContract.写入;
+	        if (hypnosisFeatureRequiresNamedRoles(feature)) detail["唯一结果位置"] = detail["催眠扳机变量路径"].join("、") + "；每条值严格为{催眠者,效果}";
 	        if (effectEndText) detail["效果结束时间"] = effectEndText;
         return detail;
       });
@@ -12201,9 +12271,11 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
           : "范围型催眠不需要指定目标或声波，前端已按范围命令暂存。";
       const settlementHint = "按钮已代表{{user}}实际行动：" + actionSceneHint +
         "结算顺序为条件满足->成功；条件不足、越级、强违人格或强剧情阻碍时才失败/部分失败。AI不要生成看屏不足、系统警告或事前劝退；失败和部分失败必须承担警戒、反感、旁人注意、主角可疑度或剧情阻碍等相应后果，不要无代价失败";
-      const hasRoleEffectCommand = commandList.some((item) => !["vip4_closed_space_common_sense", "vip4_closed_space_cognitive_block", "vip5_open_space_common_sense"].includes(String(item?.["指令ID"] || "")));
+      const hasTriggerCommand = commandList.some((item) => item?.["指令ID"] === "vip3_hypnosis_trigger");
+      const hasRoleEffectCommand = commandList.some((item) => !["vip3_hypnosis_trigger", "vip4_closed_space_common_sense", "vip4_closed_space_cognitive_block", "vip5_open_space_common_sense"].includes(String(item?.["指令ID"] || "")));
       const hasLocationRuleCommand = commandList.some((item) => item?.["指令ID"] === "vip5_open_space_common_sense");
       const atomicResults = [];
+      if (hasTriggerCommand) atomicResults.push("催眠扳机成功=同轮扣除实际MC能量+按每人1000MC将永久催眠扳机写入每个成功目标给出的精确路径，且值严格为{催眠者,效果}");
       if (hasRoleEffectCommand) atomicResults.push("角色命令成功=同轮扣除实际MC能量+按中文指令及效果时效写入每个成功目标唯一对应的临时或永久催眠效果");
       if (hasLocationRuleCommand) atomicResults.push("开放空间命令成功=同轮扣除实际MC能量+仅写入本指令给出的/规则/<规则ID>");
       if (!atomicResults.length) atomicResults.push("范围命令按自身指令ID结算，不得伪造角色效果或地点规则");

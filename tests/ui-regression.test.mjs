@@ -98,3 +98,15 @@ test('monitor preserves three gates while consuming generated worldbook location
   assert.ok(!html.includes('工作地点: "私立斋明学园男厕（学校男生很少，平时基本没人）"'));
   assert.ok(html.includes('监控必须生成3至6个彼此不同的地点'));
 });
+
+test('VIP3 hypnosis trigger stays first and uses the permanent four-part contract', () => {
+  const triggerIndex = html.indexOf('["vip3_hypnosis_trigger","VIP3","催眠扳机"');
+  const formerFirstIndex = html.indexOf('["vip3_forced","VIP3","强制高潮"');
+  assert.ok(triggerIndex >= 0 && triggerIndex < formerFirstIndex);
+  assert.ok(html.includes('"ONE_TIME",1000'));
+  for (const marker of ['<span>催眠者</span>', '被催眠者', 'placeholder="催眠扳机：', 'placeholder="扳机效果：']) assert.ok(html.includes(marker), `missing trigger form part: ${marker}`);
+  for (const field of ['triggerHypnotists', 'triggerStimuli', 'triggerEffects']) assert.ok(html.includes(`data-hypnosis-trigger-field="${field}"`));
+  assert.ok(html.includes('永久催眠效果；无结束时间，直到明确解除或删除'));
+  assert.ok(html.includes('hypnosisTriggerVariablePath(roleName, trigger)'));
+  assert.ok(html.includes('性奴+名字'));
+});
