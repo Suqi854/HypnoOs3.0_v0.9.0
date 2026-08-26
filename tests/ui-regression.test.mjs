@@ -102,6 +102,20 @@ test('information app selects six pets and toggles floating or wand storage mode
   assert.ok(floatingHost.includes('hypnoos-pet-wand-container'));
   assert.ok(floatingHost.includes('menu.lastElementChild !== wandPetEntry'));
   assert.ok(floatingHost.includes('launcher.hidden = stored'));
+  assert.ok(floatingHost.includes('label.textContent = "催眠手机"'));
+  assert.ok(floatingHost.includes('fa-mobile-screen-button extensionsMenuExtensionButton'));
+  assert.ok(floatingHost.includes('if (stored && shellOpen) toggleShell(false)'));
+  assert.ok(floatingHost.includes('if (nextName !== "idle" && !petReadyAssets.has(petStateAsset(nextName))) nextName = "idle"'));
+  assert.ok(!floatingHost.includes('nextName !== "held_scared" && !petReadyAssets.has'));
+  assert.ok(!floatingHost.includes('label.textContent = "桌宠 · " + name'));
+});
+
+test('model connector explains SiliconFlow balance failures', () => {
+  assert.ok(html.includes('function normalizeConnectorProviderError(value)'));
+  assert.ok(html.includes('硅基流动账户余额不足，请充值当前 API 密钥所属账户，或更换有余额的 API 密钥。'));
+  assert.ok(html.includes('return prefix + normalizeConnectorProviderError(detail)'));
+  assert.ok(html.includes('"文生文插头代理失败：" + normalizeConnectorProviderError(message)'));
+  assert.ok(html.includes('if (data?.error) throw new Error("文生文插头返回错误：" + normalizeConnectorProviderError'));
 });
 
 test('chaos forum keeps the original surface with bounded model-driven updates', () => {

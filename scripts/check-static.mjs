@@ -20,7 +20,7 @@ for (const path of [manifest.js, manifest.css, 'capability-contract.json']) {
 const ui = await readFile(new URL('ui/index.html', root));
 const uiText = ui.toString('utf8');
 const uiHash = createHash('sha256').update(uiText.replace(/\r\n/g, '\n')).digest('hex');
-expect(uiHash === '06394f58907563c2dded6f22b994547be8bd99d873f9f2f9c955153775156cad', `UI 基线哈希变化：${uiHash}`);
+expect(uiHash === '22f92ac7a2bd72a69de01d070d61c3c7ac0e3ece37a6e265ffc48030d851e049', `UI 基线哈希变化：${uiHash}`);
 const hypnosisRulesSource = await readFile(new URL('src/hypnosis-rules.js', root), 'utf8');
 expect(uiText.includes('html,body,#app{width:100%;height:100%;min-height:0;margin:0;overflow:hidden!important;overscroll-behavior:none}#app{contain:strict}'), '手机前端缺少满屏滚动锁');
 expect(uiText.includes('window.__ST_OPEN_PENDING_INPUT_APP__'), '手机前端缺少本轮输入应用入口');
@@ -109,9 +109,12 @@ expect(floatingHost.includes('config.singletonKey'), '悬浮宿主没有使用�
 expect(floatingHost.includes('var PET_CHARACTER_ORDER = ["miku", "rem", "mai", "umaru", "alisa", "hyakka"]'), '悬浮宿主桌宠顺序或数量不正确');
 expect(floatingHost.includes('hypnoos-pet-wand-container') && floatingHost.includes('menu.lastElementChild !== wandPetEntry'), '收纳桌宠没有固定在魔法棒菜单底部');
 expect(floatingHost.includes('var petDisplayMode = "floating"') && floatingHost.includes('launcher.hidden = stored'), '桌宠悬浮/收纳模式没有持久化切换');
+expect(floatingHost.includes('label.textContent = "催眠手机"') && floatingHost.includes('if (stored && shellOpen) toggleShell(false)'), '收纳模式没有显示催眠手机或关闭已打开的手机');
+expect(floatingHost.includes('if (nextName !== "idle" && !petReadyAssets.has(petStateAsset(nextName))) nextName = "idle"'), '桌宠动作素材未就绪时没有回退到 idle，仍可能出现空白帧');
 for (const id of ['miku', 'rem', 'mai', 'umaru', 'alisa', 'hyakka']) {
   try { await stat(new URL(`public/assets/pet/v5/${id}/${id}-idle-v5.png`, root)); } catch { failures.push(`缺少桌宠素材：${id}`); }
 }
+expect(uiText.includes('normalizeConnectorProviderError') && uiText.includes('硅基流动账户余额不足'), '模型插头没有识别硅基流动余额不足错误');
 const extensionSource = await readFile(new URL('src/extension.js', root), 'utf8');
 expect(!extensionSource.includes('hypnoos3-launcher'), '不得重新引入自制 H 启动器');
 const floatingHostSource = await readFile(new URL('src/floating-host.js', root), 'utf8');

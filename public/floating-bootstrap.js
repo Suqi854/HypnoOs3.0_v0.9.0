@@ -1556,7 +1556,7 @@
       var nextName = String(name || "idle");
       var opts = options || {};
       if (petReducedMotion() && /^(unique_a|unique_b|landing)$/.test(nextName)) nextName = "idle";
-      if (nextName !== "idle" && nextName !== "held_scared" && !petReadyAssets.has(petStateAsset(nextName))) nextName = "idle";
+      if (nextName !== "idle" && !petReadyAssets.has(petStateAsset(nextName))) nextName = "idle";
       clearPetFrameTimer();
       clearPetActivityTimer();
       clearPetMotionFrame();
@@ -1803,14 +1803,9 @@
       var stored = petDisplayMode === "stored";
       wandPetEntry.style.display = stored ? "" : "none";
       var button = wandPetEntry.querySelector("[data-hypnoos-pet-wand]");
-      var preview = wandPetEntry.querySelector("[data-hypnoos-pet-wand-preview]");
       var label = wandPetEntry.querySelector("[data-hypnoos-pet-wand-label]");
-      var name = PET_CHARACTER_NAMES[petCharacterId] || petCharacterId;
-      if (button) button.setAttribute("aria-label", "打开桌宠手机，当前桌宠" + name);
-      if (label) label.textContent = "桌宠 · " + name;
-      if (preview) {
-        preview.style.backgroundImage = "url('" + petAssetUrl(petAssetName("idle", petCharacterId)).replace(/'/g, "%27") + "')";
-      }
+      if (button) button.setAttribute("aria-label", "打开催眠手机");
+      if (label) label.textContent = "催眠手机";
     }
 
     function ensureWandPetEntry() {
@@ -1826,10 +1821,10 @@
         button.dataset.hypnoosPetWand = "";
         button.tabIndex = 0;
         button.setAttribute("role", "button");
-        var preview = hostDocument.createElement("span");
+        var preview = hostDocument.createElement("i");
         preview.dataset.hypnoosPetWandPreview = "";
-        preview.className = "extensionsMenuExtensionButton";
-        preview.style.cssText = "display:inline-block;flex:0 0 24px;width:24px;height:24px;background-repeat:no-repeat;background-position:0 0;background-size:192px 24px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))";
+        preview.className = "fa-solid fa-mobile-screen-button extensionsMenuExtensionButton";
+        preview.setAttribute("aria-hidden", "true");
         var label = hostDocument.createElement("span");
         label.dataset.hypnoosPetWandLabel = "";
         button.append(preview, label);
@@ -1855,6 +1850,7 @@
     function applyPetDisplayMode() {
       var stored = petDisplayMode === "stored";
       ensureWandPetEntry();
+      if (stored && shellOpen) toggleShell(false);
       if (launcher) {
         launcher.hidden = stored;
         launcher.setAttribute("aria-hidden", stored ? "true" : "false");

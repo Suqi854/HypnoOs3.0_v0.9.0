@@ -40847,7 +40847,18 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     let data = null;
     try { data = JSON.parse(raw); } catch {}
     const detail = data?.error?.message || data?.message || raw || ("HTTP " + response.status);
-    return prefix + String(detail).slice(0, 500);
+    return prefix + normalizeConnectorProviderError(detail);
+  }
+
+  function normalizeConnectorProviderError(value) {
+    const detail = String(value || "未知错误").slice(0, 500);
+    if (/balance\s+is\s+insufficient|insufficient\s+(?:account\s+)?balance/i.test(detail)) {
+      return "硅基流动账户余额不足，请充值当前 API 密钥所属账户，或更换有余额的 API 密钥。";
+    }
+    if (/insufficient[_\s-]*(?:quota|credit)|quota\s+(?:has\s+been\s+)?exceeded/i.test(detail)) {
+      return "模型服务额度不足，请检查当前 API 密钥的余额、额度或计费状态。";
+    }
+    return detail;
   }
 
   async function loadIndependentConnectorModels(profile, secret = "") {
@@ -40938,7 +40949,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     try { data = JSON.parse(raw); } catch {}
     if (!response.ok || data?.error) {
       const message = data?.error?.message || data?.message || raw || ("HTTP " + response.status);
-      throw new Error("文生文插头代理失败：" + String(message).slice(0, 500));
+      throw new Error("文生文插头代理失败：" + normalizeConnectorProviderError(message));
     }
     return data;
   }
@@ -41022,6 +41033,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
         });
         if (!response.ok) throw new Error(await connectorErrorMessage(response, "文生文插头返回错误："));
         data = await response.json();
+        if (data?.error) throw new Error("文生文插头返回错误：" + normalizeConnectorProviderError(data.error?.message || data.error));
       }
       const text = independentConnectorTextContent(data);
       if (!String(text || "").trim()) {

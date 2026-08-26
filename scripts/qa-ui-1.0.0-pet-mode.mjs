@@ -13,6 +13,34 @@ const browser = await chromium.launch({
 });
 
 const expectedNames = ['初音未来', '蕾姆', '樱岛麻衣', '土间埋', '爱丽莎', '千杀百花'];
+const expectedPetIds = ['miku', 'rem', 'mai', 'umaru', 'alisa', 'hyakka'];
+
+async function verifyPetSpriteFrames(page) {
+  const failures = await page.evaluate(async (petIds) => {
+    const groups = { idle: 8, 'unique-a': 8, 'unique-b': 8, drag: 8, enter: 8, exit: 8, landing: 12 };
+    const failed = [];
+    for (const petId of petIds) {
+      for (const [group, total] of Object.entries(groups)) {
+        const image = new Image();
+        image.src = `/public/assets/pet/v5/${petId}/${petId}-${group}-v5.png`;
+        try { await image.decode(); } catch { failed.push(`${petId}/${group}:decode`); continue; }
+        const canvas = document.createElement('canvas');
+        canvas.width = total * 96;
+        canvas.height = 96;
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        for (let frame = 0; frame < total; frame += 1) {
+          const alpha = context.getImageData(frame * 96, 0, 96, 96).data;
+          let visible = 0;
+          for (let index = 3; index < alpha.length; index += 4) if (alpha[index] > 10) visible += 1;
+          if (visible < 200) failed.push(`${petId}/${group}:${frame}:${visible}`);
+        }
+      }
+    }
+    return failed;
+  }, expectedPetIds);
+  assert.deepEqual(failures, [], `桌宠存在缺失资源或透明空帧：${failures.join(', ')}`);
+}
 
 async function verify(viewport, label) {
   const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
@@ -20,6 +48,7 @@ async function verify(viewport, label) {
   const errors = [];
   page.on('pageerror', (error) => errors.push(String(error?.stack || error)));
   await page.goto(`http://127.0.0.1:${previewPort}/preview.html`, { waitUntil: 'networkidle' });
+  await verifyPetSpriteFrames(page);
   await page.evaluate(() => {
     const menu = document.createElement('div');
     menu.id = 'extensionsMenu';
@@ -56,7 +85,9 @@ async function verify(viewport, label) {
     return host?.shadowRoot?.querySelector('.launcher')?.hidden === true && entry?.style.display !== 'none';
   });
   assert.equal(await page.evaluate(() => document.querySelector('#extensionsMenu')?.lastElementChild?.id), 'hypnoos-pet-wand-container');
-  assert.match(await page.locator('#hypnoos-pet-wand-container').innerText(), /桌宠 · 蕾姆/);
+  assert.equal(await page.locator('#hypnoos-pet-wand-container').innerText(), '催眠手机');
+  assert.equal(await page.locator('#hypnoos-pet-wand-container .fa-mobile-screen-button').count(), 1);
+  assert.equal(await page.evaluate(() => document.querySelector('#hypnoos3-extension-floating-phone-host')?.shadowRoot?.querySelector('.panel')?.classList.contains('open')), false, '切换收纳模式后手机没有关闭');
   await page.evaluate(() => { document.querySelector('#extensionsMenu').style.display = 'block'; });
   await page.locator('[data-hypnoos-pet-wand]').click();
   assert.equal(await page.evaluate(() => document.querySelector('#hypnoos3-extension-floating-phone-host')?.shadowRoot?.querySelector('.panel')?.classList.contains('open')), true);
