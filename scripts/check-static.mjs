@@ -20,7 +20,7 @@ for (const path of [manifest.js, manifest.css, 'capability-contract.json']) {
 const ui = await readFile(new URL('ui/index.html', root));
 const uiText = ui.toString('utf8');
 const uiHash = createHash('sha256').update(uiText.replace(/\r\n/g, '\n')).digest('hex');
-expect(uiHash === '75690022cf8a9cb26960ce817a09eebb8910c0cdce2e1a1dd4c3d9c816ca186f', `UI 基线哈希变化：${uiHash}`);
+expect(uiHash === '227119fa2f14cbb44dd4e8bce92ec414ed4359a2ea24985f1da914f3292a988c', `UI 基线哈希变化：${uiHash}`);
 const hypnosisRulesSource = await readFile(new URL('src/hypnosis-rules.js', root), 'utf8');
 expect(uiText.includes('html,body,#app{width:100%;height:100%;min-height:0;margin:0;overflow:hidden!important;overscroll-behavior:none}#app{contain:strict}'), '手机前端缺少满屏滚动锁');
 expect(uiText.includes('window.__ST_OPEN_PENDING_INPUT_APP__'), '手机前端缺少本轮输入应用入口');
@@ -65,6 +65,8 @@ expect(uiText.includes('data-settings-worldbook-picker="adaptive"') && uiText.in
 expect(uiText.includes('data-settings-worldbook-picker="profile"') && uiText.includes('data-settings-profile-worldbooks') && uiText.includes('importProfileRolesFromWorldbooks'), '设置缺少下拉多选世界书档案导入');
 expect(uiText.includes('renderSettingsHelpSection(page)') && uiText.includes('data-settings-action="toggle-help"') && uiText.includes('function removeHomeHelpTile()'), '帮助应用没有迁入世界书适配数据下方的折叠按钮');
 expect(uiText.includes('本插件基于二创改编，原作者：Ramiel；二改作者：louisHM；本插件作者SuQi') && !uiText.includes('title: "社区提醒"'), '帮助提醒文案不正确');
+expect(!uiText.includes('ST_HOME_AUTHOR_STATUS') && !uiText.includes('st-home-author-status'), '主页状态栏仍注入Ramiel作者名');
+expect(!uiText.includes('timeText: \\"Ramiel\\"'), 'React主页状态栏仍显示Ramiel');
 expect(uiText.includes('HypnoOS人物档案提取器') && uiText.includes('typeof globalThis.generateRaw === "function"'), '档案导入没有接入模型提取链');
 expect(uiText.includes('data-settings-profile-import-status') && uiText.includes('模型正在分析'), '档案导入缺少就地进度与结果反馈');
 expect(uiText.includes('data-settings-tab="logs"') && uiText.includes('data-settings-log-view') && uiText.includes('ST_DIAGNOSTIC_LOG_LIMIT'), '设置缺少诊断日志标签和有界日志存储');

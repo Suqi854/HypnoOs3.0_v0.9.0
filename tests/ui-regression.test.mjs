@@ -73,6 +73,9 @@ test('help moves below worldbook adaptation data and keeps the requested notice'
   assert.ok(html.includes('function removeHomeHelpTile()'));
   assert.ok(html.includes('body: "本插件基于二创改编，原作者：Ramiel；二改作者：louisHM；本插件作者SuQi"'));
   assert.ok(!html.includes('title: "社区提醒"'));
+  assert.ok(!html.includes('ST_HOME_AUTHOR_STATUS'));
+  assert.ok(!html.includes('st-home-author-status'));
+  assert.ok(!html.includes('timeText: \\"Ramiel\\"'));
 });
 
 test('chaos forum keeps the original surface with bounded model-driven updates', () => {

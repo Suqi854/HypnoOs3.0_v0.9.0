@@ -50,6 +50,7 @@ async function verify(viewport, screenshotName) {
   const frame = page.frames().find((candidate) => candidate !== page.mainFrame());
   assert.ok(frame, '手机 iframe 未加载');
   await frame.waitForFunction(() => document.body?.innerText?.includes('本轮输入'));
+  assert.doesNotMatch(await frame.locator('body').innerText(), /\bRamiel\b/, '主页状态栏仍显示Ramiel');
   await frame.evaluate(() => {
     localStorage.setItem('hypnoos:profile-worldbook-roles:v1:global', JSON.stringify({
       roles: {
