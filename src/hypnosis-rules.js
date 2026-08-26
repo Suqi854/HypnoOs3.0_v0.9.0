@@ -1,5 +1,5 @@
 const SCHEMA = 'HypnosisRules/v1';
-export const DEFAULT_HYPNOSIS_RULESET_VERSION = '4.3.0-hypnoos.3';
+export const DEFAULT_HYPNOSIS_RULESET_VERSION = '4.3.0-hypnoos.4';
 
 const SOURCE = Object.freeze({
   name: '催眠app二改 v4.3（louisHM 完全免费）',
@@ -24,7 +24,7 @@ const COMMANDS = Object.freeze([
   command('vip2_pain_to_pleasure', 'VIP2', '痛觉转化', { unit: 'mc', base: 10, factors: ['persons', 'minutes'] }, 'temporary-role', '把痛觉感知转换成快感，但不删除伤害、风险或身体后果。'),
   command('vip2_emperors_new_clothes', 'VIP2', '皇帝的新衣', { unit: 'mc', base: 10, factors: ['persons', 'minutes'] }, 'temporary-role', '目标没穿衣服时会认知为自己穿着衣服。'),
   command('vip2_new_emperor', 'VIP2', '新衣的皇帝', { unit: 'mc', base: 10, factors: ['persons', 'minutes'] }, 'temporary-role', '目标穿着衣服时会认知为自己没有穿衣服。'),
-  command('vip3_hypnosis_trigger', 'VIP3', '催眠扳机', { unit: 'mc', base: 1000, factors: ['persons'] }, 'permanent-hypnosis-trigger', '这是永久催眠效果。催眠者为每个被催眠者设定一个由特定词组、动作或姿势、特定物品等刺激触发的预设状态；目标无法察觉自身被设定，受到匹配刺激时进入本次填写的扳机效果。设定后无结束时间，直到明确解除。只写/角色/<目标>/效果/催眠扳机/<催眠扳机>，值严格为{催眠者,效果}。'),
+  command('vip3_hypnosis_trigger', 'VIP3', '催眠扳机', { unit: 'mc', base: 1000, factors: ['persons'] }, 'permanent-hypnosis-trigger', '这是永久催眠效果。催眠者可为目标角色植入词组、动作姿势或物品为催眠扳机；目标不会察觉自身被植入催眠扳机，受到催眠扳机的刺激后进入本次填写的预设状态。设定后无结束时间，直到明确解除。只写/角色/<目标>/效果/催眠扳机/<催眠扳机>，值严格为{催眠者,效果}。'),
   command('vip3_forced', 'VIP3', '强制高潮', { unit: 'mc', base: 100, factors: ['persons'] }, 'temporary-role', '直接触发一次高潮；不能据此扩写为永久人格、服从或持续催眠。'),
   command('vip3_orgasm_ban', 'VIP3', '绝顶禁止', { unit: 'mc', base: 300, factors: ['persons'] }, 'temporary-role', '让目标在效果有效期内无法高潮。'),
   command('vip3_visual_filter', 'VIP3', '幻视滤镜', { unit: 'mc', base: 25, factors: ['persons', 'minutes'] }, 'temporary-role', '让目标在视觉认知上把使用者看作指定对象；只改变视觉认知。'),

@@ -41,6 +41,7 @@ test('all v4.3 billing formulas and result categories remain locked', () => {
   const rules = getHypnosisRules();
   assert.equal(rules.commands.filter((item) => item.tier === 'VIP3')[0]?.id, 'vip3_hypnosis_trigger');
   assert.equal(rules.commands.find((item) => item.id === 'vip3_hypnosis_trigger')?.result, 'permanent-hypnosis-trigger');
+  assert.match(rules.commands.find((item) => item.id === 'vip3_hypnosis_trigger')?.rule || '', /目标角色植入.+受到催眠扳机的刺激后进入/);
   assert.deepEqual(rules.commands.filter((item) => item.result === 'permanent-role').map((item) => item.id), ['vip5_permanent', 'vip5_excretion_control', 'vip5_lactation', 'vip5_fetish_implant', 'vip5_permanent_false_memory', 'vip5_permanent_personality']);
   assert.equal(rules.commands.find((item) => item.id === 'vip5_open_space_common_sense').result, 'temporary-open-space-rule');
   assert.equal(rules.commands.some((item) => item.id === 'vip6_pregnancy_confirmation'), false);

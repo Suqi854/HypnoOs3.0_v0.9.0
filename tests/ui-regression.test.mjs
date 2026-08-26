@@ -104,6 +104,7 @@ test('VIP3 hypnosis trigger stays first and uses the permanent four-part contrac
   const formerFirstIndex = html.indexOf('["vip3_forced","VIP3","强制高潮"');
   assert.ok(triggerIndex >= 0 && triggerIndex < formerFirstIndex);
   assert.ok(html.includes('"ONE_TIME",1000'));
+  assert.ok(html.includes('催眠者可为目标角色植入词组、动作姿势或物品为催眠扳机；目标不会察觉，受到催眠扳机的刺激后进入预设状态。'));
   for (const marker of ['<span>催眠者</span>', '<span>目标角色</span>', 'placeholder="催眠者→目标角色→催眠扳机→效果"']) assert.ok(html.includes(marker), `missing trigger form part: ${marker}`);
   for (const field of ['triggerHypnotists', 'triggerStimuli']) assert.ok(html.includes(`data-hypnosis-trigger-field="${field}"`));
   assert.ok(!html.includes('data-hypnosis-trigger-field="triggerEffects"'));
