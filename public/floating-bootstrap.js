@@ -130,9 +130,12 @@
     var suppressLauncherClick = false;
     var petSprite = null;
     var petMenu = null;
+    var wandPetEntry = null;
+    var wandObserver = null;
     var petMenuOpen = false;
     var petMenuLongPressTimer = 0;
     var petCharacterId = "alisa";
+    var petDisplayMode = "floating";
     var petPendingCharacterId = "";
     var petSwitching = false;
     var petImageCache = new Map();
@@ -955,6 +958,10 @@
         mode: selectionMode,
         petCharacterId: petCharacterId,
         petCharacterName: PET_CHARACTER_NAMES[petCharacterId] || petCharacterId,
+        petDisplayMode: petDisplayMode,
+        petCharacters: PET_CHARACTER_ORDER.map(function (id) {
+          return { id: id, name: PET_CHARACTER_NAMES[id] || id };
+        }),
         resources: {
           money: system["持有零花钱"] ?? null,
           starlight: system["星光点"] ?? null,
@@ -1176,9 +1183,10 @@
       var saved = readUiState();
       selectionMode = saved && saved.mode === "manual" ? "manual" : "follow";
       if (saved && saved.selectedId) selectedId = textId(saved.selectedId);
-      if (saved && ["alisa", "hyakka"].indexOf(saved.petCharacterId) >= 0) {
+      if (saved && PET_CHARACTER_ORDER.indexOf(saved.petCharacterId) >= 0) {
         petCharacterId = saved.petCharacterId;
       }
+      petDisplayMode = saved && saved.petDisplayMode === "stored" ? "stored" : "floating";
       return saved;
     }
 
@@ -1193,7 +1201,8 @@
           launcherX: current.launcherX,
           launcherY: current.launcherY,
           scale: current.scale,
-          petCharacterId: petCharacterId
+          petCharacterId: petCharacterId,
+          petDisplayMode: petDisplayMode
         }));
       } catch (_) {}
     }
@@ -1209,7 +1218,8 @@
           launcherX: current.launcherX,
           launcherY: current.launcherY,
           scale: current.scale,
-          petCharacterId: petCharacterId
+          petCharacterId: petCharacterId,
+          petDisplayMode: petDisplayMode
         }));
       } catch (_) {}
     }
@@ -1225,7 +1235,8 @@
           launcherX: Math.round(x),
           launcherY: Math.round(y),
           scale: current.scale,
-          petCharacterId: petCharacterId
+          petCharacterId: petCharacterId,
+          petDisplayMode: petDisplayMode
         }));
       } catch (_) {}
     }
@@ -1241,7 +1252,8 @@
           launcherX: current.launcherX,
           launcherY: current.launcherY,
           scale: normalizedPhoneScale(scale),
-          petCharacterId: petCharacterId
+          petCharacterId: petCharacterId,
+          petDisplayMode: petDisplayMode
         }));
       } catch (_) {}
     }
@@ -1355,8 +1367,12 @@
     var PET_BASE_FACING = 1;
     var PET_RENDER_SIZE = 96;
     var PET_DRAG_GRIP_Y = 5;
-    var PET_CHARACTER_ORDER = ["alisa", "hyakka"];
+    var PET_CHARACTER_ORDER = ["miku", "rem", "mai", "umaru", "alisa", "hyakka"];
     var PET_CHARACTER_NAMES = {
+      miku: "初音未来",
+      rem: "蕾姆",
+      mai: "樱岛麻衣",
+      umaru: "土间埋",
       alisa: "爱丽莎",
       hyakka: "千杀百花"
     };
@@ -1676,13 +1692,12 @@
     function updatePetCharacterButton() {
       if (!petCharacterButton) return;
       var currentName = PET_CHARACTER_NAMES[petCharacterId] || PET_CHARACTER_NAMES.alisa;
-      var nextName = PET_CHARACTER_NAMES[nextPetCharacterId()] || PET_CHARACTER_NAMES.hyakka;
       petCharacterButton.disabled = petSwitching;
-      petCharacterButton.textContent = petSwitching ? "人物切换中…" : "人物 · " + currentName;
-      petCharacterButton.title = petSwitching ? "正在载入桌宠" : "点击切换至" + nextName;
+      petCharacterButton.textContent = petSwitching ? "人物载入中…" : "人物 · " + currentName;
+      petCharacterButton.title = petSwitching ? "正在载入桌宠" : "在信息应用中选择桌宠";
       petCharacterButton.setAttribute("aria-label", petSwitching
-        ? "正在切换桌宠"
-        : "当前桌宠" + currentName + "；点击切换至" + nextName);
+        ? "正在载入桌宠"
+        : "当前桌宠" + currentName + "；打开桌宠选择");
     }
 
     function completePetSwitch() {
@@ -1711,26 +1726,35 @@
       loadPetBackgroundAssets(petCharacterId);
     }
 
-    function switchPetCharacter() {
-      if (petSwitching) return;
-      var next = nextPetCharacterId();
+    function selectPetCharacter(characterId) {
+      var next = textId(characterId);
+      if (PET_CHARACTER_ORDER.indexOf(next) < 0) return Promise.reject(new Error("未知桌宠人物"));
+      if (petSwitching) return Promise.reject(new Error("桌宠人物正在载入"));
+      if (next === petCharacterId) return Promise.resolve(petCharacterId);
       closePetMenu();
       pausePetAutonomy();
       petSwitching = true;
       petPendingCharacterId = next;
       updatePetCharacterButton();
-      Promise.all([
+      return Promise.all([
         loadPetAsset(next, "idle"),
         loadPetAsset(next, "enter"),
         loadPetAsset(next, "landing")
       ]).then(function () {
         completePetSwitch();
+        updateWandPetEntry();
+        return petCharacterId;
       }).catch(function () {
         petSwitching = false;
         petPendingCharacterId = "";
         updatePetCharacterButton();
         resumePetAutonomy();
+        throw new Error("桌宠素材载入失败");
       });
+    }
+
+    function switchPetCharacter() {
+      return selectPetCharacter(nextPetCharacterId());
     }
 
     function clearPetMenuLongPress() {
@@ -1753,12 +1777,8 @@
       if (shellOpen) toggleShell(false);
       pausePetAutonomy();
       commitPetRoamPosition();
-      var switchButton = petMenu.querySelector("[data-pet-action='switch']");
-      if (switchButton) {
-        var next = nextPetCharacterId();
-        switchButton.title = "切换至" + PET_CHARACTER_NAMES[next];
-        switchButton.setAttribute("aria-label", "切换至" + PET_CHARACTER_NAMES[next]);
-      }
+      var chooseButton = petMenu.querySelector("[data-pet-action='choose']");
+      if (chooseButton) chooseButton.setAttribute("aria-label", "选择桌宠人物");
       positionPetMenu();
       petMenuOpen = true;
       petMenu.classList.add("open");
@@ -1778,13 +1798,90 @@
       else if (!launcherDragState && !shellOpen && !petSwitching) resumePetAutonomy();
     }
 
+    function updateWandPetEntry() {
+      if (!wandPetEntry || !wandPetEntry.isConnected) return;
+      var stored = petDisplayMode === "stored";
+      wandPetEntry.style.display = stored ? "" : "none";
+      var button = wandPetEntry.querySelector("[data-hypnoos-pet-wand]");
+      var preview = wandPetEntry.querySelector("[data-hypnoos-pet-wand-preview]");
+      var label = wandPetEntry.querySelector("[data-hypnoos-pet-wand-label]");
+      var name = PET_CHARACTER_NAMES[petCharacterId] || petCharacterId;
+      if (button) button.setAttribute("aria-label", "打开桌宠手机，当前桌宠" + name);
+      if (label) label.textContent = "桌宠 · " + name;
+      if (preview) {
+        preview.style.backgroundImage = "url('" + petAssetUrl(petAssetName("idle", petCharacterId)).replace(/'/g, "%27") + "')";
+      }
+    }
+
+    function ensureWandPetEntry() {
+      var menu = hostDocument.querySelector("#extensionsMenu");
+      if (!menu) return null;
+      var container = hostDocument.getElementById("hypnoos-pet-wand-container");
+      if (!container) {
+        container = hostDocument.createElement("div");
+        container.id = "hypnoos-pet-wand-container";
+        container.className = "extension_container";
+        var button = hostDocument.createElement("div");
+        button.className = "list-group-item flex-container flexGap5";
+        button.dataset.hypnoosPetWand = "";
+        button.tabIndex = 0;
+        button.setAttribute("role", "button");
+        var preview = hostDocument.createElement("span");
+        preview.dataset.hypnoosPetWandPreview = "";
+        preview.className = "extensionsMenuExtensionButton";
+        preview.style.cssText = "display:inline-block;flex:0 0 24px;width:24px;height:24px;background-repeat:no-repeat;background-position:0 0;background-size:192px 24px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))";
+        var label = hostDocument.createElement("span");
+        label.dataset.hypnoosPetWandLabel = "";
+        button.append(preview, label);
+        button.addEventListener("click", function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          menu.style.display = "none";
+          toggleShell(true);
+        });
+        button.addEventListener("keydown", function (event) {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          button.click();
+        });
+        container.appendChild(button);
+      }
+      if (container.parentElement !== menu || menu.lastElementChild !== container) menu.appendChild(container);
+      wandPetEntry = container;
+      updateWandPetEntry();
+      return container;
+    }
+
+    function applyPetDisplayMode() {
+      var stored = petDisplayMode === "stored";
+      ensureWandPetEntry();
+      if (launcher) {
+        launcher.hidden = stored;
+        launcher.setAttribute("aria-hidden", stored ? "true" : "false");
+      }
+      if (stored) {
+        closePetMenu();
+        pausePetAutonomy();
+      } else if (!shellOpen) {
+        resumePetAutonomy();
+      }
+      updateWandPetEntry();
+    }
+
+    function setPetDisplayMode(mode) {
+      petDisplayMode = mode === "stored" ? "stored" : "floating";
+      saveUiState();
+      applyPetDisplayMode();
+      return readInformationSnapshot();
+    }
+
     function shellCss() {
       return [
-        "*{box-sizing:border-box}",
+        "*{box-sizing:border-box}[hidden]{display:none!important}",
         ".launcher{pointer-events:auto;position:fixed;right:22px;bottom:90px;width:96px;height:96px;border:0;padding:0;border-radius:28px;background:transparent;color:#fff;display:block;cursor:grab;touch-action:none;user-select:none;z-index:3;overflow:visible}",
         ".launcher:focus-visible{outline:3px solid rgba(125,211,252,.96);outline-offset:3px}.launcher.dragging{cursor:grabbing}.pet-sprite{position:absolute;inset:0;width:96px;height:96px;background-repeat:no-repeat;image-rendering:auto;filter:drop-shadow(0 7px 5px rgba(2,6,23,.58));transform:translateY(var(--pet-lift,0)) scaleX(var(--pet-facing-scale,1));transform-origin:50% 100%;opacity:0;transition:filter .16s ease}.launcher.pet-ready .pet-sprite{opacity:1}.launcher:hover .pet-sprite,.launcher.active .pet-sprite{filter:drop-shadow(0 8px 5px rgba(30,64,175,.58)) drop-shadow(0 0 5px rgba(125,211,252,.34))}.launcher.dragging .pet-sprite{transition:none;filter:drop-shadow(0 12px 7px rgba(2,6,23,.54))}",
         ".pet-fallback{position:absolute;left:15px;top:15px;width:66px;height:66px;border:1px solid rgba(196,116,255,.7);border-radius:24px;background:linear-gradient(145deg,#58115d,#19142d 62%,#0b1022);box-shadow:0 16px 44px rgba(20,0,35,.48),inset 0 1px rgba(255,255,255,.18);display:grid;place-items:center;transition:opacity .18s ease}.launcher.pet-ready .pet-fallback{opacity:0;pointer-events:none}.pet-fallback svg{width:30px;height:30px}",
-".pet-menu{position:fixed;z-index:4;width:120px;height:56px;pointer-events:none;opacity:0;transform:translateY(8px) scale(.9);transform-origin:50% 100%;transition:opacity .14s ease,transform .14s ease}.pet-menu.open{pointer-events:auto;opacity:1;transform:none}.pet-menu button{position:absolute;top:0;width:56px;height:56px;padding:0;border:1px solid rgba(226,232,240,.7);border-radius:50%;background:linear-gradient(145deg,rgba(30,41,59,.97),rgba(15,23,42,.98));box-shadow:0 8px 22px rgba(2,6,23,.48),inset 0 1px rgba(255,255,255,.14);color:#f8fafc;font:850 11px/1.1 system-ui;cursor:pointer;touch-action:manipulation}.pet-menu button[data-pet-action='switch']{left:0}.pet-menu button[data-pet-action='settings']{left:64px}.pet-menu button:hover,.pet-menu button:focus-visible{border-color:#a5f3fc;background:linear-gradient(145deg,#155e75,#172554);outline:2px solid rgba(165,243,252,.72);outline-offset:2px}",
+".pet-menu{position:fixed;z-index:4;width:120px;height:56px;pointer-events:none;opacity:0;transform:translateY(8px) scale(.9);transform-origin:50% 100%;transition:opacity .14s ease,transform .14s ease}.pet-menu.open{pointer-events:auto;opacity:1;transform:none}.pet-menu button{position:absolute;top:0;width:56px;height:56px;padding:0;border:1px solid rgba(226,232,240,.7);border-radius:50%;background:linear-gradient(145deg,rgba(30,41,59,.97),rgba(15,23,42,.98));box-shadow:0 8px 22px rgba(2,6,23,.48),inset 0 1px rgba(255,255,255,.14);color:#f8fafc;font:850 11px/1.1 system-ui;cursor:pointer;touch-action:manipulation}.pet-menu button[data-pet-action='choose']{left:0}.pet-menu button[data-pet-action='settings']{left:64px}.pet-menu button:hover,.pet-menu button:focus-visible{border-color:#a5f3fc;background:linear-gradient(145deg,#155e75,#172554);outline:2px solid rgba(165,243,252,.72);outline-offset:2px}",
         ".launcher i{position:absolute;z-index:2;right:1px;top:1px;min-width:20px;height:20px;padding:0 5px;border:2px solid rgba(255,255,255,.88);border-radius:10px;background:#f25aa6;color:white;font:800 11px/16px system-ui;text-align:center;box-shadow:0 3px 8px rgba(15,23,42,.46)}@media(prefers-reduced-motion:reduce){.pet-sprite,.pet-fallback{transition:none!important}}",
         ".panel{pointer-events:auto;position:fixed;width:430px;height:812px;border:0;border-radius:38px;background:transparent;box-shadow:none;overflow:visible;z-index:2;display:none;isolation:isolate;--floor-sidecar-width:270px;--phone-scale:1}",
         ".panel.open{display:block}",
@@ -2077,6 +2174,8 @@
         "globalThis.__ST_HYPNOOS_SELECT_INFORMATION_FLOOR__=function(id){return r.selectInformationFloor(id)};" +
         "globalThis.__ST_HYPNOOS_TOGGLE_INFORMATION_MODE__=function(){return r.toggleInformationMode()};" +
         "globalThis.__ST_HYPNOOS_SWITCH_INFORMATION_PET__=function(){return r.switchInformationPet()};" +
+        "globalThis.__ST_HYPNOOS_SELECT_INFORMATION_PET__=function(id){return r.selectInformationPet(id)};" +
+        "globalThis.__ST_HYPNOOS_TOGGLE_INFORMATION_PET_MODE__=function(){return r.toggleInformationPetMode()};" +
         "globalThis.__ST_HYPNOOS_UPDATE_PROFILE_NEIGHBORS__=function(p){return r.updateProfileNeighbors(p)};" +
         "globalThis.__ST_HYPNOOS_UPDATE_PROFILE_POSSESSION__=function(p){return r.updateProfilePossession(p)};" +
         "globalThis.__ST_HYPNOOS_UPDATE_ENCOUNTER_POSSESSION_DECOR__=function(p){return r.updateEncounterPossessionDecor(p)};" +
@@ -2139,12 +2238,20 @@
       shadow = shell.attachShadow({ mode: "open" });
       shadow.innerHTML = "<style>" + shellCss() + "</style>" +
         "<button class='launcher' type='button' aria-label='打开悬浮手机' aria-haspopup='menu' aria-expanded='false'><span class='pet-sprite' aria-hidden='true'></span><span class='pet-fallback' aria-hidden='true'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8'><rect x='6' y='2.5' width='12' height='19' rx='3'/><path d='M10 5h4M11 18.5h2'/></svg></span><i>0</i></button>" +
-"<nav class='pet-menu' role='menu' aria-label='桌宠菜单' aria-hidden='true'><button type='button' role='menuitem' data-pet-action='switch'>切换</button><button type='button' role='menuitem' data-pet-action='settings'>通用</button></nav>" +
+"<nav class='pet-menu' role='menu' aria-label='桌宠菜单' aria-hidden='true'><button type='button' role='menuitem' data-pet-action='choose'>选择</button><button type='button' role='menuitem' data-pet-action='settings'>通用</button></nav>" +
         "<section class='panel' aria-label='HypnoOS 悬浮手机'><aside class='map-extra-chain-host' aria-label='更多地图区域' aria-hidden='true'></aside><aside class='work-lever-host' aria-label='打工滚筒摇杆'><button class='work-lever' type='button' data-work-lever-host aria-label='拉动或点击摇杆切换下一份工作'><span class='work-lever__body'><svg viewBox='0 0 126 150' aria-hidden='true'><defs><linearGradient id='workLeverTube' x1='0' y1='0' x2='1' y2='0'><stop offset='0' stop-color='#aeb8b1'/><stop offset='.42' stop-color='#647169'/><stop offset='.72' stop-color='#303a34'/><stop offset='1' stop-color='#151b17'/></linearGradient><radialGradient id='workLeverKnob' cx='.32' cy='.25' r='.72'><stop offset='0' stop-color='#ffd36b'/><stop offset='.22' stop-color='#df850d'/><stop offset='.68' stop-color='#91340b'/><stop offset='1' stop-color='#431506'/></radialGradient></defs><path class='work-lever__tube-shadow' d='M44 31V101Q44 120 63 120H126'/><path class='work-lever__tube' d='M44 31V101Q44 120 63 120H126'/><path class='work-lever__tube-shine' d='M44 35V99Q44 113 61 113H122'/><circle class='work-lever__knob-ring' cx='44' cy='28' r='33'/><circle class='work-lever__knob-core' cx='44' cy='28' r='27'/></svg></span></button></aside><aside class='hypnosis-judgement-perch' aria-hidden='true'><span class='hypnosis-judgement-figure is-demon'><img class='hypnosis-judgement-figure__rear' alt='' draggable='false' src='" + escapeHtml(String(config.assetBase || "").replace(/\/?$/, "/") + "profile-ui/hypnosis-demon-side-v3.png") + "'><img class='hypnosis-judgement-figure__front' alt='' draggable='false' src='" + escapeHtml(String(config.assetBase || "").replace(/\/?$/, "/") + "profile-ui/hypnosis-demon-side-v3.png") + "'></span><span class='hypnosis-judgement-figure is-angel'><img class='hypnosis-judgement-figure__rear' alt='' draggable='false' src='" + escapeHtml(String(config.assetBase || "").replace(/\/?$/, "/") + "profile-ui/hypnosis-angel-side-v3.png") + "'><img class='hypnosis-judgement-figure__front' alt='' draggable='false' src='" + escapeHtml(String(config.assetBase || "").replace(/\/?$/, "/") + "profile-ui/hypnosis-angel-side-v3.png") + "'></span></aside><aside class='encounter-detail-host' aria-hidden='true'></aside><aside class='profile-neighbor-host' aria-label='相邻人物档案'><button class='profile-neighbor-rail prev' type='button' data-kicker='PREV' data-profile-neighbor='prev'></button><button class='profile-neighbor-rail next' type='button' data-kicker='NEXT' data-profile-neighbor='next'></button></aside><aside class='encounter-possession-decor-host' aria-hidden='true' hidden><img alt='' draggable='false' src='" + escapeHtml(String(config.assetBase || "").replace(/\/?$/, "/") + "profile-ui/profile-possession-top-grip-v1.png") + "'></aside><aside class='profile-possession-host' aria-label='附身控制'><button class='profile-possession-grip' type='button' data-profile-possession-host='' aria-pressed='false'><img alt='' draggable='false' src='" + escapeHtml(String(config.assetBase || "").replace(/\/?$/, "/") + "profile-ui/profile-possession-top-grip-v1.png") + "'></button></aside><div class='phone-wrap'><iframe class='phone' title='HypnoOS 手机前端' scrolling='no'></iframe><div class='variable-format-dialog' role='dialog' aria-modal='true' aria-hidden='true'><section class='variable-format-dialog__card'><strong data-variable-format-title>变量格式检查</strong><p data-variable-format-body></p><div class='variable-format-dialog__actions'><button type='button' data-variable-format-close>关闭</button><button type='button' data-variable-format-repair>清理并补齐</button></div></section></div></div><span class='drag-edge top' data-phone-drag></span><span class='drag-edge right' data-phone-drag></span><span class='drag-edge bottom' data-phone-drag></span><span class='drag-edge left' data-phone-drag></span><span class='drag-grip' data-phone-drag aria-label='拖动手机'></span><span class='resize-corner left' data-phone-resize='left'></span><span class='resize-corner right' data-phone-resize='right'></span><aside class='sidecar'><section class='resource-panel loading' aria-label='当前楼层资源'><div class='resource-row money'><span>零花钱</span><strong data-resource-money>--</strong></div><div class='resource-row starlight'><span>星光点</span><strong data-resource-starlight>--</strong></div><div class='resource-row energy'><span>MC能量</span><strong data-resource-energy>--</strong></div></section><button class='variable-format-toggle' type='button'>变量格式检查</button><span class='readonly'>历史楼层 · 只读；切回当前楼后才能操作</span><button class='pet-character-toggle' type='button'>人物 · 爱丽莎</button><button class='floor-toggle' type='button' aria-expanded='false'>楼层</button><section class='floor-drawer'><span class='floor-title'></span><button class='mode' type='button'>跟随视口</button><select class='select' aria-label='选择变量楼层'></select><span class='badge'></span></section></aside></section>";
       hostDocument.body.appendChild(shell);
       launcher = shadow.querySelector(".launcher");
       petSprite = shadow.querySelector(".pet-sprite");
       petMenu = shadow.querySelector(".pet-menu");
+      ensureWandPetEntry();
+      if (!wandObserver && typeof host.MutationObserver === "function") {
+        wandObserver = new host.MutationObserver(function () {
+          var menu = hostDocument.querySelector("#extensionsMenu");
+          if (!wandPetEntry || !wandPetEntry.isConnected || (menu && menu.lastElementChild !== wandPetEntry)) ensureWandPetEntry();
+        });
+        wandObserver.observe(hostDocument.body, { childList: true, subtree: true });
+      }
       panel = shadow.querySelector(".panel");
       if (panel && !panel.querySelector(".location-rule-radar")) {
         ["rear", "front"].forEach(function (layer) {
@@ -2257,9 +2364,11 @@
 	      petCharacterButton?.addEventListener("click", function (event) {
 	        event.preventDefault();
 	        event.stopPropagation();
-	        switchPetCharacter();
+	        toggleShell(true);
+	        host.setTimeout(function () { phoneApi("__ST_OPEN_INFORMATION_APP__", [], false); }, 0);
 	      });
 	      updatePetCharacterButton();
+      applyPetDisplayMode();
       launcher.addEventListener("click", function (event) {
         event.preventDefault();
         event.stopPropagation();
@@ -2294,8 +2403,11 @@
         event.preventDefault();
         event.stopPropagation();
         var action = button.getAttribute("data-pet-action");
-        if (action === "switch") switchPetCharacter();
-        else if (action === "settings") {
+        if (action === "choose") {
+          closePetMenu();
+          toggleShell(true);
+          host.setTimeout(function () { phoneApi("__ST_OPEN_INFORMATION_APP__", [], false); }, 0);
+        } else if (action === "settings") {
           closePetMenu();
           host.dispatchEvent(new host.CustomEvent("hypnoos3-open-settings"));
         }
@@ -2809,8 +2921,13 @@
         return readInformationSnapshot();
       },
       switchInformationPet: function () {
-        switchPetCharacter();
-        return readInformationSnapshot();
+        return switchPetCharacter().then(readInformationSnapshot);
+      },
+      selectInformationPet: function (id) {
+        return selectPetCharacter(id).then(readInformationSnapshot);
+      },
+      toggleInformationPetMode: function () {
+        return setPetDisplayMode(petDisplayMode === "stored" ? "floating" : "stored");
       },
       phoneApi: phoneApi,
       notifyStages: notifyStages,
@@ -2836,6 +2953,10 @@
         clearPetActivityTimer();
         clearPetMotionFrame();
         clearPetMenuLongPress();
+        try { wandObserver?.disconnect?.(); } catch (_) {}
+        wandObserver = null;
+        try { wandPetEntry?.remove?.(); } catch (_) {}
+        wandPetEntry = null;
         try {
           if (petMotionQuery && petMotionHandler) {
             if (petMotionQuery.removeEventListener) petMotionQuery.removeEventListener("change", petMotionHandler);

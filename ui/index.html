@@ -41439,6 +41439,8 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       .st-information-panel h3{margin:0 0 9px;font-size:14px}.st-information-panel p{margin:7px 0;color:#b9c4d8;font-size:11px;line-height:1.55;white-space:pre-wrap}
       .st-information-resources{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.st-information-resource{min-width:0;border-radius:12px;padding:10px 7px;background:#0a1022;text-align:center}.st-information-resource span{display:block;color:#aeb8cb;font-size:9px}.st-information-resource strong{display:block;margin-top:5px;color:#fff;font:850 13px ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis}.st-information-resource.money{border:1px solid rgba(251,191,36,.35)}.st-information-resource.starlight{border:1px solid rgba(244,114,182,.35)}.st-information-resource.energy{border:1px solid rgba(56,189,248,.35)}
       .st-information-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.st-information-actions button,.st-information-panel select{min-height:40px;border:1px solid rgba(148,163,184,.35);border-radius:11px;background:#17213a;color:#f8fafc;padding:0 10px;font-weight:800}.st-information-actions button.primary{border-color:#5eead4;background:#0f5d65}.st-information-actions button:disabled{opacity:.45}.st-information-panel select{width:100%;margin-top:8px;font-size:11px}
+      .st-information-pet-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(3,44px);gap:8px}.st-information-pet-grid button{min-width:0;height:44px;border:1px solid rgba(148,163,184,.35);border-radius:11px;background:#17213a;color:#f8fafc;padding:0 8px;font-size:11px;font-weight:800;overflow-wrap:anywhere}.st-information-pet-grid button[aria-pressed="true"]{border-color:#5eead4;background:#0f5d65;box-shadow:inset 0 0 0 1px rgba(153,246,228,.24)}.st-information-pet-grid button:focus-visible{outline:2px solid #7dd3fc;outline-offset:2px}
+      .st-information-pet-mode{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px}.st-information-pet-mode p{margin:0}.st-information-pet-mode button{min-height:44px;border:1px solid #5eead4;border-radius:11px;background:#0f5d65;color:#f8fafc;padding:0 12px;font-weight:800;white-space:normal}
       .st-information-floor-meta{display:flex;justify-content:space-between;gap:8px;color:#cbd5e1;font-size:10px}.st-information-status{color:#99f6e4!important}.st-information-status.warn{color:#fde68a!important}
       .st-information-feedback{margin:0;border:1px solid rgba(94,234,212,.5);border-radius:12px;background:rgba(15,93,101,.55);padding:9px 11px;color:#ccfbf1;font-size:11px;font-weight:800;line-height:1.5}.st-information-feedback[data-state="running"]{border-color:rgba(125,211,252,.55);background:rgba(14,63,91,.62);color:#e0f2fe}.st-information-feedback[data-state="error"]{border-color:rgba(251,113,133,.65);background:rgba(127,29,29,.55);color:#ffe4e6}
     `;
@@ -41462,7 +41464,14 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       selectedId: "",
       writable: true,
       mode: "follow",
+      petCharacterId: "alisa",
       petCharacterName: "爱丽莎",
+      petDisplayMode: "floating",
+      petCharacters: [
+        { id: "miku", name: "初音未来" }, { id: "rem", name: "蕾姆" },
+        { id: "mai", name: "樱岛麻衣" }, { id: "umaru", name: "土间埋" },
+        { id: "alisa", name: "爱丽莎" }, { id: "hyakka", name: "千杀百花" }
+      ],
       resources: { money: system["持有零花钱"], starlight: system["星光点"], energy: system["MC能量"] },
       variableReport: window.__ST_HYPNOOS_VARIABLE_FORMAT_REPORT__?.() || null,
       floors: []
@@ -41481,6 +41490,9 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     const floors = Array.isArray(data.floors) ? data.floors : [];
     const feedback = String(page.dataset.informationFeedback || "");
     const feedbackState = String(page.dataset.informationFeedbackState || "success");
+    const petCharacters = Array.isArray(data.petCharacters) && data.petCharacters.length ? data.petCharacters.slice(0, 6) : [];
+    const petChoices = petCharacters.map((item) => '<button type="button" data-information-pet="' + escapeAttr(item.id) + '" aria-pressed="' + (String(item.id) === String(data.petCharacterId) ? "true" : "false") + '">' + escapeHtml(item.name) + '</button>').join("");
+    const petStored = data.petDisplayMode === "stored";
     const floorOptions = floors.map((item) => '<option value="' + escapeAttr(item.id) + '" ' + (String(item.id) === String(data.selectedId) ? "selected" : "") + '>第 ' + escapeHtml(item.floor) + ' 楼 · 滑动' + escapeHtml(item.swipe) + ' · ' + (item.current ? "当前" : "历史") + ' · ' + (item.snapshot ? "有变量" : "无快照") + '</option>').join("");
     page.innerHTML = renderLiteHeader(page, { title: "信息", islandText: "INFO" }) +
       '<main class="st-lite-body">' +
@@ -41491,7 +41503,8 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
           '<div class="st-information-resource energy"><span>MC能量</span><strong>' + escapeHtml(informationValue(data.resources?.energy)) + '</strong></div>' +
         '</div></section>' +
         '<section class="st-information-panel"><h3>变量格式</h3><p class="st-information-status ' + (extra || missing ? "warn" : "") + '">' + escapeHtml(formatText) + '</p><div class="st-information-actions"><button type="button" data-information-action="refresh-format">刷新检查</button><button class="primary" type="button" data-information-action="repair" ' + (!report.hasData || !data.writable || (!extra && !missing) ? "disabled" : "") + '>清理并补齐</button></div></section>' +
-        '<section class="st-information-panel"><h3>桌宠人物</h3><p>当前人物：' + escapeHtml(data.petCharacterName || "爱丽莎") + '</p><div class="st-information-actions"><button class="primary" type="button" data-information-action="pet">切换人物</button></div></section>' +
+        '<section class="st-information-panel"><h3>桌宠人物</h3><div class="st-information-pet-grid" role="group" aria-label="选择桌宠人物">' + petChoices + '</div></section>' +
+        '<section class="st-information-panel st-information-pet-mode"><div><h3>桌宠模式</h3><p>当前：' + (petStored ? "魔法棒收纳" : "悬浮桌宠") + '</p></div><button type="button" data-information-action="pet-mode">切换至' + (petStored ? "悬浮模式" : "收纳模式") + '</button></section>' +
         '<section class="st-information-panel"><h3>变量楼层</h3><div class="st-information-floor-meta"><span>' + (data.mode === "follow" ? "跟随视口" : "手动选楼") + '</span><span>' + (data.writable ? "当前楼 · 可操作" : "历史楼 · 只读") + '</span></div><select data-information-floor ' + (floorOptions ? "" : "disabled") + '>' + (floorOptions || '<option>等待楼层</option>') + '</select><div class="st-information-actions" style="margin-top:8px"><button type="button" data-information-action="mode">' + (data.mode === "follow" ? "改为手动选楼" : "恢复跟随视口") + '</button><button type="button" data-information-action="refresh-floor">刷新</button></div></section>' +
       '</main>';
     bindLiteHeader(page, () => renderInformationPage(page));
@@ -41513,7 +41526,8 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     page.querySelector('[data-information-action="refresh-format"]')?.addEventListener("click", () => runAction("正在刷新变量格式检查…", () => "变量格式检查已刷新。", async () => {}));
     page.querySelector('[data-information-action="refresh-floor"]')?.addEventListener("click", () => runAction("正在刷新变量楼层…", () => "变量楼层已刷新。", async () => {}));
     page.querySelector('[data-information-action="repair"]')?.addEventListener("click", () => runAction("正在清理并补齐变量…", "变量格式已清理并补齐。", () => window.__ST_HYPNOOS_CORRECT_VARIABLE_FORMAT__?.()));
-    page.querySelector('[data-information-action="pet"]')?.addEventListener("click", () => runAction("正在切换桌宠人物…", "桌宠人物已切换。", () => window.__ST_HYPNOOS_SWITCH_INFORMATION_PET__?.()));
+    page.querySelectorAll('[data-information-pet]').forEach((button) => button.addEventListener("click", () => runAction("正在选择桌宠人物…", "桌宠人物已更新。", () => window.__ST_HYPNOOS_SELECT_INFORMATION_PET__?.(button.dataset.informationPet))));
+    page.querySelector('[data-information-action="pet-mode"]')?.addEventListener("click", () => runAction("正在切换桌宠模式…", "桌宠模式已更新。", () => window.__ST_HYPNOOS_TOGGLE_INFORMATION_PET_MODE__?.()));
     page.querySelector('[data-information-action="mode"]')?.addEventListener("click", () => runAction("正在切换楼层模式…", "变量楼层模式已切换。", () => window.__ST_HYPNOOS_TOGGLE_INFORMATION_MODE__?.()));
     page.querySelector('[data-information-floor]')?.addEventListener("change", (event) => runAction("正在切换变量楼层…", "变量楼层已切换。", () => window.__ST_HYPNOOS_SELECT_INFORMATION_FLOOR__?.(event.target.value)));
   }

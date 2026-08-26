@@ -20,7 +20,7 @@ for (const path of [manifest.js, manifest.css, 'capability-contract.json']) {
 const ui = await readFile(new URL('ui/index.html', root));
 const uiText = ui.toString('utf8');
 const uiHash = createHash('sha256').update(uiText.replace(/\r\n/g, '\n')).digest('hex');
-expect(uiHash === '227119fa2f14cbb44dd4e8bce92ec414ed4359a2ea24985f1da914f3292a988c', `UI 基线哈希变化：${uiHash}`);
+expect(uiHash === '06394f58907563c2dded6f22b994547be8bd99d873f9f2f9c955153775156cad', `UI 基线哈希变化：${uiHash}`);
 const hypnosisRulesSource = await readFile(new URL('src/hypnosis-rules.js', root), 'utf8');
 expect(uiText.includes('html,body,#app{width:100%;height:100%;min-height:0;margin:0;overflow:hidden!important;overscroll-behavior:none}#app{contain:strict}'), '手机前端缺少满屏滚动锁');
 expect(uiText.includes('window.__ST_OPEN_PENDING_INPUT_APP__'), '手机前端缺少本轮输入应用入口');
@@ -35,6 +35,9 @@ expect(uiText.includes('window.__ST_SEND_OPERATION_DIRECTLY__'), '本轮输入�
 expect(uiText.includes('window.__ST_OPEN_INFORMATION_APP__'), '手机前端缺少信息应用入口');
 expect(uiText.includes('window.__ST_OPEN_AVATAR_LIBRARY_APP__'), '手机前端缺少头像库应用入口');
 expect(uiText.includes('data-information-action="refresh-format"') && uiText.includes('st-information-feedback'), '信息应用缺少按键反馈');
+expect(uiText.includes('st-information-pet-grid') && uiText.includes('grid-template-rows:repeat(3,44px)') && uiText.includes('__ST_HYPNOOS_SELECT_INFORMATION_PET__'), '信息应用缺少2x3桌宠选择');
+expect(uiText.indexOf('<h3>桌宠人物</h3>') < uiText.indexOf('<h3>桌宠模式</h3>') && uiText.indexOf('<h3>桌宠模式</h3>') < uiText.indexOf('<h3>变量楼层</h3>'), '桌宠模式按钮没有位于桌宠人物与变量楼层之间');
+expect(uiText.includes('__ST_HYPNOOS_TOGGLE_INFORMATION_PET_MODE__') && !uiText.includes('data-information-action="pet">切换人物'), '信息应用仍使用循环切换人物或缺少桌宠模式切换');
 expect(uiText.includes('data-profile-gender-correction'), '人物档案缺少手动性别修正选择框');
 expect(uiText.includes('declaredProfilePhotoSlots') && uiText.includes('roleData.portrait'), '人物档案没有读取头像或立绘兼容字段');
 expect(uiText.includes('normalizeHypnosisTriggerEntries') && uiText.includes('renderHypnosisTriggerPanel(roleData)'), '人物档案缺少催眠扳机数据或效果页展示');
@@ -103,6 +106,12 @@ expect(floatingHost.includes("scrolling='no'"), '手机 iframe 必须关闭文�
 expect(!floatingHost.includes('0 0 0 6px rgba(17,12,30,.72)'), '悬浮宿主仍包含额外 6px 黑色描边');
 expect(!removedFeaturePattern.test(floatingHost), '悬浮宿主不得残留已移除功能的按钮、同步或渲染代码');
 expect(floatingHost.includes('config.singletonKey'), '悬浮宿主没有使用可配置独立单例键');
+expect(floatingHost.includes('var PET_CHARACTER_ORDER = ["miku", "rem", "mai", "umaru", "alisa", "hyakka"]'), '悬浮宿主桌宠顺序或数量不正确');
+expect(floatingHost.includes('hypnoos-pet-wand-container') && floatingHost.includes('menu.lastElementChild !== wandPetEntry'), '收纳桌宠没有固定在魔法棒菜单底部');
+expect(floatingHost.includes('var petDisplayMode = "floating"') && floatingHost.includes('launcher.hidden = stored'), '桌宠悬浮/收纳模式没有持久化切换');
+for (const id of ['miku', 'rem', 'mai', 'umaru', 'alisa', 'hyakka']) {
+  try { await stat(new URL(`public/assets/pet/v5/${id}/${id}-idle-v5.png`, root)); } catch { failures.push(`缺少桌宠素材：${id}`); }
+}
 const extensionSource = await readFile(new URL('src/extension.js', root), 'utf8');
 expect(!extensionSource.includes('hypnoos3-launcher'), '不得重新引入自制 H 启动器');
 const floatingHostSource = await readFile(new URL('src/floating-host.js', root), 'utf8');

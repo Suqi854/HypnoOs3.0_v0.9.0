@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import test from 'node:test';
 
 import { PHONE_APPS } from '../src/apps.js';
 import { getRegionPack } from '../src/regions.js';
 
 const html = await readFile(new URL('../ui/index.html', import.meta.url), 'utf8');
+const floatingHost = await readFile(new URL('../public/floating-bootstrap.js', import.meta.url), 'utf8');
 
 function functionBody(name) {
   const start = html.indexOf(`function ${name}(`);
@@ -76,6 +77,31 @@ test('help moves below worldbook adaptation data and keeps the requested notice'
   assert.ok(!html.includes('ST_HOME_AUTHOR_STATUS'));
   assert.ok(!html.includes('st-home-author-status'));
   assert.ok(!html.includes('timeText: \\"Ramiel\\"'));
+});
+
+test('information app selects six pets and toggles floating or wand storage mode', async () => {
+  const petPanel = html.indexOf('<h3>桌宠人物</h3>');
+  const modePanel = html.indexOf('<h3>桌宠模式</h3>');
+  const floorPanel = html.indexOf('<h3>变量楼层</h3>');
+  assert.ok(petPanel >= 0 && petPanel < modePanel && modePanel < floorPanel, '桌宠模式按钮没有位于桌宠人物与变量楼层之间');
+  assert.ok(html.includes('grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(3,44px)'));
+  assert.ok(html.includes('data-information-pet=') && html.includes('aria-pressed='));
+  assert.ok(html.includes('__ST_HYPNOOS_SELECT_INFORMATION_PET__'));
+  assert.ok(html.includes('__ST_HYPNOOS_TOGGLE_INFORMATION_PET_MODE__'));
+  assert.ok(!html.includes('data-information-action="pet">切换人物'));
+
+  const expected = [
+    ['miku', '初音未来'], ['rem', '蕾姆'], ['mai', '樱岛麻衣'],
+    ['umaru', '土间埋'], ['alisa', '爱丽莎'], ['hyakka', '千杀百花'],
+  ];
+  for (const [id, name] of expected) {
+    assert.ok(floatingHost.includes(`${id}: "${name}"`), `桌宠列表缺少${name}`);
+    await stat(new URL(`../public/assets/pet/v5/${id}/${id}-idle-v5.png`, import.meta.url));
+  }
+  assert.ok(floatingHost.includes('var petDisplayMode = "floating"'));
+  assert.ok(floatingHost.includes('hypnoos-pet-wand-container'));
+  assert.ok(floatingHost.includes('menu.lastElementChild !== wandPetEntry'));
+  assert.ok(floatingHost.includes('launcher.hidden = stored'));
 });
 
 test('chaos forum keeps the original surface with bounded model-driven updates', () => {
