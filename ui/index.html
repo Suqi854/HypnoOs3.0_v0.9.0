@@ -11635,6 +11635,17 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     return rolePageVariablePath(roleName, "效果", "催眠扳机") + "/" + String(trigger || "").replace(/~/g, "~0").replace(/\//g, "~1");
   }
 
+  function parseHypnosisTriggerSpecification(value) {
+    const parts = String(value || "").split("→").map((part) => part.trim()).filter(Boolean);
+    if (parts.length < 4) return { hypnotist: "", target: "", trigger: "", effect: "" };
+    return {
+      hypnotist: parts[0],
+      target: parts[1],
+      trigger: parts[2],
+      effect: parts.slice(3).join("→")
+    };
+  }
+
   function hypnosisFeatureResultContract(feature, roleNames, personCount, effectEndText = "") {
     const id = String(feature?.id || "").trim();
     if (id === "vip5_open_space_common_sense") {
@@ -11756,7 +11767,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       const options = available.length
         ? available.map((name) => '<label><input type="checkbox" data-hypnosis-select-option="role" data-feature-id="' + escapeAttr(featureId) + '" value="' + escapeAttr(name) + '"' + (selectedSet.has(name) ? " checked" : "") + '><span>' + escapeHtml(name) + '</span></label>').join("")
         : '<em>当前档案和变量里没有可选择角色</em>';
-      return '<div class="st-hypnosis-select"><span>' + (hypnosisFeatureRequiresNamedRoles(feature) ? "被催眠者" : "目标角色") + '</span>' +
+      return '<div class="st-hypnosis-select"><span>目标角色</span>' +
         '<button type="button" class="st-hypnosis-pick-button" data-hypnosis-picker-toggle data-picker-type="role" data-feature-id="' + escapeAttr(featureId) + '" aria-expanded="' + (open ? "true" : "false") + '"><i class="st-hypnosis-pick-plus">+</i><strong>' + escapeHtml(preview) + '</strong><small>' + selected.length + '人</small></button>' +
         (open ? '<div class="st-hypnosis-picker">' + options + '</div>' : '') +
       '</div>';
@@ -11776,14 +11787,11 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     if (hypnosisFeatureRequiresNamedRoles(feature)) {
       const hypnotist = hypnosisLiteInputValue(draft, "triggerHypnotists", feature.id, "{{user}}");
       const trigger = hypnosisLiteInputValue(draft, "triggerStimuli", feature.id, "");
-      const effect = hypnosisLiteInputValue(draft, "triggerEffects", feature.id, "");
-      const example = '示例：催眠者说出催眠扳机“性奴+名字”后，角色无论处于睡眠还是其他状态会立刻陷入催眠状态，清空自主意识，思想空白，不会有任何情感波动，双目无神，直视前方虚无，面朝催眠者站直身体后自然放松，如同人偶，说出“性爱奴隶+名字+听从主人的命令”，只能对催眠者的命令产生反应。';
       return '<div class="st-hypnosis-param-grid">' +
         '<label class="st-hypnosis-param"><span>催眠者</span><input type="text" value="' + escapeAttr(hypnotist) + '" data-hypnosis-trigger-field="triggerHypnotists" data-feature-id="' + escapeAttr(feature.id) + '" placeholder="输入催眠者"></label>' +
         renderHypnosisChoicePicker(feature, draft, page, "role") +
       '</div>' +
-      '<textarea data-hypnosis-trigger-field="triggerStimuli" data-feature-id="' + escapeAttr(feature.id) + '" placeholder="催眠扳机：特定词组、动作姿势、特定物品等">' + escapeHtml(trigger) + '</textarea>' +
-      '<textarea data-hypnosis-trigger-field="triggerEffects" data-feature-id="' + escapeAttr(feature.id) + '" placeholder="扳机效果：' + escapeAttr(example) + '">' + escapeHtml(effect) + '</textarea>';
+      '<textarea data-hypnosis-trigger-field="triggerStimuli" data-feature-id="' + escapeAttr(feature.id) + '" placeholder="催眠者→目标角色→催眠扳机→效果">' + escapeHtml(trigger) + '</textarea>';
     }
     const items = [];
     const selectionMode = hypnosisDraftUsesSelectionMode(draft);
@@ -12193,9 +12201,8 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       const triggerFeature = selected.find(hypnosisFeatureRequiresNamedRoles);
       if (triggerFeature) {
         const hypnotist = hypnosisLiteInputValue(draft, "triggerHypnotists", triggerFeature.id, "{{user}}").trim();
-        const trigger = hypnosisLiteInputValue(draft, "triggerStimuli", triggerFeature.id, "").trim();
-        const effect = hypnosisLiteInputValue(draft, "triggerEffects", triggerFeature.id, "").trim();
-        const missingTriggerField = !hypnotist ? "催眠者" : !trigger ? "催眠扳机" : !effect ? "扳机效果" : "";
+        const specification = parseHypnosisTriggerSpecification(hypnosisLiteInputValue(draft, "triggerStimuli", triggerFeature.id, ""));
+        const missingTriggerField = !hypnotist ? "催眠者" : !specification.trigger || !specification.effect ? "催眠者→目标角色→催眠扳机→效果" : "";
         if (missingTriggerField) {
           page.dataset.hypnosisNotice = "请填写催眠扳机的「" + missingTriggerField + "」。";
           rerenderPreservingScroll();
@@ -12229,10 +12236,12 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
         if (hypnosisFeatureRequiresNamedRoles(feature)) {
           const roleNames = hypnosisSelectedRoleNames(feature, draft);
           const hypnotist = hypnosisLiteInputValue(draft, "triggerHypnotists", feature.id, "{{user}}").trim();
-          const trigger = hypnosisLiteInputValue(draft, "triggerStimuli", feature.id, "").trim();
-          const effect = hypnosisLiteInputValue(draft, "triggerEffects", feature.id, "").trim();
+          const specification = parseHypnosisTriggerSpecification(hypnosisLiteInputValue(draft, "triggerStimuli", feature.id, ""));
+          const trigger = specification.trigger;
+          const effect = specification.effect;
           detail["催眠者"] = hypnotist;
           detail["被催眠者"] = roleNames.join("、");
+          detail["用户填写"] = [specification.hypnotist, specification.target, trigger, effect].join("→");
           detail["催眠扳机"] = trigger;
           detail["扳机效果"] = effect;
           detail["永久效果"] = "是；无结束时间，直到明确解除或删除";

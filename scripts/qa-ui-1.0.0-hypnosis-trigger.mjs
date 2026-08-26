@@ -80,15 +80,14 @@ async function verify(viewport, screenshotName) {
     localStorage.removeItem('hypnoos.settings.cheatMode.v1:' + scope);
   });
   assert.equal(await frame.locator('[data-hypnosis-delivery-mode="number"]').isDisabled(), true);
-  for (const label of ['催眠者', '被催眠者']) assert.match(await vip3.innerText(), new RegExp(label));
-  assert.match(await frame.locator('[data-hypnosis-trigger-field="triggerStimuli"]').getAttribute('placeholder'), /^催眠扳机：/);
-  assert.match(await frame.locator('[data-hypnosis-trigger-field="triggerEffects"]').getAttribute('placeholder'), /^扳机效果：/);
+  for (const label of ['催眠者', '目标角色']) assert.match(await vip3.innerText(), new RegExp(label));
+  assert.equal(await frame.locator('[data-hypnosis-trigger-field="triggerStimuli"]').getAttribute('placeholder'), '催眠者→目标角色→催眠扳机→效果');
+  assert.equal(await frame.locator('[data-hypnosis-trigger-field="triggerEffects"]').count(), 0);
 
   await frame.locator('[data-hypnosis-picker-toggle][data-feature-id="vip3_hypnosis_trigger"]').click();
   await frame.locator('[data-hypnosis-select-option="role"][data-feature-id="vip3_hypnosis_trigger"][value="测试甲"]').check();
   await frame.locator('[data-hypnosis-select-option="role"][data-feature-id="vip3_hypnosis_trigger"][value="测试乙"]').check();
-  await frame.locator('[data-hypnosis-trigger-field="triggerStimuli"]').fill('晚安/测试');
-  await frame.locator('[data-hypnosis-trigger-field="triggerEffects"]').fill('立即进入预先设定的安静等待状态');
+  await frame.locator('[data-hypnosis-trigger-field="triggerStimuli"]').fill('{{user}}→测试甲、测试乙→晚安/测试→立即进入预先设定的安静等待状态');
   assert.match(await frame.locator('.st-hypnosis-total').innerText(), /2000 MC/);
   const overflow = await frame.evaluate(() => {
     const body = document.querySelector('.st-hypnosis-lite-app .st-lite-body');
