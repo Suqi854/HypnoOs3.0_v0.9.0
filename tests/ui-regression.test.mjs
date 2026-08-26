@@ -64,3 +64,13 @@ test('fixed special locations cannot replace the selected-worldbook catalog', ()
   assert.ok(!catalog.includes('specialLocationDynamicItems'));
   assert.ok(html.includes('specialLocations: { title: "特殊地点"'));
 });
+
+test('help moves below worldbook adaptation data and keeps the requested notice', () => {
+  const settings = functionBody('renderSettingsPage');
+  assert.ok(settings.indexOf('<h3>世界书适配数据</h3>') < settings.indexOf('renderSettingsHelpSection(page)'));
+  assert.ok(html.includes('data-settings-action="toggle-help"'));
+  assert.ok(html.includes('aria-controls="st-settings-help-content"'));
+  assert.ok(html.includes('function removeHomeHelpTile()'));
+  assert.ok(html.includes('body: "本插件基于二创改编，原作者：Ramiel；二改作者：louisHM；本插件作者SuQi"'));
+  assert.ok(!html.includes('title: "社区提醒"'));
+});

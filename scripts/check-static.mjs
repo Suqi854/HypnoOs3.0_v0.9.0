@@ -20,7 +20,7 @@ for (const path of [manifest.js, manifest.css, 'capability-contract.json']) {
 const ui = await readFile(new URL('ui/index.html', root));
 const uiText = ui.toString('utf8');
 const uiHash = createHash('sha256').update(uiText.replace(/\r\n/g, '\n')).digest('hex');
-expect(uiHash === '3d5c7094670e6b2f94f20bc8cab3e7eb57af74d4432b480cb2cebee49c6eb018', `UI 基线哈希变化：${uiHash}`);
+expect(uiHash === '19e64cebf4668d54dbb5ad1aa6c51de7572085c11b11532085d2dd7b211f1f71', `UI 基线哈希变化：${uiHash}`);
 const hypnosisRulesSource = await readFile(new URL('src/hypnosis-rules.js', root), 'utf8');
 expect(uiText.includes('html,body,#app{width:100%;height:100%;min-height:0;margin:0;overflow:hidden!important;overscroll-behavior:none}#app{contain:strict}'), '手机前端缺少满屏滚动锁');
 expect(uiText.includes('window.__ST_OPEN_PENDING_INPUT_APP__'), '手机前端缺少本轮输入应用入口');
@@ -59,6 +59,8 @@ expect(uiText.includes('openWorkPage(null)') && uiText.includes('activeWorkJobs(
 expect(uiText.includes('openMonitorPage(null)') && uiText.includes('adaptiveRecordsSync("monitor")[0]'), '监控没有保持原UI并接入适配数据');
 expect(uiText.includes('data-settings-worldbook-picker="adaptive"') && uiText.includes('type="checkbox"') && uiText.includes('generateAdaptiveWorldbookProfile(worldbookNames)'), '通用适配没有支持下拉多选世界书合并');
 expect(uiText.includes('data-settings-worldbook-picker="profile"') && uiText.includes('data-settings-profile-worldbooks') && uiText.includes('importProfileRolesFromWorldbooks'), '设置缺少下拉多选世界书档案导入');
+expect(uiText.includes('renderSettingsHelpSection(page)') && uiText.includes('data-settings-action="toggle-help"') && uiText.includes('function removeHomeHelpTile()'), '帮助应用没有迁入世界书适配数据下方的折叠按钮');
+expect(uiText.includes('本插件基于二创改编，原作者：Ramiel；二改作者：louisHM；本插件作者SuQi') && !uiText.includes('title: "社区提醒"'), '帮助提醒文案不正确');
 expect(uiText.includes('HypnoOS人物档案提取器') && uiText.includes('typeof globalThis.generateRaw === "function"'), '档案导入没有接入模型提取链');
 expect(uiText.includes('data-settings-profile-import-status') && uiText.includes('模型正在分析'), '档案导入缺少就地进度与结果反馈');
 expect(uiText.includes('data-settings-tab="logs"') && uiText.includes('data-settings-log-view') && uiText.includes('ST_DIAGNOSTIC_LOG_LIMIT'), '设置缺少诊断日志标签和有界日志存储');

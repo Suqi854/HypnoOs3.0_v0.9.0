@@ -8,7 +8,7 @@ export const UI_BASELINE = Object.freeze({
   upstreamCommit: 'db71f7715f86aa2be0210c1602843c66c2792139',
   artifactSha256: '303ff97170e8117e8b111070907ac67c720e5f508998db4f0560cc9b58126fd4',
   approvedRuntimeVersion: '0.9.0',
-  approvedRuntimeUiSha256: '3d5c7094670e6b2f94f20bc8cab3e7eb57af74d4432b480cb2cebee49c6eb018',
+  approvedRuntimeUiSha256: '19e64cebf4668d54dbb5ad1aa6c51de7572085c11b11532085d2dd7b211f1f71',
 });
 
 export const SCHEMA_IDS = Object.freeze({

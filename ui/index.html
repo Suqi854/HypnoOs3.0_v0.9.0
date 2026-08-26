@@ -4595,6 +4595,9 @@ var __webpack_exports__ = __webpack_require__("./src/催眠APP前端/index.tsx")
 .st-settings-panel{border:1px solid rgba(148,163,184,.16);border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.035));padding:10px;display:grid;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.18)}
 .st-settings-panel h3{margin:0;color:#f8fafc;font-size:15px;line-height:1.25;font-weight:950}
 .st-settings-panel p,.st-settings-list{margin:0;color:rgba(226,232,240,.72);font-size:11px;line-height:1.5}
+.st-settings-help-toggle{width:100%;min-height:44px;border:1px solid rgba(125,211,252,.28);border-radius:9px;background:linear-gradient(135deg,rgba(3,105,161,.72),rgba(15,118,110,.72));color:#fff;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;font:950 13px/1.2 inherit;cursor:pointer;box-shadow:0 8px 18px rgba(14,165,233,.14)}
+.st-settings-help-toggle span{font-size:16px;line-height:1;transition:transform .16s ease}.st-settings-help-toggle[aria-expanded="true"] span{transform:rotate(180deg)}
+.st-settings-help-content{display:grid;gap:8px;padding-top:2px}
 .st-settings-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
 .st-settings-actions.is-three{grid-template-columns:1fr 1fr 1fr}
 .st-settings-actions.is-single{grid-template-columns:1fr}
@@ -39735,7 +39738,8 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
           '<h3>世界书适配数据</h3>' +
           '<p>只清空当前聊天中由“根据世界书自动生成”创建的适配内容；不会修改或删除原世界书，也不会清除中国版、日本版通用模板。</p>' +
           '<div class="st-settings-actions is-single"><button type="button" class="st-settings-button danger" data-settings-action="clear-adaptive-data" ' + (!readAdaptiveGeneratedProfile() ? "disabled" : "") + '>清空数据</button></div>' +
-        '</section>'
+        '</section>' +
+        renderSettingsHelpSection(page)
         )) +
       '</main>';
     const nextBody = page.querySelector(":scope > .st-lite-body");
@@ -39781,6 +39785,11 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     }
     page.querySelector('[data-settings-region]')?.addEventListener("change", (event) => {
       page.dataset.settingsAdaptiveMode = String(event.target.value || "china");
+      renderSettingsPage(page);
+    });
+    page.querySelector('[data-settings-action="toggle-help"]')?.addEventListener("click", (event) => {
+      settingsStopEvent(event);
+      page.dataset.settingsHelpExpanded = page.dataset.settingsHelpExpanded === "true" ? "false" : "true";
       renderSettingsPage(page);
     });
     page.querySelectorAll('[data-settings-worldbook]').forEach((input) => input.addEventListener("change", () => {
@@ -40067,19 +40076,10 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
 
   const ST_HELP_APP_ITEMS = [
     {
-      id: "community-credit",
-      title: "社区提醒",
-      tag: "免费",
-      body: "本卡完全免费且为社区大家共同努力的结果",
-      detail: [
-        { kind: "text", body: "本卡完全免费且为社区大家共同努力的结果" },
-        { kind: "text", body: "原作者：Ramiel；本版本为个人二改与前端重构版。\n本卡作者：louisHM" },
-        { kind: "text", body: "后续 @SDZ_aser 的数据库版本大家也可以期待" },
-        { kind: "list", title: "使用到的各位大佬的世界书", items: ["@orjenrn大佬", "@WangFeng 大佬", "@Akashi Maho 大佬", "@SDZ_aser 大佬", "@白楷 大佬", "@小乔 的世界书"] },
-        { kind: "text", body: "世界书建议：@白楷 @eric @qyqy @YKWIM 等大佬们" },
-        { kind: "text", body: "正则帮助：感谢 @灮岚" },
-        { kind: "text", body: "帮忙测试：@weiaolantei @黑白 @豆腐仙贝 @法拉姆 @E·HERO @mml @哈哈 @YOYO @٩(๑^o^๑)۶ @Prototype System @v @纸小虎 @达尔文是个猩猩 @你是黄金奖杯 @墨玖 @刘培茄 @听雪 @Shadtion @米奇喵喵屋 @mimimi @meiya @ChuiXue_YouYue @🌒PackeTail-V4-Flash-Lite℠🍑 @sb @New_JanZ @烈火 @himi @Nkkkk @Sxwda @朔风 @圣女别回头我是阿不思 等大佬们" }
-      ]
+      id: "notice",
+      title: "提醒",
+      tag: "说明",
+      body: "本插件基于二创改编，原作者：Ramiel；二改作者：louisHM；本插件作者SuQi"
     },
     { title: "催眠APP", tag: "指令", body: "选择催眠命令、补充MC能量、查看VIP买断；启动后会把本轮催眠操作暂存给AI结算。" },
     { title: "人物档案", tag: "角色", body: "查看已记录角色的衣着、信息、状态、敏感度和效果，也能在符合条件时触发少量角色专属操作。" },
@@ -40096,6 +40096,25 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     { title: "信息", tag: "状态", body: "查看零花钱、星光点、MC能量、变量格式、桌宠人物和当前变量楼层。" },
     { title: "设置", tag: "迁移", body: "导出或导入指定前端存储，并检查当前MVU变量是否缺少常用字段。" }
   ];
+
+  function renderHelpCards(expandedId = "") {
+    return ST_HELP_APP_ITEMS.map((item) => (
+      '<article class="st-help-card ' + (item.detail ? "is-expandable " : "") + (expandedId && expandedId === item.id ? "is-expanded" : "") + '" ' + (item.detail ? 'role="button" tabindex="0" data-help-detail-id="' + escapeAttr(item.id || item.title) + '" aria-expanded="' + (expandedId === item.id ? "true" : "false") + '"' : "") + '>' +
+        '<strong>' + escapeHtml(item.title) + '</strong>' +
+        '<span>' + escapeHtml(item.tag) + '</span>' +
+        '<p>' + escapeHtml(item.body) + '</p>' +
+        (item.detail && expandedId === item.id ? renderHelpDetailBlock(item.detail) : "") +
+      '</article>'
+    )).join("");
+  }
+
+  function renderSettingsHelpSection(page) {
+    const expanded = page?.dataset?.settingsHelpExpanded === "true";
+    return '<section class="st-settings-panel st-settings-help-panel">' +
+      '<button type="button" class="st-settings-help-toggle" data-settings-action="toggle-help" aria-expanded="' + (expanded ? "true" : "false") + '" aria-controls="st-settings-help-content"><strong>帮助</strong><span aria-hidden="true">⌄</span></button>' +
+      (expanded ? '<div id="st-settings-help-content" class="st-settings-help-content"><section class="st-help-grid">' + renderHelpCards() + '</section></div>' : "") +
+    '</section>';
+  }
 
   function renderHelpDetailBlock(detail) {
     const rows = Array.isArray(detail) ? detail : [];
@@ -40114,18 +40133,10 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
 
   function renderHelpLitePage(page) {
     const expandedId = String(page.dataset.helpExpandedId || "");
-    const cards = ST_HELP_APP_ITEMS.map((item) => (
-      '<article class="st-help-card ' + (item.detail ? "is-expandable " : "") + (expandedId && expandedId === item.id ? "is-expanded" : "") + '" ' + (item.detail ? 'role="button" tabindex="0" data-help-detail-id="' + escapeAttr(item.id || item.title) + '" aria-expanded="' + (expandedId === item.id ? "true" : "false") + '"' : "") + '>' +
-        '<strong>' + escapeHtml(item.title) + '</strong>' +
-        '<span>' + escapeHtml(item.tag) + '</span>' +
-        '<p>' + escapeHtml(item.body) + '</p>' +
-        (item.detail && expandedId === item.id ? renderHelpDetailBlock(item.detail) : "") +
-      '</article>'
-    )).join("");
     page.innerHTML =
       renderLiteHeader(page, { title: "帮助", html: '<strong>帮助</strong>' }) +
       '<main class="st-lite-body">' +
-        '<section class="st-help-grid">' + cards + '</section>' +
+        '<section class="st-help-grid">' + renderHelpCards(expandedId) + '</section>' +
       '</main>';
     bindLiteHeader(page, () => renderHelpLitePage(page));
     page.querySelector('[data-lite-action="back"]')?.addEventListener("click", () => {
@@ -42264,6 +42275,13 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     }
   }
 
+  function removeHomeHelpTile() {
+    const root = findPhoneRoot(document.body);
+    if (!root || !looksLikePhoneHome(root)) return;
+    const tile = dedupeHomeTilesByText("帮助") || findHomeTileByText("帮助");
+    if (tile) tile.remove();
+  }
+
   function patchPendingInputTile() {
     const root = findPhoneRoot(document.body);
     if (!root || !looksLikePhoneHome(root)) return;
@@ -42506,6 +42524,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     if (root && looksLikePhoneHome(root)) void applyHomeWallpaper(root);
     patchHomeAuthorStatus(root);
     removeHomeOperationConfirm(root);
+    removeHomeHelpTile();
     ensureOperationSidePanel();
     patchInternalCoreAppTiles();
     patchPersonProfileTile();

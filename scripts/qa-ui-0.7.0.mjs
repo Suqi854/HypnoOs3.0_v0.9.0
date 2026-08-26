@@ -115,22 +115,23 @@ async function openPhone(viewport, screenshotPrefix) {
   const compactOrders = await frame.evaluate(() => Array.from(document.querySelectorAll('[data-home-app-id][data-st-home-dock="false"]'))
     .map((node) => Number(node.style.order)).sort((a, b) => a - b));
   assert.deepEqual(compactOrders, compactOrders.map((_, index) => index), '桌面应用排序留下了空位');
+  assert.equal(await frame.locator('[data-home-app-id="help"]').count(), 0, '帮助应用仍占用桌面磁贴');
 
   if (screenshotPrefix.includes('desktop')) {
     const avatarTile = frame.locator('[data-home-app-id="avatar-library"]');
-    const helpTile = frame.locator('[data-home-app-id="help"]');
+    const cameraTile = frame.locator('[data-home-app-id="camera"]');
     const avatarBefore = Number(await avatarTile.evaluate((node) => node.style.order));
-    const helpBefore = Number(await helpTile.evaluate((node) => node.style.order));
+    const cameraBefore = Number(await cameraTile.evaluate((node) => node.style.order));
     const avatarBox = await avatarTile.boundingBox();
-    const helpBox = await helpTile.boundingBox();
-    assert.ok(avatarBox && helpBox, '头像库或帮助应用无法取得拖拽坐标');
+    const cameraBox = await cameraTile.boundingBox();
+    assert.ok(avatarBox && cameraBox, '头像库或照相应用无法取得拖拽坐标');
     await page.mouse.move(avatarBox.x + avatarBox.width / 2, avatarBox.y + avatarBox.height / 2);
     await page.mouse.down();
-    await page.mouse.move(helpBox.x + helpBox.width / 2, helpBox.y + helpBox.height / 2, { steps: 8 });
+    await page.mouse.move(cameraBox.x + cameraBox.width / 2, cameraBox.y + cameraBox.height / 2, { steps: 8 });
     await page.mouse.up();
     await frame.waitForTimeout(520);
-    assert.equal(Number(await avatarTile.evaluate((node) => node.style.order)), helpBefore, '头像库没有参与桌面拖拽排序');
-    assert.equal(Number(await helpTile.evaluate((node) => node.style.order)), avatarBefore, '拖拽目标没有完成位置交换');
+    assert.equal(Number(await avatarTile.evaluate((node) => node.style.order)), cameraBefore, '头像库没有参与桌面拖拽排序');
+    assert.equal(Number(await cameraTile.evaluate((node) => node.style.order)), avatarBefore, '拖拽目标没有完成位置交换');
     assert.equal(await frame.locator('.st-avatar-library-app').count(), 0, '拖拽头像库时误触打开了应用');
   }
 
@@ -193,7 +194,6 @@ async function openPhone(viewport, screenshotPrefix) {
       ['inventory', '.st-inventory-app'],
       ['clock', '.st-clock-app'],
       ['work', '.st-work-app'],
-      ['help', '.st-help-app'],
       ['wallpaper', '.st-wallpaper-app'],
       ['camera', '.st-camera-app'],
     ];
@@ -571,6 +571,11 @@ async function openPhone(viewport, screenshotPrefix) {
   }), { money: 3456, starlight: 12, energy: 66 }, '作弊模式下实际使用催眠指令改写了原始资源');
   await frame.locator('.st-hypnosis-lite-app [data-lite-action="back"]').click();
   await frame.locator('[aria-label="打开设置"]').dispatchEvent('pointerdown', { button: 0, pointerId: 1 });
+  const settingsHelpToggle = frame.locator('[data-settings-action="toggle-help"]');
+  assert.equal(await settingsHelpToggle.getAttribute('aria-expanded'), 'false', '帮助按钮默认没有收起');
+  await settingsHelpToggle.click();
+  assert.equal(await frame.locator('[data-settings-action="toggle-help"]').getAttribute('aria-expanded'), 'true', '帮助按钮点击后没有展开');
+  assert.match(await frame.locator('.st-settings-help-content').innerText(), /本插件基于二创改编，原作者：Ramiel；二改作者：louisHM；本插件作者SuQi/);
   await frame.getByRole('button', { name: '作弊模式开启中' }).click();
   await frame.waitForFunction(() => document.body?.innerText?.includes('作弊模式已关闭'));
   assert.deepEqual(await page.evaluate(() => {
