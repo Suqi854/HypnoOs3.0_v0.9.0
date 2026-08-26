@@ -1,0 +1,66 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import test from 'node:test';
+
+import { PHONE_APPS } from '../src/apps.js';
+import { getRegionPack } from '../src/regions.js';
+
+const html = await readFile(new URL('../ui/index.html', import.meta.url), 'utf8');
+
+function functionBody(name) {
+  const start = html.indexOf(`function ${name}(`);
+  assert.notEqual(start, -1, `missing function ${name}`);
+  const next = html.indexOf('\n  function ', start + 1);
+  return html.slice(start, next < 0 ? html.length : next);
+}
+
+test('critical phone apps remain registered under the existing 4.3 surface', () => {
+  const ids = new Set(PHONE_APPS.map((app) => app.id));
+  for (const id of ['hypnosis', 'profile-female', 'profile-male', 'calendar', 'timetable', 'achievements', 'map', 'work', 'monitor', 'encounter']) {
+    assert.ok(ids.has(id), `missing critical app declaration: ${id}`);
+  }
+});
+
+test('worldbook-backed apps keep their specialized 4.3 routes', () => {
+  for (const route of [
+    'window.__ST_OPEN_LITE_CALENDAR_APP__ = () => openLiteCalendarPage(null)',
+    'window.__ST_OPEN_TIMETABLE_APP__ = () => openTimetablePage(null)',
+    'window.__ST_OPEN_MAP_APP__ = () => openTodoPage(null, "map", "st-map-app", "地图", "", false)',
+    'window.__ST_OPEN_SPECIAL_LOCATION_APP__ = () => openSpecialLocationPage(null)',
+    'window.__ST_OPEN_MONITOR_APP__ = () => openMonitorPage(null)',
+    'window.__ST_OPEN_WORK_APP__ = () => openWorkPage(null)',
+    'window.__ST_OPEN_ENCOUNTER_APP__ = (tab) => openEncounterPage(null, tab)',
+    'window.__ST_OPEN_REWARD_APP__ = () => openRewardPage(null)',
+    'window.__ST_OPEN_HYPNOSIS_LITE_APP__ = () => openHypnosisLitePage()',
+  ]) assert.ok(html.includes(route), `specialized route changed: ${route}`);
+});
+
+test('legacy people are cleared before encounter rendering while imports remain available', () => {
+  const encounter = functionBody('openEncounterPage');
+  assert.ok(encounter.indexOf('await encounterResetLibraryFor070Once()') < encounter.indexOf('renderEncounterPage(page)'));
+  assert.ok(html.includes('data-encounter-action="import-library"'));
+  assert.ok(html.includes('data-encounter-action="import-role-json"'));
+});
+
+test('normal hospitals remain locations but the removed hospital line has no entry route', () => {
+  assert.ok(getRegionPack('cn').locations.some((item) => item.name === '医院'));
+  assert.ok(getRegionPack('jp').locations.some((item) => item.name === '病院'));
+  assert.ok(html.includes('{ id: "general-hospital", label: "综合医院"'));
+  assert.ok(!html.includes('row: 2, enter: "hospital"'));
+  assert.ok(!html.includes('hospital: settingsLineStageValue(ST_HOSPITAL_LINE_KEY)'));
+});
+
+test('bad-record entrances stay removed without deleting legacy migration readers', () => {
+  assert.ok(html.includes('const PERSON_PROFILE_CONFIDENTIAL_TABS = ["sensitivity", "effects", "remodel"]'));
+  assert.ok(!html.includes('data-profile-action="bad-records"'));
+  assert.ok(!html.includes('data-profile-locked-bad-records'));
+  assert.ok(html.includes('function migrateLegacyProfileBadRecordState(page)'));
+});
+
+test('fixed special locations cannot replace the selected-worldbook catalog', () => {
+  const catalog = functionBody('specialLocationCatalog');
+  assert.ok(catalog.includes('adaptiveSpecialLocationItems()'));
+  assert.ok(!catalog.includes('SPECIAL_LOCATION_STATIC_ITEMS'));
+  assert.ok(!catalog.includes('specialLocationDynamicItems'));
+  assert.ok(html.includes('specialLocations: { title: "特殊地点"'));
+});

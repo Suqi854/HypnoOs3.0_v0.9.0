@@ -39036,7 +39036,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     const logs = readDiagnosticLogs();
     return '<section class="st-settings-panel st-settings-log-panel">' +
       '<h3>运行日志</h3><p>用于排查世界书读取、模型调用、档案导入及运行异常。日志仅保存在当前浏览器，最多保留 ' + ST_DIAGNOSTIC_LOG_LIMIT + ' 条；密钥、令牌和敏感请求头会自动隐藏，提示词与世界书正文不会写入。</p>' +
-      '<div class="st-settings-log-meta"><span>当前 ' + logs.length + ' 条</span><span>HypnoOS 0.7.7</span></div>' +
+      '<div class="st-settings-log-meta"><span>当前 ' + logs.length + ' 条</span><span>HypnoOS 0.8.3</span></div>' +
       '<div class="st-settings-actions is-three"><button type="button" class="st-settings-button" data-settings-log-action="copy">复制日志</button><button type="button" class="st-settings-button" data-settings-log-action="download">下载日志</button><button type="button" class="st-settings-button danger" data-settings-log-action="clear" ' + (!logs.length ? "disabled" : "") + '>清空日志</button></div>' +
       '<pre class="st-settings-log-view" data-settings-log-view tabindex="0">' + escapeHtml(diagnosticLogText()) + '</pre>' +
       '</section>';
