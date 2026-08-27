@@ -177,18 +177,23 @@ test('hypnosis and MC recharge quotes use the canonical rule bridge', () => {
   assert.ok(floatingCore.includes('calculateMcEnergyRecharge(options)'));
 });
 
-test('profile removal directly clears runtime and cached profile data', () => {
+test('profile removal clears only phone-side profile data and hides the whole dossier', () => {
   const remove = functionBody('deleteProfileRoleData');
   assert.ok(remove.includes('ST_LOCKED_PROFILE_ROLES.has(name)'));
-  assert.ok(remove.includes('delete nextStat["角色"][name]'));
-  assert.ok(remove.includes('encounterReplaceMvuData({ ...data, mvu: nextMvu, stat: nextStat })'));
+  assert.ok(!remove.includes('encounterCurrentMvuData'));
+  assert.ok(!remove.includes('encounterReplaceMvuData'));
+  assert.ok(!remove.includes('requireWritablePhoneFloor'));
   assert.ok(remove.includes('removeImportedProfileWorldbookRole(name)'));
   assert.ok(remove.includes('dismissProfileRoleName(name)'));
   assert.ok(remove.includes('removeFavoriteRoleName(name)'));
   assert.ok(remove.includes('profileClearLocalPhotoSlots(name)'));
   assert.ok(!remove.includes('appendAppOperation'));
+  const roles = functionBody('getStatsRoles');
+  assert.ok(roles.includes('const visibleRoles = { ...importedRoles, ...adaptiveWorldbookRoleCache, ...mvuRoles }'));
+  assert.ok(roles.includes('delete visibleRoles[name]'));
   assert.ok(html.includes('确认移除'));
   assert.ok(!html.includes('确认请求 AI 删除'));
+  assert.ok(html.includes('不会删除世界书条目或角色变量'));
   assert.ok(html.includes('restoreDismissedProfileRoleNames(Object.keys(roles))'));
   const binding = functionBody('bindPersonProfileActionButtons');
   assert.ok(binding.includes('button.addEventListener("pointerup"'));
@@ -227,4 +232,6 @@ test('profile photo replace opens the avatar library and applies to the requeste
   assert.ok(directActions.includes('bindAvatarLibraryActivation(button, () => openProfileAvatarLibraryPicker(page, slot))'));
   assert.ok(profilePage.includes('if (action === "change") openProfileAvatarLibraryPicker(page, slot)'));
   assert.ok(!profilePage.includes('if (action === "change") page.querySelector'));
+  const photoDialog = functionBody('renderProfilePhotoDialog');
+  assert.ok(photoDialog.includes('<button type="button" class="st-profile-photo-preview" data-profile-photo-action="change"'));
 });

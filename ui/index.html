@@ -6054,7 +6054,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
 .st-profile-photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
 .st-profile-photo-slot{position:relative;border:1px solid rgba(81,64,49,.18);border-radius:8px;background:rgba(255,251,241,.58);padding:7px;display:grid;gap:6px;min-width:0}
 .st-profile-photo-slot.is-selected{border-color:rgba(47,109,98,.46);box-shadow:0 0 0 2px rgba(47,109,98,.1),inset 0 1px 0 rgba(255,255,255,.52)}
-.st-profile-photo-preview{aspect-ratio:4/5;border:2px double rgba(81,64,49,.28);background:#eee8dc;display:grid;place-items:center;overflow:hidden;border-radius:4px;color:rgba(68,54,42,.42);font-size:11px;font-weight:900;text-align:center}
+.st-profile-photo-preview{width:100%;aspect-ratio:4/5;border:2px double rgba(81,64,49,.28);background:#eee8dc;display:grid;place-items:center;overflow:hidden;border-radius:4px;color:rgba(68,54,42,.42);font:inherit;font-size:11px;font-weight:900;text-align:center;padding:0;cursor:pointer}
 .st-profile-photo-preview img{width:100%;height:100%;object-fit:cover;display:block}
 .st-profile-photo-slot.is-selected .st-profile-photo-preview::after{content:"选中";position:absolute;right:9px;top:9px;border:1px solid rgba(47,109,98,.34);border-radius:999px;background:rgba(247,241,229,.9);color:#2f6d62;padding:2px 6px;font-size:9px;font-weight:950;box-shadow:0 3px 8px rgba(47,109,98,.12)}
 .st-profile-photo-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px}
@@ -12913,9 +12913,9 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     const roles = variables?.["角色"];
     const mvuRoles = roles && typeof roles === "object" && !Array.isArray(roles) ? roles : {};
     const importedRoles = readImportedProfileWorldbookRoles();
-    const cachedRoles = { ...importedRoles, ...adaptiveWorldbookRoleCache };
-    for (const name of readDismissedProfileRoleNames()) delete cachedRoles[name];
-    return { ...cachedRoles, ...mvuRoles };
+    const visibleRoles = { ...importedRoles, ...adaptiveWorldbookRoleCache, ...mvuRoles };
+    for (const name of readDismissedProfileRoleNames()) delete visibleRoles[name];
+    return visibleRoles;
   }
 
   // 人物档案一次同步 render 只读取一次当前楼层快照。这里只保存调用栈内
@@ -16085,19 +16085,6 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     const name = String(roleName || "").trim();
     if (!name) throw new Error("没有可移除的角色档案。");
     if (ST_LOCKED_PROFILE_ROLES.has(name)) throw new Error("固定角色档案不可移除。");
-    if (!requireWritablePhoneFloor()) throw new Error("历史楼层只读；切回当前楼后才能移除档案。");
-
-    const data = encounterCurrentMvuData();
-    const runtimeRoles = data?.stat?.["角色"];
-    if (runtimeRoles && typeof runtimeRoles === "object" && !Array.isArray(runtimeRoles) && Object.prototype.hasOwnProperty.call(runtimeRoles, name)) {
-      const nextMvu = encounterClone(data.mvu);
-      const nextStat = nextMvu?.stat_data && typeof nextMvu.stat_data === "object" ? nextMvu.stat_data : nextMvu;
-      if (!nextStat?.["角色"] || typeof nextStat["角色"] !== "object") throw new Error("当前角色变量无法安全写入。");
-      delete nextStat["角色"][name];
-      const written = await encounterReplaceMvuData({ ...data, mvu: nextMvu, stat: nextStat });
-      if (!written) throw new Error("当前角色变量删除失败。");
-    }
-
     removeImportedProfileWorldbookRole(name);
     delete adaptiveWorldbookRoleCache[name];
     dismissProfileRoleName(name);
@@ -16141,6 +16128,8 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     }
     try {
       await deleteProfileRoleData(name);
+      page.dataset.profileDeskMode = "desk";
+      page.dataset.profileIndex = "0";
       closeProfileDeleteDialog(page);
     } catch (error) {
       delete page.dataset.profileDeleteBusy;
@@ -16154,7 +16143,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     return '<div class="st-profile-nickname-dialog" data-profile-delete-dialog role="dialog" aria-modal="true" aria-label="删除角色">' +
       '<section class="st-profile-nickname-card">' +
         '<h3>移除人物档案</h3>' +
-        '<p>确认移除「' + escapeHtml(name || "这个角色") + '」的角色档案？当前角色数据、收藏和照片绑定会一并清除，原世界书条目不会删除。</p>' +
+        '<p>确认从催眠手机移除「' + escapeHtml(name || "这个角色") + '」的角色档案？档案卡片、收藏、照片和手机内缓存会一并清除，不会删除世界书条目或角色变量。</p>' +
         (errorText ? '<p class="st-profile-chain-notice">' + escapeHtml(errorText) + '</p>' : '') +
         '<div class="st-profile-nickname-actions">' +
           '<button type="button" data-profile-delete-action="cancel" ' + (busy ? 'disabled' : '') + '>取消</button>' +
@@ -16363,7 +16352,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       const filled = Boolean(source);
       const active = filled && index === selected;
       return '<article class="st-profile-photo-slot ' + (active ? "is-selected" : "") + '">' +
-        '<div class="st-profile-photo-preview">' + (filled ? '<img alt="' + escapeAttr(roleName + " 照片" + (index + 1)) + '" src="' + escapeAttr(source) + '">' : '<span>照片位 ' + (index + 1) + '</span>') + '</div>' +
+        '<button type="button" class="st-profile-photo-preview" data-profile-photo-action="change" data-profile-photo-slot="' + index + '" aria-label="从头像库选择照片位 ' + (index + 1) + '">' + (filled ? '<img alt="' + escapeAttr(roleName + " 照片" + (index + 1)) + '" src="' + escapeAttr(source) + '">' : '<span>照片位 ' + (index + 1) + '</span>') + '</button>' +
         '<div class="st-profile-photo-actions">' +
           '<button type="button" data-profile-photo-action="change" data-profile-photo-slot="' + index + '">更换</button>' +
           '<button type="button" class="danger" data-profile-photo-action="delete" data-profile-photo-slot="' + index + '"' + (!filled ? " disabled" : "") + '>删除</button>' +

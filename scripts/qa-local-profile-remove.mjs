@@ -80,16 +80,20 @@ try {
       genderPresent: Object.prototype.hasOwnProperty.call(read('hypnoos:profile-gender-overrides:v1:global', '{}'), name),
       dismissed: read('hypnoos:dismissed-profile-roles:v1:global', '[]').includes(name),
       dialogOpen: Boolean(document.querySelector('[data-profile-delete-dialog]')),
+      dossierCardPresent: Boolean(document.querySelector('[data-profile-desk-role="' + CSS.escape(name) + '"]')),
+      dossierDetailPresent: document.querySelector('.st-profile-app')?.dataset?.profileDeskMode === 'detail',
     };
   }, roleName);
 
   assert.deepEqual(result, {
-    runtimePresent: false,
+    runtimePresent: true,
     importedPresent: false,
     favoritePresent: false,
     genderPresent: false,
     dismissed: true,
     dialogOpen: false,
+    dossierCardPresent: false,
+    dossierDetailPresent: false,
   });
   assert.deepEqual(errors, [], `页面脚本报错：${errors.join('\n')}`);
   console.log('PASS local SillyTavern profile removal', result);

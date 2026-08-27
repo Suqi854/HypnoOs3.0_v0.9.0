@@ -55,7 +55,7 @@ try {
   const photoDialog = profile.locator('[data-profile-photo-dialog]');
   await photoDialog.waitFor({ state: 'visible' });
   assert.equal(await photoDialog.locator('.st-profile-photo-slot').count(), 4, '照片夹不再保持四个槽位');
-  await photoDialog.locator('[data-profile-photo-action="change"][data-profile-photo-slot="0"]').dispatchEvent('mousedown', { button: 0 });
+  await photoDialog.locator('.st-profile-photo-preview[data-profile-photo-slot="0"]').dispatchEvent('mousedown', { button: 0 });
   const picker = profile.locator('[data-profile-avatar-library-picker]');
   await picker.waitFor({ state: 'visible' });
   assert.equal(await photoDialog.locator('.st-profile-photo-slot').count(), 4, '打开头像库后改变了原照片夹布局');
