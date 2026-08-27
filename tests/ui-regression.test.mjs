@@ -176,3 +176,26 @@ test('hypnosis and MC recharge quotes use the canonical rule bridge', () => {
   assert.ok(floatingHost.includes('__ST_HYPNOOS_CALCULATE_MC_RECHARGE__'));
   assert.ok(floatingCore.includes('calculateMcEnergyRecharge(options)'));
 });
+
+test('profile removal directly clears runtime and cached profile data', () => {
+  const remove = functionBody('deleteProfileRoleData');
+  assert.ok(remove.includes('ST_LOCKED_PROFILE_ROLES.has(name)'));
+  assert.ok(remove.includes('delete nextStat["角色"][name]'));
+  assert.ok(remove.includes('encounterReplaceMvuData({ ...data, mvu: nextMvu, stat: nextStat })'));
+  assert.ok(remove.includes('removeImportedProfileWorldbookRole(name)'));
+  assert.ok(remove.includes('dismissProfileRoleName(name)'));
+  assert.ok(remove.includes('removeFavoriteRoleName(name)'));
+  assert.ok(remove.includes('profileClearLocalPhotoSlots(name)'));
+  assert.ok(!remove.includes('appendAppOperation'));
+  assert.ok(html.includes('确认移除'));
+  assert.ok(!html.includes('确认请求 AI 删除'));
+  assert.ok(html.includes('restoreDismissedProfileRoleNames(Object.keys(roles))'));
+  const binding = functionBody('bindPersonProfileActionButtons');
+  assert.ok(binding.includes('button.addEventListener("pointerup"'));
+  assert.ok(binding.includes('button.addEventListener("pointerdown"'));
+  assert.ok(binding.includes('button.addEventListener("mousedown"'));
+  assert.ok(binding.includes('button.addEventListener("touchstart"'));
+  assert.ok(binding.includes('button.addEventListener("keydown"'));
+  assert.ok(binding.includes('data-profile-delete-dialog-direct-bound') || binding.includes('profileDeleteDialogDirectBound'));
+  assert.ok(binding.includes('void confirmProfileDeleteDialog(page)'));
+});

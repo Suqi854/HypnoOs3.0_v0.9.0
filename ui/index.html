@@ -12888,6 +12888,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     const payload = { schema: "HypnoProfileWorldbooks/v1", source: "model", worldbookNames: selected, importedAt: new Date().toISOString(), roles };
     localStorage.setItem(profileWorldbookRolesKey(), JSON.stringify(payload));
     writeProfileWorldbookSelections(selected);
+    restoreDismissedProfileRoleNames(Object.keys(roles));
     adaptiveWorldbookRoleCache = { ...roles };
     adaptiveWorldbookRoleCacheScope = roleFavoriteStorageScope();
     window.dispatchEvent(new CustomEvent("HYPNOOS_PROFILE_WORLDBOOK_ROLES_CHANGED", { detail: { worldbookNames: selected, roleNames: Object.keys(roles) } }));
@@ -12899,7 +12900,9 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     const roles = variables?.["角色"];
     const mvuRoles = roles && typeof roles === "object" && !Array.isArray(roles) ? roles : {};
     const importedRoles = readImportedProfileWorldbookRoles();
-    return { ...importedRoles, ...adaptiveWorldbookRoleCache, ...mvuRoles };
+    const cachedRoles = { ...importedRoles, ...adaptiveWorldbookRoleCache };
+    for (const name of readDismissedProfileRoleNames()) delete cachedRoles[name];
+    return { ...cachedRoles, ...mvuRoles };
   }
 
   // 人物档案一次同步 render 只读取一次当前楼层快照。这里只保存调用栈内
@@ -13079,6 +13082,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   }
 
   const ST_ROLE_FAVORITES_STORAGE_PREFIX = "hypnoos:favorite-roles:v1";
+  const ST_PROFILE_DISMISSED_ROLES_PREFIX = "hypnoos:dismissed-profile-roles:v1";
 
   function roleFavoriteStorageScope() {
     try {
@@ -13152,6 +13156,53 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       localStorage.setItem(roleFavoriteStorageKey(), JSON.stringify(next));
     } catch {}
     return next;
+  }
+
+  function removeFavoriteRoleName(roleName) {
+    const name = String(roleName || "").trim();
+    if (!name) return false;
+    let changed = false;
+    for (const key of roleFavoriteReadKeys()) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw === null) continue;
+        const current = parseFavoriteRoleNames(raw);
+        if (!current.includes(name)) continue;
+        localStorage.setItem(key, JSON.stringify(current.filter((item) => item !== name)));
+        changed = true;
+      } catch {}
+    }
+    return changed;
+  }
+
+  function profileDismissedRolesStorageKey() {
+    return ST_PROFILE_DISMISSED_ROLES_PREFIX + ":" + roleFavoriteLegacyStorageScope();
+  }
+
+  function readDismissedProfileRoleNames() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(profileDismissedRolesStorageKey()) || "[]");
+      return Array.isArray(parsed) ? parsed.map((name) => String(name || "").trim()).filter(Boolean) : [];
+    } catch { return []; }
+  }
+
+  function writeDismissedProfileRoleNames(names) {
+    const next = Array.from(new Set((names || []).map((name) => String(name || "").trim()).filter(Boolean)));
+    try { localStorage.setItem(profileDismissedRolesStorageKey(), JSON.stringify(next)); } catch {}
+    return next;
+  }
+
+  function dismissProfileRoleName(roleName) {
+    const name = String(roleName || "").trim();
+    if (!name) return false;
+    writeDismissedProfileRoleNames(readDismissedProfileRoleNames().concat(name));
+    return true;
+  }
+
+  function restoreDismissedProfileRoleNames(roleNames) {
+    const restored = new Set((roleNames || []).map((name) => String(name || "").trim()).filter(Boolean));
+    if (!restored.size) return readDismissedProfileRoleNames();
+    return writeDismissedProfileRoleNames(readDismissedProfileRoleNames().filter((name) => !restored.has(name)));
   }
 
   function isFavoriteRoleName(roleName) {
@@ -13427,6 +13478,27 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     overrides[name] = value;
     try { localStorage.setItem(profileGenderOverrideStorageKey(), JSON.stringify(overrides)); } catch {}
     return true;
+  }
+
+  function removeProfileGenderOverride(roleName) {
+    const name = String(roleName || "").trim();
+    if (!name) return false;
+    const keys = new Set([profileGenderOverrideStorageKey(), ST_PROFILE_GENDER_OVERRIDE_PREFIX + ":" + roleFavoriteLegacyStorageScope()]);
+    try {
+      const previous = window.__ST_HYPNOOS_PREVIOUS_FRONTEND_MESSAGE_SCOPE__?.();
+      if (previous) keys.add(ST_PROFILE_GENDER_OVERRIDE_PREFIX + ":" + String(previous));
+    } catch {}
+    let changed = false;
+    for (const key of keys) {
+      try {
+        const overrides = JSON.parse(localStorage.getItem(key) || "{}");
+        if (!overrides || typeof overrides !== "object" || Array.isArray(overrides) || !Object.prototype.hasOwnProperty.call(overrides, name)) continue;
+        delete overrides[name];
+        localStorage.setItem(key, JSON.stringify(overrides));
+        changed = true;
+      } catch {}
+    }
+    return changed;
   }
 
   function roleGender(roleName, roleData, fallback = "") {
@@ -15996,16 +16068,30 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     renderPersonProfilePage(page);
   }
 
-  function requestDeleteProfileRole(roleName) {
+  async function deleteProfileRoleData(roleName) {
     const name = String(roleName || "").trim();
-    if (!name) return;
-    appendAppOperation({
-      来源: "人物档案",
-      操作: "删除角色",
-      角色名: name,
-      目标变量路径: "/角色/" + name,
-      AI执行规范: "这是用户在人物档案中主动请求删除这个角色变量。若剧情与变量允许，只使用remove删除stat_data.角色下对应角色；不要删除或改写任何世界书条目，不要顺手删除其他角色、系统变量、任务、成就、地点规则、地点或资源。若无法删除，在正文说明原因。"
-    });
+    if (!name) throw new Error("没有可移除的角色档案。");
+    if (ST_LOCKED_PROFILE_ROLES.has(name)) throw new Error("固定角色档案不可移除。");
+    if (!requireWritablePhoneFloor()) throw new Error("历史楼层只读；切回当前楼后才能移除档案。");
+
+    const data = encounterCurrentMvuData();
+    const runtimeRoles = data?.stat?.["角色"];
+    if (runtimeRoles && typeof runtimeRoles === "object" && !Array.isArray(runtimeRoles) && Object.prototype.hasOwnProperty.call(runtimeRoles, name)) {
+      const nextMvu = encounterClone(data.mvu);
+      const nextStat = nextMvu?.stat_data && typeof nextMvu.stat_data === "object" ? nextMvu.stat_data : nextMvu;
+      if (!nextStat?.["角色"] || typeof nextStat["角色"] !== "object") throw new Error("当前角色变量无法安全写入。");
+      delete nextStat["角色"][name];
+      const written = await encounterReplaceMvuData({ ...data, mvu: nextMvu, stat: nextStat });
+      if (!written) throw new Error("当前角色变量删除失败。");
+    }
+
+    removeImportedProfileWorldbookRole(name);
+    delete adaptiveWorldbookRoleCache[name];
+    dismissProfileRoleName(name);
+    removeFavoriteRoleName(name);
+    removeProfileGenderOverride(name);
+    profileClearLocalPhotoSlots(name);
+    return true;
   }
 
   function openProfileDeleteDialog(page, roleName) {
@@ -16014,6 +16100,8 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     clearProfileDialogStates(page, { keep: "delete-role" });
     page.dataset.profileDeleteDialog = "true";
     page.dataset.profileDeleteRole = name;
+    delete page.dataset.profileDeleteBusy;
+    delete page.dataset.profileDeleteError;
     delete page.dataset.profilePickerOpen;
     renderPersonProfilePage(page);
   }
@@ -16022,25 +16110,42 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     if (!page?.dataset) return;
     delete page.dataset.profileDeleteDialog;
     delete page.dataset.profileDeleteRole;
+    delete page.dataset.profileDeleteBusy;
+    delete page.dataset.profileDeleteError;
     renderPersonProfilePage(page);
   }
 
-  function confirmProfileDeleteDialog(page) {
+  async function confirmProfileDeleteDialog(page) {
     const name = String(page?.dataset?.profileDeleteRole || "").trim();
     if (!name) return closeProfileDeleteDialog(page);
-    requestDeleteProfileRole(name);
-    closeProfileDeleteDialog(page);
+    if (page.dataset.profileDeleteBusy === "true") return;
+    page.dataset.profileDeleteBusy = "true";
+    delete page.dataset.profileDeleteError;
+    const confirm = page.querySelector('[data-profile-delete-action="confirm"]');
+    if (confirm) {
+      confirm.disabled = true;
+      confirm.textContent = "正在移除…";
+    }
+    try {
+      await deleteProfileRoleData(name);
+      closeProfileDeleteDialog(page);
+    } catch (error) {
+      delete page.dataset.profileDeleteBusy;
+      page.dataset.profileDeleteError = String(error?.message || error || "移除失败，请重试。");
+      renderPersonProfilePage(page);
+    }
   }
 
-  function renderProfileDeleteDialog(roleName) {
+  function renderProfileDeleteDialog(roleName, busy = false, errorText = "") {
     const name = String(roleName || "").trim();
     return '<div class="st-profile-nickname-dialog" data-profile-delete-dialog role="dialog" aria-modal="true" aria-label="删除角色">' +
       '<section class="st-profile-nickname-card">' +
         '<h3>移除人物档案</h3>' +
-        '<p>确认请求 AI 删除「' + escapeHtml(name || "这个角色") + '」的角色变量？这不会删除或禁用邂逅写入的人设世界书。</p>' +
+        '<p>确认移除「' + escapeHtml(name || "这个角色") + '」的角色档案？当前角色数据、收藏和照片绑定会一并清除，原世界书条目不会删除。</p>' +
+        (errorText ? '<p class="st-profile-chain-notice">' + escapeHtml(errorText) + '</p>' : '') +
         '<div class="st-profile-nickname-actions">' +
-          '<button type="button" data-profile-delete-action="cancel">取消</button>' +
-          '<button type="button" class="primary" data-profile-delete-action="confirm">确认暂存</button>' +
+          '<button type="button" data-profile-delete-action="cancel" ' + (busy ? 'disabled' : '') + '>取消</button>' +
+          '<button type="button" class="primary" data-profile-delete-action="confirm" ' + (busy ? 'disabled' : '') + '>' + (busy ? '正在移除…' : '确认移除') + '</button>' +
         '</div>' +
       '</section>' +
     '</div>';
@@ -19478,9 +19583,49 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   }
 
   function bindPersonProfileActionButtons(page) {
-    // 人物档案的动作统一交由 bindPersonProfileEvents 的页面委托处理。
-    // 这里保留空函数以兼容既有渲染调用，避免重绘后出现双重点击路径。
-    void page;
+    const activateDelete = (button, event) => {
+      if ((event.type === "pointerup" || event.type === "mousedown") && event.button !== undefined && event.button !== 0) return;
+      if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (page.dataset.profileDeleteOpenPending === "true") return;
+      page.dataset.profileDeleteOpenPending = "true";
+      const deskRoleName = String(button.getAttribute("data-profile-desk-delete-role") || "").trim();
+      window.setTimeout(() => {
+        delete page.dataset.profileDeleteOpenPending;
+        if (!page.isConnected) return;
+        if (deskRoleName) {
+          if (!ST_LOCKED_PROFILE_ROLES.has(deskRoleName)) openProfileDeleteDialog(page, deskRoleName);
+          return;
+        }
+        runPersonProfileAction(page, "delete-role", button);
+      }, 0);
+    };
+    page.querySelectorAll('[data-profile-action="delete-role"], [data-profile-desk-delete-role]').forEach((button) => {
+      if (button.dataset.profileDeleteDirectBound === "true") return;
+      button.dataset.profileDeleteDirectBound = "true";
+      button.addEventListener("pointerup", (event) => activateDelete(button, event));
+      button.addEventListener("mousedown", (event) => activateDelete(button, event));
+      button.addEventListener("touchstart", (event) => activateDelete(button, event), { passive: false });
+      button.addEventListener("keydown", (event) => activateDelete(button, event));
+    });
+    const activateDeleteDialog = (button, event) => {
+      if ((event.type === "pointerdown" || event.type === "mousedown") && event.button !== undefined && event.button !== 0) return;
+      if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const action = button.getAttribute("data-profile-delete-action") || "cancel";
+      if (action === "confirm") void confirmProfileDeleteDialog(page);
+      else closeProfileDeleteDialog(page);
+    };
+    page.querySelectorAll('[data-profile-delete-action]').forEach((button) => {
+      if (button.dataset.profileDeleteDialogDirectBound === "true") return;
+      button.dataset.profileDeleteDialogDirectBound = "true";
+      button.addEventListener("pointerdown", (event) => activateDeleteDialog(button, event));
+      button.addEventListener("mousedown", (event) => activateDeleteDialog(button, event));
+      button.addEventListener("touchstart", (event) => activateDeleteDialog(button, event), { passive: false });
+      button.addEventListener("keydown", (event) => activateDeleteDialog(button, event));
+    });
   }
 
   function currentPersonProfileRoleContext(page) {
@@ -20093,7 +20238,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       ? renderProfileTodoDialog(page.dataset.profileTodoDialog)
       : "";
     const deleteDialogHtml = page.dataset.profileDeleteDialog === "true"
-      ? renderProfileDeleteDialog(page.dataset.profileDeleteRole)
+      ? renderProfileDeleteDialog(page.dataset.profileDeleteRole, page.dataset.profileDeleteBusy === "true", page.dataset.profileDeleteError || "")
       : "";
     page.dataset.profileSignature = personProfileSignature(page);
     page.innerHTML =
@@ -20258,7 +20403,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       ? renderProfileChildOperationDialog(roleName, profileChildEntries(roleData).find((entry) => entry.key === page.dataset.profileChildrenSelected), page.dataset.profileChildOperationDialog)
       : "";
     const deleteDialogHtml = page.dataset.profileDeleteDialog === "true"
-      ? renderProfileDeleteDialog(page.dataset.profileDeleteRole || roleName)
+      ? renderProfileDeleteDialog(page.dataset.profileDeleteRole || roleName, page.dataset.profileDeleteBusy === "true", page.dataset.profileDeleteError || "")
       : "";
     const neighborProfileData = (delta) => {
       if (roleNames.length < 2) return null;
@@ -39666,6 +39811,18 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       const parsed = JSON.parse(localStorage.getItem(profileWorldbookRolesKey()) || "null");
       return parsed?.roles && typeof parsed.roles === "object" && !Array.isArray(parsed.roles) ? parsed.roles : {};
     } catch { return {}; }
+  }
+
+  function removeImportedProfileWorldbookRole(roleName) {
+    const name = String(roleName || "").trim();
+    if (!name) return false;
+    try {
+      const parsed = JSON.parse(localStorage.getItem(profileWorldbookRolesKey()) || "null");
+      if (!parsed?.roles || typeof parsed.roles !== "object" || Array.isArray(parsed.roles) || !Object.prototype.hasOwnProperty.call(parsed.roles, name)) return false;
+      delete parsed.roles[name];
+      localStorage.setItem(profileWorldbookRolesKey(), JSON.stringify(parsed));
+      return true;
+    } catch { return false; }
   }
 
   function readAdaptiveGeneratedProfile() {
