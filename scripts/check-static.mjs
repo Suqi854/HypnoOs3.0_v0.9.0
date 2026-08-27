@@ -102,6 +102,7 @@ for (const marker of ['data-phone-drag', 'pet-character-toggle', 'sidecar', 'lau
 expect((floatingHost.match(/data-phone-resize=/g) || []).length === 2, '悬浮宿主必须保留下方左右两个缩放热区');
 expect(floatingHost.includes('.sidecar{display:none!important}'), '外部信息挂件仍可能占用界面空间');
 expect(floatingHost.includes('savePhoneScale'), '手机缩放没有持久化');
+expect(floatingHost.includes('resizeAnimationFrame = requestFrame(flushResizeFrame)') && floatingHost.includes('clampPosition(x, resizeState.top, size)'), '手机缩放没有按动画帧合并或仍依赖强制布局回读');
 expect(floatingHost.includes("scrolling='no'"), '手机 iframe 必须关闭文档滚动条');
 expect(!floatingHost.includes('0 0 0 6px rgba(17,12,30,.72)'), '悬浮宿主仍包含额外 6px 黑色描边');
 expect(!removedFeaturePattern.test(floatingHost), '悬浮宿主不得残留已移除功能的按钮、同步或渲染代码');

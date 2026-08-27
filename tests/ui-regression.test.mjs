@@ -112,6 +112,19 @@ test('information app selects six pets and toggles floating or wand storage mode
   assert.ok(!floatingHost.includes('label.textContent = "桌宠 · " + name'));
 });
 
+test('phone resize is frame-coalesced without forced layout reads per pointer move', () => {
+  const moveStart = floatingHost.indexOf('function moveResize(event)');
+  const moveEnd = floatingHost.indexOf('function endResize(event)', moveStart);
+  const move = floatingHost.slice(moveStart, moveEnd);
+  const flushStart = floatingHost.indexOf('function flushResizeFrame()');
+  const flushEnd = floatingHost.indexOf('function endResize(event)', flushStart);
+  const flush = floatingHost.slice(flushStart, flushEnd);
+  assert.ok(move.includes('resizeAnimationFrame = requestFrame(flushResizeFrame)'));
+  assert.ok(!move.includes('getBoundingClientRect'));
+  assert.ok(flush.includes('Math.floor(430 * scale)'));
+  assert.ok(flush.includes('clampPosition(x, resizeState.top, size)'));
+});
+
 test('model connector explains SiliconFlow balance failures', () => {
   assert.ok(html.includes('function normalizeConnectorProviderError(value)'));
   assert.ok(html.includes('硅基流动账户余额不足，请充值当前 API 密钥所属账户，或更换有余额的 API 密钥。'));

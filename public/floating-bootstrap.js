@@ -126,6 +126,8 @@
     var loadedForWritableId = "";
     var dragState = null;
     var resizeState = null;
+    var resizeAnimationFrame = 0;
+    var resizePendingPoint = null;
     var launcherDragState = null;
     var suppressLauncherClick = false;
     var petSprite = null;
@@ -1296,11 +1298,11 @@
       return scale;
     }
 
-    function clampPosition(x, y) {
+    function clampPosition(x, y, knownSize) {
       var viewport = hostViewportRect();
-      var rect = panel?.getBoundingClientRect?.();
-      var width = rect?.width || (panel ? panel.offsetWidth : Math.min(760, viewport.width - 24));
-      var height = rect?.height || (panel ? panel.offsetHeight : Math.min(900, viewport.height - 24));
+      var rect = knownSize ? null : panel?.getBoundingClientRect?.();
+      var width = Number(knownSize?.width) || rect?.width || (panel ? panel.offsetWidth : Math.min(760, viewport.width - 24));
+      var height = Number(knownSize?.height) || rect?.height || (panel ? panel.offsetHeight : Math.min(900, viewport.height - 24));
       var sidecar = panelSidecarReserve(width);
       var lowerBoundX = viewport.left + 8;
       var upperX = Math.max(lowerBoundX, viewport.left + viewport.width - width - sidecar - 8);
@@ -2644,13 +2646,23 @@
     function moveResize(event) {
       if (!resizeState || event.pointerId !== resizeState.pointerId) return;
       event.preventDefault();
-      var horizontal = (event.clientX - resizeState.startX) / 430 * (resizeState.corner === "left" ? -1 : 1);
-      var vertical = (event.clientY - resizeState.startY) / 812;
+      resizePendingPoint = { x: event.clientX, y: event.clientY };
+      if (resizeAnimationFrame) return;
+      resizeAnimationFrame = requestFrame(flushResizeFrame);
+    }
+
+    function flushResizeFrame() {
+      resizeAnimationFrame = 0;
+      if (!resizeState || !resizePendingPoint) return;
+      var point = resizePendingPoint;
+      resizePendingPoint = null;
+      var horizontal = (point.x - resizeState.startX) / 430 * (resizeState.corner === "left" ? -1 : 1);
+      var vertical = (point.y - resizeState.startY) / 812;
       var delta = Math.abs(horizontal) >= Math.abs(vertical) ? horizontal : vertical;
       var scale = syncPanelSize(resizeState.startScale + delta);
-      var rect = panel.getBoundingClientRect();
-      var x = resizeState.corner === "left" ? resizeState.right - rect.width : resizeState.left;
-      var next = clampPosition(x, resizeState.top);
+      var size = { width: Math.max(1, Math.floor(430 * scale)), height: Math.max(1, Math.floor(812 * scale)) };
+      var x = resizeState.corner === "left" ? resizeState.right - size.width : resizeState.left;
+      var next = clampPosition(x, resizeState.top, size);
       panel.style.left = next.x + "px";
       panel.style.top = next.y + "px";
       panel.dataset.phoneScale = String(scale);
@@ -2658,8 +2670,14 @@
 
     function endResize(event) {
       if (!resizeState || (event && event.pointerId !== resizeState.pointerId)) return;
+      if (resizePendingPoint) flushResizeFrame();
       var ended = resizeState;
       resizeState = null;
+      resizePendingPoint = null;
+      if (resizeAnimationFrame) {
+        try { host.cancelAnimationFrame?.(resizeAnimationFrame); } catch (_) {}
+        resizeAnimationFrame = 0;
+      }
       host.removeEventListener("pointermove", moveResize, true);
       host.removeEventListener("pointerup", endResize, true);
       host.removeEventListener("pointercancel", endResize, true);
