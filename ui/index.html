@@ -6056,7 +6056,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
 .st-profile-photo-slot.is-selected{border-color:rgba(47,109,98,.46);box-shadow:0 0 0 2px rgba(47,109,98,.1),inset 0 1px 0 rgba(255,255,255,.52)}
 .st-profile-photo-preview{width:100%;aspect-ratio:4/5;border:2px double rgba(81,64,49,.28);background:#eee8dc;display:grid;place-items:center;overflow:hidden;border-radius:4px;color:rgba(68,54,42,.42);font:inherit;font-size:11px;font-weight:900;text-align:center;padding:0;cursor:pointer}
 .st-profile-photo-preview img{width:100%;height:100%;object-fit:cover;display:block}
-.st-profile-photo-slot.is-selected .st-profile-photo-preview::after{content:"选中";position:absolute;right:9px;top:9px;border:1px solid rgba(47,109,98,.34);border-radius:999px;background:rgba(247,241,229,.9);color:#2f6d62;padding:2px 6px;font-size:9px;font-weight:950;box-shadow:0 3px 8px rgba(47,109,98,.12)}
+.st-profile-photo-slot.is-selected .st-profile-photo-preview::after{content:"已选";position:absolute;right:9px;top:9px;border:1px solid rgba(47,109,98,.34);border-radius:999px;background:rgba(247,241,229,.9);color:#2f6d62;padding:2px 6px;font-size:9px;font-weight:950;box-shadow:0 3px 8px rgba(47,109,98,.12)}
 .st-profile-photo-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px}
 .st-profile-photo-actions button{min-width:0;height:24px;border:1px solid rgba(81,64,49,.18);border-radius:6px;background:rgba(255,251,241,.72);color:rgba(68,54,42,.78);font-size:10px;font-weight:950;cursor:pointer;padding:0 4px}
 .st-profile-photo-actions button.primary{border-color:rgba(47,109,98,.34);background:rgba(47,109,98,.1);color:#2f6d62}
@@ -6549,7 +6549,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
 .st-profile-app .st-profile-photo-preview{border:3px solid #111;border-radius:0;background:#e6dfd4;color:#605953}
 .st-profile-app .st-profile-photo-warning{border:2px solid #111;border-radius:0;background:#fff;color:#111}
 .st-profile-app .st-profile-photo-warning p{color:#8d1327}
-.st-profile-app .st-profile-avatar-picker-dialog{position:absolute;inset:0;z-index:3;display:grid;place-items:center;padding:18px;background:var(--pf-modal-scrim);backdrop-filter:blur(6px)}
+.st-profile-app .st-profile-avatar-picker-dialog{position:absolute;inset:0;z-index:24;display:grid;place-items:center;padding:18px;background:var(--pf-modal-scrim);backdrop-filter:blur(6px)}
 .st-profile-app .st-profile-avatar-picker-card{width:min(100%,304px);max-height:calc(100% - 12px);overflow:auto;gap:10px}
 .st-profile-app .st-profile-avatar-picker-head{display:flex;align-items:end;justify-content:space-between;gap:10px}
 .st-profile-app .st-profile-avatar-picker-head small{color:#605953;font-size:10px;font-weight:900}
@@ -6561,6 +6561,8 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
 .st-profile-app .st-profile-avatar-picker-option{min-width:0;border:2px solid #111;background:#fff;padding:6px;display:grid;gap:5px;color:#111;cursor:pointer;text-align:left}
 .st-profile-app .st-profile-avatar-picker-option img{display:block;width:100%;aspect-ratio:4/5;object-fit:cover;background:#e6dfd4}
 .st-profile-app .st-profile-avatar-picker-option strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px}
+.st-profile-app .st-profile-avatar-picker-option.is-selected{border-color:var(--pf-accent);background:#eef7f4;box-shadow:0 0 0 2px var(--pf-accent)}
+.st-profile-app .st-profile-avatar-picker-confirm{width:100%;min-height:34px;border:2px solid #111;border-radius:0;background:var(--pf-accent);color:#fff;font-family:"Arial Black","Noto Sans SC",sans-serif;font-weight:950;cursor:pointer;clip-path:polygon(0 8%,100% 0,95% 100%,4% 90%)}
 .st-profile-app .st-profile-avatar-picker-empty{grid-column:1/-1;margin:0;padding:24px 8px;text-align:center;color:#605953;font-size:11px;font-weight:900}
 .st-profile-app .st-profile-child-role-dialog{padding:7px}
 .st-profile-app .st-profile-child-role-card{
@@ -11756,7 +11758,6 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   }
 
   function hypnosisLiteFeatureCost(feature, draft) {
-    if (settingsCheatModeActive()) return 0;
     if (!feature || Number(feature.costValue || 0) <= 0) return 0;
     const persons = hypnosisFeatureUsesPersonCount(feature) ? hypnosisFeaturePersonCount(feature, draft) : 1;
     const parts = hypnosisFeatureUsesPartCount(feature) ? hypnosisFeaturePartCount(feature, draft) : 1;
@@ -14801,6 +14802,9 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       remove("profileDeleteDialog");
       remove("profileDeleteRole");
     }
+    remove("profileAvatarLibrarySlot");
+    remove("profileAvatarLibrarySelected");
+    remove("profileAvatarLibraryFeedback");
     return changed;
   }
 
@@ -15805,53 +15809,47 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   function renderProfileRemodelPanel(page, roleName = "") {
     migrateLegacyProfileRemodelSelection(page);
     const roles = getStatsRoles();
-    const unlocked = hospitalLineRemodelUnlocked();
     const role = isPlainObject(roles?.[roleName]) ? roles[roleName] : {};
     const parts = ST_HOSPITAL_REMODEL_PARTS;
     const storedPart = String(page?.dataset?.profileRemodelSelectedPart || "");
     const selectedPart = parts.find((part) => part.id === storedPart) || null;
     const storedDetail = String(page?.dataset?.profileRemodelSelectedDetail || "");
     const selectedDetail = selectedPart?.detail?.includes(storedDetail) ? storedDetail : "";
-    if (!unlocked) {
-      return '<section class="st-person-lines st-profile-remodel is-locked"><div class="st-person-line is-long"><span>医院改造室</span><strong>未开放</strong></div><p>医院线尚未完成担保。当前只可查看锁定状态，不能进行改造。</p></section>';
-    }
     const majorHtml = parts.map((part) => {
       const configured = Boolean(hospitalRemodelAreaText(role, part.id));
       const areaUnlocked = hospitalRemodelAreaUnlocked(role, part.id);
       return '<button type="button" class="st-profile-remodel-major' + (selectedPart?.id === part.id ? " active" : "") + (configured ? " is-configured" : "") + (areaUnlocked ? " is-unlocked" : "") + '" data-profile-remodel-part="' + escapeAttr(part.id) + '">' + escapeHtml(part.label) + '</button>';
     }).join("");
     const overviewButton = '<button type="button" class="st-profile-remodel-overview' + (!selectedPart ? " active" : "") + '" data-profile-remodel-overview>改造总览</button>';
-    const heading = '<div class="st-person-line is-long"><span>医院改造</span><strong>' + escapeHtml(roleName || "当前角色") + '</strong></div>';
+    const heading = '<div class="st-person-line is-long"><span>改造</span><strong>' + escapeHtml(roleName || "当前角色") + '</strong></div>';
     if (!selectedPart) {
       const overviewHtml = parts.map((part) => {
-        const areaUnlocked = hospitalRemodelAreaUnlocked(role, part.id);
         const areaObject = hospitalRemodelAreaObject(role, part.id);
         const records = Object.entries(areaObject)
           .filter(([, value]) => typeof value === "string" && value.trim())
           .map(([detail, value]) => '<p><strong>' + escapeHtml(detail) + '</strong>　' + escapeHtml(String(value).trim()) + '</p>')
           .join("");
-        return '<article class="st-profile-remodel-overview-card"><header><strong>' + escapeHtml(part.label) + '</strong><small>' + (areaUnlocked ? (records ? "已有记录" : "已解锁") : "未解锁") + '</small></header>' + (records || '<p>' + (areaUnlocked ? "尚无细分改造记录。" : "需先在综合医院解锁。") + '</p>') + '</article>';
+        return '<article class="st-profile-remodel-overview-card"><header><strong>' + escapeHtml(part.label) + '</strong><small>' + (records ? "已有记录" : "暂无记录") + '</small></header>' + (records || '<p>尚无改造记录。</p>') + '</article>';
       }).join("");
       return '<section class="st-profile-remodel">' + heading + overviewButton +
         '<div class="st-profile-remodel-major-grid" aria-label="改造大部位">' + majorHtml + '</div>' +
         '<section class="st-profile-remodel-overview-grid" aria-label="改造总览">' + overviewHtml + '</section>' +
       '</section>';
     }
-    const partUnlocked = hospitalRemodelAreaUnlocked(role, selectedPart.id);
     const areaObject = hospitalRemodelAreaObject(role, selectedPart.id);
     const content = selectedDetail && typeof areaObject[selectedDetail] === "string" ? areaObject[selectedDetail].trim() : "";
     const detailHtml = selectedPart.detail.map((detail) => '<button type="button" class="st-profile-remodel-detail-chip' + (detail === selectedDetail ? " active" : "") + (hospitalRemodelDetailText(role, selectedPart.id, detail) ? " is-configured" : "") + '" data-profile-remodel-detail="' + escapeAttr(detail) + '">' + escapeHtml(detail) + '</button>').join("");
     return '<section class="st-profile-remodel">' +
       heading + overviewButton +
       '<div class="st-profile-remodel-major-grid" aria-label="改造大部位">' + majorHtml + '</div>' +
-      '<section class="st-profile-remodel-section"><header><strong>' + escapeHtml(selectedPart.label) + ' · 细分部位</strong><small>' + (partUnlocked ? "档案索引" : "未解锁") + '</small></header><div class="st-profile-remodel-detail-strip">' + detailHtml + '</div></section>' +
-      '<section class="st-profile-remodel-section"><header><strong>' + escapeHtml(selectedDetail ? selectedDetail + " · 改造内容" : selectedPart.label + " · 部位总览") + '</strong><small>' + (partUnlocked ? (selectedDetail ? (content ? "已记录" : "未记录") : "请选择细分部位") : "未解锁") + '</small></header><div class="st-profile-remodel-content' + (content ? "" : " is-empty") + '">' + (partUnlocked ? (selectedDetail ? (content ? escapeHtml(content) : "尚未记录") : "请选择上方细分部位查看对应改造内容。") : "请在综合医院花费10星光点解锁该大部位。") + '</div></section>' +
+      '<section class="st-profile-remodel-section"><header><strong>' + escapeHtml(selectedPart.label) + ' · 细分部位</strong><small>档案索引</small></header><div class="st-profile-remodel-detail-strip">' + detailHtml + '</div></section>' +
+      '<section class="st-profile-remodel-section"><header><strong>' + escapeHtml(selectedDetail ? selectedDetail + " · 改造内容" : selectedPart.label + " · 部位总览") + '</strong><small>' + (selectedDetail ? (content ? "已记录" : "未记录") : "请选择细分部位") + '</small></header><div class="st-profile-remodel-content' + (content ? "" : " is-empty") + '">' + (selectedDetail ? (content ? escapeHtml(content) : "尚未记录") : "请选择上方细分部位查看对应改造内容。") + '</div></section>' +
     '</section>';
   }
 
-  function openProfileLockedDialog(page, kind = "bad-records") {
+  function openProfileLockedDialog(page) {
     clearProfileDialogStates(page, { keep: "locked" });
-    page.dataset.profileLockedDialog = kind === "remodel-immune" ? "remodel-immune" : kind === "remodel" ? "remodel" : "bad-records";
+    page.dataset.profileLockedDialog = "bad-records";
     delete page.dataset.profilePickerOpen;
     renderPersonProfilePage(page);
   }
@@ -15884,13 +15882,11 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     '</div>';
   }
 
-  function renderProfileLockedDialog(kind = "bad-records") {
-    const remodel = kind === "remodel" || kind === "remodel-immune";
-    const immune = kind === "remodel-immune";
-    return '<div class="st-profile-nickname-dialog st-profile-locked-dialog" role="dialog" aria-modal="true" aria-label="' + (remodel ? "医院改造室未开放" : "劣迹未解锁") + '">' +
+  function renderProfileLockedDialog() {
+    return '<div class="st-profile-nickname-dialog st-profile-locked-dialog" role="dialog" aria-modal="true" aria-label="劣迹未解锁">' +
       '<section class="st-profile-nickname-card">' +
         '<h3>未解锁</h3>' +
-        '<p>' + (immune ? "弥留子没有可供医院改造的实体，无法进行改造。" : remodel ? "医院线尚未完成共同确认，医院改造室暂未开放。" : "劣迹档案尚未开放。警视厅特别关注仍处于当前阶段。") + '</p>' +
+        '<p>劣迹档案尚未开放。警视厅特别关注仍处于当前阶段。</p>' +
         '<div class="st-profile-nickname-actions"><button type="button" class="primary" data-profile-locked-close>知道了</button></div>' +
       '</section>' +
     '</div>';
@@ -16226,6 +16222,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   }
 
   function closeProfilePhotoDialog(page) {
+    closeProfileAvatarLibraryPicker(page, false);
     delete page.dataset.profilePhotoDialog;
     delete page.dataset.profilePhotoResetWarning;
     renderPersonProfilePage(page);
@@ -16264,22 +16261,12 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     renderPersonProfilePage(page);
   }
 
-  function profileSelectPhotoSlot(page, slotIndex) {
-    const context = currentEditableProfileContext(page);
-    if (!context) return;
-    delete page.dataset.profilePhotoResetWarning;
-    const index = Math.max(0, Math.min(3, Math.trunc(Number(slotIndex) || 0)));
-    const state = profilePhotoSlotsState(context.roleName, context.roleData);
-    const slots = normalizeProfilePhotoSlots(state.slots);
-    if (!slots[index]) return;
-    profileSaveLocalPhotoSlots(context.roleName, slots, index);
-    renderPersonProfilePage(page);
-  }
-
-  function closeProfileAvatarLibraryPicker(page) {
+  function closeProfileAvatarLibraryPicker(page, rerender = true) {
     delete page.dataset.profileAvatarLibrarySlot;
+    delete page.dataset.profileAvatarLibrarySelected;
     delete page.dataset.profileAvatarLibraryFeedback;
     page.querySelector("[data-profile-avatar-library-picker]")?.remove();
+    if (rerender && page?.isConnected) renderPersonProfilePage(page);
   }
 
   function lockProfileAvatarLibraryPointer(page, duration = 420) {
@@ -16289,6 +16276,50 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
 
   function profileAvatarLibraryPointerLocked(page) {
     return Number(page?.dataset?.profileAvatarLibraryPointerLockUntil || 0) > Date.now();
+  }
+
+  // 把头像库选中的头像就地写入对应照片位：只保存状态并直接更新页面上的
+  // 照片区域/照片夹预览，不做整页重渲染，保证悬浮窗保持打开、玩家可以
+  // 继续换选，最后点“确定”或点边缘空白才退出。
+  function profileSetPhotoSlotLive(page, slotIndex, image) {
+    const context = currentEditableProfileContext(page);
+    if (!context) return;
+    const index = Math.max(0, Math.min(3, Math.trunc(Number(slotIndex) || 0)));
+    const state = profilePhotoSlotsState(context.roleName, context.roleData);
+    const slots = normalizeProfilePhotoSlots(state.slots);
+    slots[index] = String(image || "").trim();
+    profileSaveLocalPhotoSlots(context.roleName, slots, slots[index] ? index : state.selected);
+    const selectedIndex = slots[index] ? index : Math.max(0, slots.findIndex(Boolean));
+    const displayName = profileDisplayNameText(context.roleName, context.roleData);
+    const photoButton = page.querySelector(".st-person-photo");
+    if (photoButton) {
+      const img = photoButton.querySelector("img");
+      if (image) {
+        if (img) {
+          img.src = image;
+          img.alt = displayName;
+        } else {
+          photoButton.innerHTML = '<img alt="' + escapeAttr(displayName) + '" src="' + escapeAttr(image) + '">';
+        }
+      } else if (img) {
+        photoButton.innerHTML = '<div class="st-person-photo-empty">点击照片区域<br>选择头像</div>';
+      }
+    }
+    page.querySelectorAll("[data-profile-photo-slot-cell]").forEach((cell) => {
+      const cellIndex = Math.max(0, Math.min(3, Math.trunc(Number(cell.getAttribute("data-profile-photo-slot-cell") || 0) || 0)));
+      const filled = Boolean(slots[cellIndex]);
+      cell.classList.toggle("is-selected", filled && cellIndex === selectedIndex);
+      const preview = cell.querySelector(".st-profile-photo-preview");
+      if (preview) {
+        if (filled) {
+          preview.innerHTML = '<img alt="' + escapeAttr(context.roleName + " 照片" + (cellIndex + 1)) + '" src="' + escapeAttr(slots[cellIndex]) + '">';
+        } else {
+          preview.innerHTML = '<span>照片位 ' + (cellIndex + 1) + '</span>';
+        }
+      }
+      const deleteButton = cell.querySelector('[data-profile-photo-action="delete"]');
+      if (deleteButton) deleteButton.disabled = !filled;
+    });
   }
 
   async function renderProfileAvatarLibraryPicker(page, picker, slotIndex) {
@@ -16301,8 +16332,9 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       source: await profileGetPhotoStorageIdb(avatarLibraryImageKey(item.id)) || ""
     })));
     if (!picker.isConnected || picker.dataset.profileAvatarLibraryRenderToken !== token) return;
+    const selectedId = String(page.dataset.profileAvatarLibrarySelected || "");
     const options = records.filter((record) => record.source).map(({ item, source }) =>
-      '<button type="button" class="st-profile-avatar-picker-option" data-profile-avatar-library-select="' + escapeAttr(item.id) + '">' +
+      '<button type="button" class="st-profile-avatar-picker-option' + (String(item.id) === selectedId ? " is-selected" : "") + '" data-profile-avatar-library-select="' + escapeAttr(item.id) + '" aria-pressed="' + (String(item.id) === selectedId ? "true" : "false") + '">' +
         '<img src="' + escapeAttr(source) + '" alt="' + escapeAttr(item.name) + '">' +
         '<strong>' + escapeHtml(item.name) + '</strong>' +
       '</button>'
@@ -16311,13 +16343,18 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       '<div class="st-profile-avatar-picker-head"><h3>选择头像</h3><small>照片位 ' + (index + 1) + '</small></div>' +
       '<div class="st-profile-avatar-picker-toolbar">' +
         '<button type="button" data-profile-avatar-library-upload>上传到头像库</button>' +
-        '<button type="button" data-profile-avatar-library-close>返回</button>' +
+        '<button type="button" data-profile-avatar-library-photo-folder>照片夹</button>' +
         '<input type="file" data-profile-avatar-library-files accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>' +
         (page.dataset.profileAvatarLibraryFeedback ? '<p class="st-profile-avatar-picker-feedback" role="status" aria-live="polite">' + escapeHtml(page.dataset.profileAvatarLibraryFeedback) + '</p>' : '') +
       '</div>' +
       '<div class="st-profile-avatar-picker-grid">' + (options || '<p class="st-profile-avatar-picker-empty">头像库为空，请先上传角色头像。</p>') + '</div>' +
+      '<button type="button" class="st-profile-avatar-picker-confirm" data-profile-avatar-library-confirm>确定</button>' +
     '</section>';
-    bindAvatarLibraryActivation(picker.querySelector("[data-profile-avatar-library-close]"), () => closeProfileAvatarLibraryPicker(page));
+    bindAvatarLibraryActivation(picker.querySelector("[data-profile-avatar-library-confirm]"), () => closeProfileAvatarLibraryPicker(page, true));
+    bindAvatarLibraryActivation(picker.querySelector("[data-profile-avatar-library-photo-folder]"), () => {
+      closeProfileAvatarLibraryPicker(page, false);
+      openProfilePhotoDialog(page);
+    });
     const input = picker.querySelector("[data-profile-avatar-library-files]");
     bindAvatarLibraryActivation(picker.querySelector("[data-profile-avatar-library-upload]"), () => {
       if (typeof input?.showPicker === "function") input.showPicker();
@@ -16327,28 +16364,32 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       const files = Array.from(input.files || []);
       if (!files.length) return;
       page.dataset.profileAvatarLibraryFeedback = "正在校验并保存头像…";
+      await renderProfileAvatarLibraryPicker(page, picker, index);
       const result = await importAvatarLibraryFiles(files);
       page.dataset.profileAvatarLibraryFeedback = "已导入 " + result.added.length + " 张。" + (result.rejected.length ? "\n未导入：" + result.rejected.join("；") : "");
       await renderProfileAvatarLibraryPicker(page, picker, index);
     });
     picker.querySelectorAll("[data-profile-avatar-library-select]").forEach((button) => bindAvatarLibrarySelectionActivation(button, async () => {
-      const source = await profileGetPhotoStorageIdb(avatarLibraryImageKey(button.getAttribute("data-profile-avatar-library-select")));
+      const itemId = button.getAttribute("data-profile-avatar-library-select");
+      const source = await profileGetPhotoStorageIdb(avatarLibraryImageKey(itemId));
       if (!source) return;
-      lockProfileAvatarLibraryPointer(page);
-      closeProfileAvatarLibraryPicker(page);
-      profileSetPhotoSlot(page, index, source);
+      page.dataset.profileAvatarLibrarySelected = String(itemId || "");
+      profileSetPhotoSlotLive(page, index, source);
+      await renderProfileAvatarLibraryPicker(page, picker, index);
     }));
   }
 
+  // 头像库悬浮窗：点角色照片区域或照片夹的“选择”按钮都会打开。
+  // 点选头像立即应用到对应照片位；只有底部“确定”按钮或边缘空白区域能退出。
   function openProfileAvatarLibraryPicker(page, slotIndex) {
-    const dialog = page?.querySelector?.("[data-profile-photo-dialog]");
-    if (!dialog) return;
+    if (!page?.querySelector?.(".st-profile-detail-stage")) return;
     const index = Math.max(0, Math.min(3, Math.trunc(Number(slotIndex) || 0)));
-    const current = dialog.querySelector("[data-profile-avatar-library-picker]");
+    const current = page.querySelector("[data-profile-avatar-library-picker]");
     if (current && Number(page.dataset.profileAvatarLibrarySlot || 0) === index) return;
-    closeProfileAvatarLibraryPicker(page);
+    closeProfileAvatarLibraryPicker(page, false);
     lockProfileAvatarLibraryPointer(page);
     page.dataset.profileAvatarLibrarySlot = String(index);
+    delete page.dataset.profileAvatarLibrarySelected;
     const picker = document.createElement("div");
     picker.className = "st-profile-avatar-picker-dialog";
     picker.setAttribute("data-profile-avatar-library-picker", "");
@@ -16357,10 +16398,23 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     picker.setAttribute("aria-label", "从头像库选择角色头像");
     picker.innerHTML = '<section class="st-profile-photo-card st-profile-avatar-picker-card" role="document"><h3>选择头像</h3><p class="st-profile-avatar-picker-empty">正在读取头像库…</p></section>';
     picker.addEventListener("mousedown", (event) => {
-      if (event.target === picker) closeProfileAvatarLibraryPicker(page);
+      if (event.target === picker) {
+        event.preventDefault();
+        closeProfileAvatarLibraryPicker(page, true);
+      }
     });
-    dialog.appendChild(picker);
+    const stage = page.querySelector(".st-profile-detail-stage");
+    stage.appendChild(picker);
     void renderProfileAvatarLibraryPicker(page, picker, index);
+  }
+
+  // 点击档案里的角色照片区域：直接打开头像库悬浮窗，作用于当前选中的照片位。
+  function openProfilePhotoAvatarPicker(page) {
+    const context = currentEditableProfileContext(page);
+    if (!context) return;
+    const state = profilePhotoSlotsState(context.roleName, context.roleData);
+    const selected = Math.max(0, Math.min(3, Math.trunc(Number(state?.selected) || 0)));
+    openProfileAvatarLibraryPicker(page, selected);
   }
 
   function renderProfilePhotoDialog(roleName, roleData, resetWarning = false) {
@@ -16370,12 +16424,12 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     const cells = slots.map((source, index) => {
       const filled = Boolean(source);
       const active = filled && index === selected;
-      return '<article class="st-profile-photo-slot ' + (active ? "is-selected" : "") + '">' +
-        '<button type="button" class="st-profile-photo-preview" data-profile-photo-action="change" data-profile-photo-slot="' + index + '" aria-label="从头像库选择照片位 ' + (index + 1) + '">' + (filled ? '<img alt="' + escapeAttr(roleName + " 照片" + (index + 1)) + '" src="' + escapeAttr(source) + '">' : '<span>照片位 ' + (index + 1) + '</span>') + '</button>' +
+      return '<article class="st-profile-photo-slot ' + (active ? "is-selected" : "") + '" data-profile-photo-slot-cell="' + index + '">' +
+        '<button type="button" class="st-profile-photo-preview" data-profile-photo-action="pick" data-profile-photo-slot="' + index + '" aria-label="从头像库选择照片位 ' + (index + 1) + '">' + (filled ? '<img alt="' + escapeAttr(roleName + " 照片" + (index + 1)) + '" src="' + escapeAttr(source) + '">' : '<span>照片位 ' + (index + 1) + '</span>') + '</button>' +
         '<div class="st-profile-photo-actions">' +
-          '<button type="button" data-profile-photo-action="change" data-profile-photo-slot="' + index + '">更换</button>' +
+          '<button type="button" data-profile-photo-action="local" data-profile-photo-slot="' + index + '">更换</button>' +
           '<button type="button" class="danger" data-profile-photo-action="delete" data-profile-photo-slot="' + index + '"' + (!filled ? " disabled" : "") + '>删除</button>' +
-          '<button type="button" class="primary" data-profile-photo-action="select" data-profile-photo-slot="' + index + '"' + (!filled || active ? " disabled" : "") + '>' + (active ? "已选" : "选中") + '</button>' +
+          '<button type="button" class="primary" data-profile-photo-action="select" data-profile-photo-slot="' + index + '">选择</button>' +
         '</div>' +
         '<input type="file" accept="image/*" data-profile-photo-file-slot="' + index + '" hidden>' +
       '</article>';
@@ -19406,17 +19460,6 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       const roles = getStatsRoles();
       const deskRoleName = String(target?.closest?.("[data-profile-desk-role]")?.getAttribute?.("data-profile-desk-role") || "");
       const roleNames = profileRoleNamesForPage(page, roles);
-      const selectedRoleName = deskRoleName || roleNames[normalizeProfileIndex(page, roleNames.length)] || "";
-      const selectedRoleData = isPlainObject(roles?.[selectedRoleName]) ? roles[selectedRoleName] : {};
-      if (isMaleRole(selectedRoleName, selectedRoleData)) {
-        page.dataset.profileTransformNotice = "男性角色不能进行改造。";
-        renderPersonProfilePage(page);
-        return;
-      }
-      if (ST_NON_OPERABLE_ROLE_NAMES.has(selectedRoleName)) {
-        openProfileLockedDialog(page, "remodel-immune");
-        return;
-      }
       if (deskRoleName) {
         const index = roleNames.indexOf(deskRoleName);
         if (index >= 0) page.dataset.profileIndex = String(index);
@@ -19464,7 +19507,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       return;
     }
     if (action === "upload-photo") {
-      openProfilePhotoDialog(page);
+      openProfilePhotoAvatarPicker(page);
       return;
     }
   }
@@ -19672,17 +19715,6 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   }
 
   function bindPersonProfileActionButtons(page) {
-    page.querySelectorAll('[data-profile-action="upload-photo"]').forEach((button) => {
-      if (button.dataset.profilePhotoDirectBound === "true") return;
-      button.dataset.profilePhotoDirectBound = "true";
-      bindAvatarLibraryActivation(button, () => openProfilePhotoDialog(page));
-    });
-    page.querySelectorAll('[data-profile-photo-action="change"]').forEach((button) => {
-      if (button.dataset.profilePhotoChangeDirectBound === "true") return;
-      button.dataset.profilePhotoChangeDirectBound = "true";
-      const slot = Number(button.getAttribute("data-profile-photo-slot") || 0) || 0;
-      bindAvatarLibraryActivation(button, () => openProfileAvatarLibraryPicker(page, slot));
-    });
     const activateDelete = (button, event) => {
       if ((event.type === "pointerup" || event.type === "mousedown") && event.button !== undefined && event.button !== 0) return;
       if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
@@ -20029,11 +20061,15 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
         event.stopPropagation();
         const action = photoAction.getAttribute("data-profile-photo-action") || "";
         const slot = Number(photoAction.getAttribute("data-profile-photo-slot") || 0) || 0;
-        if (action === "change" && profileAvatarLibraryPointerLocked(page) && page.querySelector("[data-profile-avatar-library-picker]")) return;
+        if ((action === "pick" || action === "select") && profileAvatarLibraryPointerLocked(page) && page.querySelector("[data-profile-avatar-library-picker]")) return;
         if (action === "close") closeProfilePhotoDialog(page);
-        if (action === "change") openProfileAvatarLibraryPicker(page, slot);
+        if (action === "pick" || action === "select") openProfileAvatarLibraryPicker(page, slot);
+        if (action === "local") {
+          const input = photoAction.closest(".st-profile-photo-slot")?.querySelector("[data-profile-photo-file-slot]");
+          if (typeof input?.showPicker === "function") input.showPicker();
+          else input?.click();
+        }
         if (action === "delete") profileDeletePhotoSlot(page, slot);
-        if (action === "select") profileSelectPhotoSlot(page, slot);
         if (action === "reset-default") {
           page.dataset.profilePhotoResetWarning = "true";
           renderPersonProfilePage(page);
@@ -20201,7 +20237,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       }
       if ((event.key === "Enter" || event.key === " ") && event.target?.closest?.('[data-profile-action="upload-photo"]')) {
         event.preventDefault();
-        openProfilePhotoDialog(page);
+        openProfilePhotoAvatarPicker(page);
       }
       if (event.key === "Escape" && page.dataset.profilePickerOpen === "true") {
         event.preventDefault();
@@ -20339,8 +20375,8 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
           '<button type="button" data-profile-desk-page="next" aria-label="下一页">›</button>' +
         '</nav>'
       : "";
-    const lockedDialogHtml = ["bad-records", "remodel", "remodel-immune"].includes(page.dataset.profileLockedDialog)
-      ? renderProfileLockedDialog(page.dataset.profileLockedDialog)
+    const lockedDialogHtml = page.dataset.profileLockedDialog === "bad-records"
+      ? renderProfileLockedDialog()
       : "";
     const todoDialogHtml = page.dataset.profileTodoDialog === "items"
       ? renderProfileTodoDialog(page.dataset.profileTodoDialog)
@@ -20445,11 +20481,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       '<button class="st-person-tab is-locked ' + (active ? "active" : "") + '" type="button" data-profile-action="' + escapeAttr(action) + '" aria-label="' + escapeAttr(label + "待续") + '">' + escapeHtml(label) + '</button>'
     );
     const eventsTabHtml = '<button class="st-person-tab ' + (inEventsMode ? "active" : "") + '" type="button" data-profile-chain-open>事件</button>';
-    const remodelTabHtml = ST_NON_OPERABLE_ROLE_NAMES.has(roleName)
-      ? '<button class="st-person-tab is-locked" type="button" data-profile-action="remodel" aria-label="该角色不可改造">改造</button>'
-      : isMaleRole(roleName, roleData)
-        ? '<button class="st-person-tab is-locked" type="button" data-profile-action="remodel" aria-label="男性角色不可改造">改造</button>'
-      : '<button class="st-person-tab ' + (!inEventsMode && activeTab === "remodel" ? "active" : "") + '" type="button" data-profile-action="remodel">改造</button>';
+    const remodelTabHtml = '<button class="st-person-tab ' + (!inEventsMode && activeTab === "remodel" ? "active" : "") + '" type="button" data-profile-action="remodel">改造</button>';
     const navSet = activeProfileNavSet(page);
     page.dataset.profileNavSet = navSet;
     const navSwitchHtml = '<button class="st-person-tab is-nav-switch" type="button" data-profile-action="toggle-tab-group">' + (navSet === "confidential" ? "常规" : "深层") + '</button>';
@@ -20495,8 +20527,8 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     const photoDialogHtml = page.dataset.profilePhotoDialog === "true"
       ? renderProfilePhotoDialog(roleName, roleData, page.dataset.profilePhotoResetWarning === "true")
       : "";
-    const lockedDialogHtml = ["bad-records", "remodel", "remodel-immune"].includes(page.dataset.profileLockedDialog)
-      ? renderProfileLockedDialog(page.dataset.profileLockedDialog)
+    const lockedDialogHtml = page.dataset.profileLockedDialog === "bad-records"
+      ? renderProfileLockedDialog()
       : "";
     const todoDialogHtml = page.dataset.profileTodoDialog === "items"
       ? renderProfileTodoDialog(page.dataset.profileTodoDialog)
@@ -20534,8 +20566,8 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
             '<div class="st-person-photo-tabs-wrap" data-profile-nav-set="' + escapeAttr(navSet) + '" style="--profile-nav-normal-art:url(' + escapeAttr(JSON.stringify(ST_PROFILE_NAV_NORMAL_ART)) + ');--profile-nav-confidential-art:url(' + escapeAttr(JSON.stringify(ST_PROFILE_NAV_CONFIDENTIAL_ART)) + ')">' +
               '<nav class="st-person-tabs st-person-tabs-left" aria-label="档案分页左侧">' + leftTabsHtml + '</nav>' +
               '<div class="st-person-photo-wrap">' +
-                '<button class="st-person-photo" type="button" data-profile-action="upload-photo" title="管理照片">' +
-                  (photo ? '<img alt="' + escapeAttr(profileDisplayNameText(roleName, roleData)) + '" src="' + escapeAttr(photo) + '">' : '<div class="st-person-photo-empty">点击照片区域<br>管理图片</div>') +
+                '<button class="st-person-photo" type="button" data-profile-action="upload-photo" title="选择头像">' +
+                  (photo ? '<img alt="' + escapeAttr(profileDisplayNameText(roleName, roleData)) + '" src="' + escapeAttr(photo) + '">' : '<div class="st-person-photo-empty">点击照片区域<br>选择头像</div>') +
                 '</button>' +
               '</div>' +
               '<nav class="st-person-tabs st-person-tabs-right" aria-label="档案分页右侧">' + rightTabsHtml + '</nav>' +
@@ -39570,7 +39602,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     }
     try { window.__ST_SET_CHEAT_MODE_STATUS_REMINDER__?.(null); } catch {}
     page.dataset.settingsStatus = active
-      ? "作弊模式已开启：全部VIP已解锁，零花钱、星光点和MC能量已写入99999999，可再次点击补满。"
+      ? "作弊模式已开启：全部VIP已解锁，零花钱、星光点和MC能量已写入99999999，可再次点击补满；催眠操作仍照常消耗MC能量。"
       : "作弊模式已关闭：已恢复读取原有VIP与资源变量。";
     diagnosticLog("info", active ? "cheat.enabled" : "cheat.disabled", { scope: "phone-only", worldbookWrites: 0, variableWrites: active ? 1 : 0 });
     renderSettingsPage(page);
@@ -40336,7 +40368,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
         '</section>' +
         '<section class="st-settings-panel st-settings-cheat-panel ' + (cheatActive ? "is-active" : "") + '">' +
           '<h3>作弊模式</h3>' +
-          '<p>当前状态：<strong>' + (cheatActive ? "已开启" : "未开启") + '</strong>。输入密钥开启后解锁全部VIP，并把零花钱、星光点和MC能量写入99999999；可重复点击补满，不修改世界书。</p>' +
+          '<p>当前状态：<strong>' + (cheatActive ? "已开启" : "未开启") + '</strong>。输入密钥开启后解锁全部VIP，并把零花钱、星光点和MC能量写入99999999；可重复点击补满，不修改世界书；催眠操作仍照常消耗MC能量。</p>' +
           (!cheatActive ? '<label><span>开启密钥</span><input class="st-settings-code st-settings-cheat-key" type="password" data-settings-cheat-key autocomplete="off" inputmode="numeric" placeholder="请输入密钥"></label>' : '') +
           '<div class="st-settings-actions ' + (cheatActive ? "is-two" : "is-single") + '">' +
             '<button type="button" class="st-settings-button primary" data-settings-action="cheat-on"' + (cheatActive ? ' data-settings-cheat-indicator title="再次补满作弊资源"' : '') + '>' + (cheatActive ? "再次获取资源" : "开启作弊模式") + '</button>' +

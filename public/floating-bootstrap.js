@@ -1796,6 +1796,11 @@
       if (shellOpen) toggleShell(false);
       pausePetAutonomy();
       commitPetRoamPosition();
+      // 长按/右键唤起菜单时，桌宠先播放“被戳/摇摆”反应动画。
+      loadPetAsset(petCharacterId, "unique-b").then(function () {
+        if (!launcher || launcherDragState || petSwitching || shellOpen) return;
+        setPetState("unique_b");
+      }).catch(function () {});
       var chooseButton = petMenu.querySelector("[data-pet-action='choose']");
       if (chooseButton) chooseButton.setAttribute("aria-label", "选择桌宠人物");
       positionPetMenu();

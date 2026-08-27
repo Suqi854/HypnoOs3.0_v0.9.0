@@ -279,26 +279,38 @@ test('avatar library applies uploaded images through host-safe controls', () => 
   assert.ok(render.includes('profileSaveLocalPhoto(selectedRole, source)'));
 });
 
-test('profile photo replace opens the avatar library and applies to the requested slot', () => {
+test('profile photo area and photo folder open the avatar library floating window and apply live', () => {
   const picker = functionBody('renderProfileAvatarLibraryPicker');
   const open = functionBody('openProfileAvatarLibraryPicker');
+  const photoArea = functionBody('openProfilePhotoAvatarPicker');
   const profilePage = functionBody('bindPersonProfileEvents');
   assert.ok(open.includes('data-profile-avatar-library-picker'));
   assert.ok(open.includes('renderProfileAvatarLibraryPicker(page, picker, index)'));
+  assert.ok(open.includes('.st-profile-detail-stage'));
   assert.ok(picker.includes('readAvatarLibraryIndex()'));
   assert.ok(picker.includes('profileGetPhotoStorageIdb(avatarLibraryImageKey'));
-  assert.ok(picker.includes('profileSetPhotoSlot(page, index, source)'));
+  assert.ok(picker.includes('profileSetPhotoSlotLive(page, index, source)'));
   assert.ok(picker.includes('importAvatarLibraryFiles(files)'));
   assert.ok(picker.includes('bindAvatarLibrarySelectionActivation(button, async () =>'));
+  assert.ok(picker.includes('data-profile-avatar-library-confirm'));
+  assert.ok(picker.includes('data-profile-avatar-library-photo-folder'));
   assert.ok(open.includes('if (current && Number(page.dataset.profileAvatarLibrarySlot || 0) === index) return'));
   assert.ok(open.includes('lockProfileAvatarLibraryPointer(page)'));
+  assert.ok(photoArea.includes('openProfileAvatarLibraryPicker(page, selected)'));
   const directActions = functionBody('bindPersonProfileActionButtons');
-  assert.ok(directActions.includes('bindAvatarLibraryActivation(button, () => openProfilePhotoDialog(page))'));
-  assert.ok(directActions.includes('bindAvatarLibraryActivation(button, () => openProfileAvatarLibraryPicker(page, slot))'));
-  assert.ok(profilePage.includes('if (action === "change") openProfileAvatarLibraryPicker(page, slot)'));
-  assert.ok(!profilePage.includes('if (action === "change") page.querySelector'));
+  assert.ok(!directActions.includes('bindAvatarLibraryActivation(button, () => openProfilePhotoDialog(page))'));
+  assert.ok(profilePage.includes('if (action === "pick" || action === "select") openProfileAvatarLibraryPicker(page, slot)'));
+  assert.ok(profilePage.includes('if (action === "local")'));
+  assert.ok(!profilePage.includes('if (action === "change") openProfileAvatarLibraryPicker'));
   const photoDialog = functionBody('renderProfilePhotoDialog');
-  assert.ok(photoDialog.includes('<button type="button" class="st-profile-photo-preview" data-profile-photo-action="change"'));
+  assert.ok(photoDialog.includes('data-profile-photo-action="pick"'));
+  assert.ok(photoDialog.includes('data-profile-photo-action="local"'));
+  assert.ok(photoDialog.includes('data-profile-photo-action="select"'));
+  assert.ok(photoDialog.includes('data-profile-photo-slot-cell="'));
+  assert.ok(!photoDialog.includes('data-profile-photo-action="change"'));
+  const profileAction = functionBody('runPersonProfileAction');
+  assert.ok(profileAction.includes('if (action === "upload-photo")'));
+  assert.ok(profileAction.includes('openProfilePhotoAvatarPicker(page)'));
 });
 
 test('raw operation containers use the built-in fold renderer without a SillyTavern regex', () => {
