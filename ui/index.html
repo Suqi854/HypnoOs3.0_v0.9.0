@@ -30705,7 +30705,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     return null;
   }
 
-  async function encounterInsertEntriesWithTavernHelper(win, entries, fallbackName) {
+  async function encounterInsertEntriesWithTavernHelper(win, entries, fallbackName, options = {}) {
     const bound = await encounterEnsureCharacterWorldbookWithTavernHelper(win, fallbackName);
     if (!bound || typeof bound.target?.createWorldbookEntries !== "function") return null;
     try {
@@ -30732,6 +30732,12 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
             const comment = encounterEntryTitle(entry);
             if (!existingCommentsToRepair.has(comment)) continue;
             const incoming = incomingByComment.get(comment);
+            if (options.overwrite === true && incoming) {
+              const uid = entry.uid;
+              Object.assign(entry, encounterClone(incoming));
+              if (uid !== undefined) entry.uid = uid;
+              continue;
+            }
             if (ENCOUNTER_MANAGED_CONSTANT_ENTRY_COMMENTS.has(comment)) {
               encounterNormalizeManagedWorldEntryActivation(entry);
               continue;
@@ -31054,7 +31060,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     }
   }
 
-	  async function encounterInsertEntriesWithSillyTavernModule(win, entries, fallbackName) {
+	  async function encounterInsertEntriesWithSillyTavernModule(win, entries, fallbackName, options = {}) {
 	    const bound = await encounterEnsureCharacterWorldbookWithSillyTavernModule(win, fallbackName);
 	    if (!bound) return null;
     try {
@@ -31075,6 +31081,14 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       let updatedCount = 0;
       let existingCount = 0;
       for (const entry of laidOutEntries) {
+        const existing = options.overwrite === true ? encounterFindWorldEntryDuplicate(currentEntries, entry) : null;
+        if (existing) {
+          const uid = existing.uid;
+          Object.assign(existing, encounterClone(entry));
+          if (uid !== undefined) existing.uid = uid;
+          updatedCount += 1;
+          continue;
+        }
         const status = encounterUpsertWorldEntry(data, entry);
         if (status === "inserted") insertedCount += 1;
         else if (status === "updated") updatedCount += 1;
@@ -31627,14 +31641,14 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       return { ok: true, line, hasRole, base, monitoring, affection, completion, traitRoom, legacyHeadingMigration };
     }
 
-		  async function encounterInsertPackageWorldbooks(pkg) {
+		  async function encounterInsertPackageWorldbooks(pkg, options = {}) {
 		    const entries = encounterWorldbookEntryList(pkg);
 		    if (!entries.length) return { ok: true, count: 0, failed: [] };
 		    const fallbackName = encounterDefaultCharacterWorldbookName(pkg);
 		    for (const win of encounterCandidateWindows()) {
-		      const helperResult = await encounterInsertEntriesWithTavernHelper(win, entries, fallbackName);
+		      const helperResult = await encounterInsertEntriesWithTavernHelper(win, entries, fallbackName, options);
 		      if (helperResult?.ok) return { ...helperResult, failed: [] };
-		      const result = await encounterInsertEntriesWithSillyTavernModule(win, entries, fallbackName);
+		      const result = await encounterInsertEntriesWithSillyTavernModule(win, entries, fallbackName, options);
 		      if (result?.ok) return { ...result, failed: [] };
 		    }
 	    return {
@@ -39370,14 +39384,14 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     };
     const results = [];
     if (stages.police > 0) {
-      const install = await encounterInsertPackageWorldbooks(policeAttentionPackage());
+      const install = await encounterInsertPackageWorldbooks(policeAttentionPackage(), { overwrite: true });
       if (!install?.ok) throw new Error("警视厅线世界书覆盖失败：" + (install?.failed?.join("；") || install?.reason || "未知错误"));
       const sync = await policeAttentionSyncWorldbookLifecycle(stages.police);
       if (!sync?.ok) throw new Error(sync?.reason || "警视厅线世界书阶段同步失败。");
       results.push("警视厅线阶段" + stages.police);
     }
     if (stages.ghost > 0) {
-      const install = await encounterInsertPackageWorldbooks(ghostLinePackage());
+      const install = await encounterInsertPackageWorldbooks(ghostLinePackage(), { overwrite: true });
       if (!install?.ok) throw new Error("隐藏线世界书覆盖失败：" + (install?.failed?.join("；") || install?.reason || "未知错误"));
       const sync = await settingsSyncGhostLineWorldbookLifecycle(stages.ghost);
       if (!sync?.ok) throw new Error(sync?.reason || "隐藏线世界书阶段同步失败。");
@@ -40287,7 +40301,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
         '</section>' +
         '<section class="st-settings-panel">' +
           '<h3>覆盖世界书</h3>' +
-          '<p>用于不同版本聊天迁移：若警视厅线、医院线或隐藏线已经开始，会按当前阶段重新覆盖对应角色卡世界书，并恢复正确启停状态。不会修改变量，也不会提前透露隐藏线内容。</p>' +
+          '<p>用于不同版本聊天迁移：若警视厅线或隐藏线已经开始，会用当前版本替换对应角色卡世界书的同名旧条目，并恢复正确启停状态。不会修改变量，也不会提前透露隐藏线内容。</p>' +
           '<div class="st-settings-actions is-single">' +
             '<button type="button" class="st-settings-button primary" data-settings-action="overwrite-line-worldbooks">覆盖当前阶段世界书</button>' +
           '</div>' +
@@ -40607,7 +40621,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     });
     page.querySelector('[data-settings-action="overwrite-line-worldbooks"]')?.addEventListener("click", async (event) => {
       settingsStopEvent(event);
-      const ok = await encounterConfirm(page, { title: "覆盖线路世界书", message: "将根据当前变量中已开始的线路，重新覆盖对应世界书条目并恢复阶段启停。此操作不会修改变量。", confirmText: "确认覆盖" });
+      const ok = await encounterConfirm(page, { title: "覆盖线路世界书", message: "将根据当前变量中已开始的线路，用当前版本替换同名旧条目并恢复阶段启停。此操作不会修改变量。", confirmText: "确认覆盖" });
       if (!ok) return;
       page.dataset.settingsStatus = "正在覆盖当前阶段世界书...";
       renderSettingsPage(page);

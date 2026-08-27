@@ -37,6 +37,18 @@ test('worldbook-backed apps keep their specialized 4.3 routes', () => {
   ]) assert.ok(html.includes(route), `specialized route changed: ${route}`);
 });
 
+test('settings worldbook overwrite replaces old managed line entries only on explicit request', () => {
+  const settingsOverwrite = functionBody('settingsOverwriteLineWorldbooks');
+  const insert = functionBody('encounterInsertPackageWorldbooks');
+  const helper = functionBody('encounterInsertEntriesWithTavernHelper');
+  const native = functionBody('encounterInsertEntriesWithSillyTavernModule');
+  assert.ok(settingsOverwrite.includes('{ overwrite: true }'));
+  assert.ok(insert.includes('options = {}'));
+  assert.ok(helper.includes('options.overwrite === true'));
+  assert.ok(native.includes('options.overwrite === true'));
+  assert.ok(html.includes('用当前版本替换同名旧条目'));
+});
+
 test('legacy people are cleared before encounter rendering while imports remain available', () => {
   const encounter = functionBody('openEncounterPage');
   assert.ok(encounter.indexOf('await encounterResetLibraryFor070Once()') < encounter.indexOf('renderEncounterPage(page)'));
