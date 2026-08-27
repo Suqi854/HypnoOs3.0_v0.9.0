@@ -102,13 +102,133 @@ test('optional runtime lifecycle forwards MVU updates and disposes subscriptions
     let calls = 0;
     const host = new HostAdapter();
     host.installOptionalRuntimeLifecycle(() => { calls += 1; });
-    listeners.get('mvu-update-ended')();
     await Promise.resolve();
     assert.equal(calls, 1);
+    listeners.get('mvu-update-ended')();
+    await Promise.resolve();
+    assert.equal(calls, 2);
     host.destroy();
-    assert.equal(stopped, 1);
+    assert.equal(stopped, 2);
   } finally {
     delete globalThis.eventOn;
+    delete globalThis.Mvu;
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  }
+});
+
+test('optional runtime lifecycle binds MVU when it initializes after HypnoOS', async () => {
+  const previousDocument = globalThis.document;
+  const listeners = new Map();
+  globalThis.document = { querySelectorAll: () => [] };
+  globalThis.eventOn = (name, listener) => {
+    listeners.set(name, listener);
+    return { stop() { listeners.delete(name); } };
+  };
+  delete globalThis.Mvu;
+  const host = new HostAdapter();
+  try {
+    let calls = 0;
+    host.installOptionalRuntimeLifecycle(() => { calls += 1; });
+    assert.equal(listeners.has('global_Mvu_initialized'), true);
+
+    globalThis.Mvu = {
+      events: {
+        VARIABLE_INITIALIZED: 'mvu-initialized',
+        VARIABLE_UPDATE_ENDED: 'mvu-update-ended',
+      },
+      getMvuData: () => ({}),
+      replaceMvuData: () => true,
+    };
+    listeners.get('global_Mvu_initialized')();
+    await Promise.resolve();
+    assert.equal(listeners.has('mvu-initialized'), true);
+    assert.equal(listeners.has('mvu-update-ended'), true);
+    assert.equal(calls, 1);
+  } finally {
+    host.destroy();
+    delete globalThis.eventOn;
+    delete globalThis.Mvu;
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  }
+});
+
+test('optional runtime lifecycle refreshes variables after every AI reply', async () => {
+  const previousDocument = globalThis.document;
+  const hostListeners = new Map();
+  globalThis.document = { querySelectorAll: () => [] };
+  globalThis.SillyTavern = { getContext: () => ({
+    eventTypes: { MESSAGE_RECEIVED: 'message-received' },
+    eventSource: {
+      on: (name, listener) => hostListeners.set(name, listener),
+      removeListener: (name) => hostListeners.delete(name),
+    },
+  }) };
+  const host = new HostAdapter();
+  try {
+    let calls = 0;
+    host.installOptionalRuntimeLifecycle(() => { calls += 1; });
+    hostListeners.get('message-received')();
+    await Promise.resolve();
+    hostListeners.get('message-received')();
+    await Promise.resolve();
+    assert.equal(calls, 2);
+  } finally {
+    host.destroy();
+    delete globalThis.SillyTavern;
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  }
+});
+
+test('optional runtime lifecycle retries when MVU precedes Tavern Helper events', async () => {
+  const previousDocument = globalThis.document;
+  const listeners = new Map();
+  globalThis.document = { querySelectorAll: () => [] };
+  globalThis.Mvu = {
+    events: { VARIABLE_UPDATE_ENDED: 'mvu-update-ended' },
+    getMvuData: () => ({}),
+    replaceMvuData: () => true,
+  };
+  delete globalThis.eventOn;
+  const host = new HostAdapter();
+  try {
+    let calls = 0;
+    host.installOptionalRuntimeLifecycle(() => { calls += 1; });
+    await Promise.resolve();
+    assert.equal(calls, 1);
+    globalThis.eventOn = (name, listener) => {
+      listeners.set(name, listener);
+      return { stop() { listeners.delete(name); } };
+    };
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    assert.equal(listeners.has('mvu-update-ended'), true);
+  } finally {
+    host.destroy();
+    delete globalThis.eventOn;
+    delete globalThis.Mvu;
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  }
+});
+
+test('optional runtime snapshots prefer current message MVU over chat mirrors', async () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { querySelectorAll: () => [] };
+  globalThis.SillyTavern = { getContext: () => ({ chat: [{}] }) };
+  globalThis.getVariables = (option) => ({ stat_data: { 系统: { MC能量: option.type === 'chat' ? 1 : 2 } } });
+  globalThis.Mvu = {
+    getMvuData: (option) => ({ stat_data: { 系统: { MC能量: option.type === 'chat' ? 3 : 99 } } }),
+    replaceMvuData: () => true,
+  };
+  try {
+    const snapshots = await new HostAdapter().readOptionalRuntimeState();
+    assert.equal(snapshots[0].source, 'mvu:message');
+    assert.equal(snapshots[0].value.stat_data.系统.MC能量, 99);
+  } finally {
+    delete globalThis.SillyTavern;
+    delete globalThis.getVariables;
     delete globalThis.Mvu;
     if (previousDocument === undefined) delete globalThis.document;
     else globalThis.document = previousDocument;

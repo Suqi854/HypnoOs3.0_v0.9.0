@@ -260,15 +260,21 @@ export class HostAdapter {
   async readOptionalRuntimeState() {
     const snapshots = [];
     const latest = this.latestMessageId();
+    const mvu = runtimeMvu();
+    const helper = runtimeFunction('getVariables');
     for (const option of [{ type: 'message', message_id: latest }, { type: 'message', message_id: 'latest' }, { type: 'chat' }]) {
-      try {
-        const value = await Promise.resolve(this.readVariables(option));
-        if (usableObject(value)) snapshots.push({ source: `tavern-helper:${option.type}`, value });
-      } catch {}
-      try {
-        const value = await Promise.resolve(this.readMvu(option));
-        if (usableObject(value)) snapshots.push({ source: `mvu:${option.type}`, value });
-      } catch {}
+      if (mvu) {
+        try {
+          const value = await Promise.resolve(mvu.getMvuData(option));
+          if (usableObject(value)) snapshots.push({ source: `mvu:${option.type}`, value });
+        } catch {}
+      }
+      if (helper) {
+        try {
+          const value = await Promise.resolve(helper.fn.call(helper.view, option));
+          if (usableObject(value)) snapshots.push({ source: `tavern-helper:${option.type}`, value });
+        } catch {}
+      }
     }
     const message = this.context?.chat?.[latest];
     const messageSnapshot = messageVariableSnapshot(message);
@@ -313,16 +319,48 @@ export class HostAdapter {
     if (typeof listener !== 'function') return;
     const notify = () => Promise.resolve().then(listener).catch((error) => console.warn(`[${EXTENSION_ID}] 兼容状态导入失败`, error));
     const subscribed = new Set();
-    const helper = runtimeFunction('eventOn');
-    const mvuEvents = this.getMvuEvents();
-    for (const key of ['VARIABLE_INITIALIZED', 'VARIABLE_UPDATE_ENDED']) {
-      const eventName = mvuEvents[key];
-      if (!eventName || subscribed.has(eventName) || !helper) continue;
+    let retryTimer = null;
+    let retryCount = 0;
+    let runtimeSynced = false;
+    const subscribeRuntimeEvent = (helper, eventName, callback) => {
+      if (!eventName || subscribed.has(eventName) || !helper) return false;
       try {
-        const subscription = helper.fn.call(helper.view, eventName, notify);
+        const subscription = helper.fn.call(helper.view, eventName, callback);
         subscribed.add(eventName);
         this.#disposers.push(() => subscription?.stop?.());
-      } catch {}
+        return true;
+      } catch { return false; }
+    };
+    const bindRuntimeEvents = () => {
+      retryCount += 1;
+      const helper = runtimeFunction('eventOn');
+      subscribeRuntimeEvent(helper, 'global_Mvu_initialized', bindRuntimeEvents);
+      const mvuEvents = this.getMvuEvents();
+      for (const key of ['VARIABLE_INITIALIZED', 'VARIABLE_UPDATE_ENDED']) {
+        subscribeRuntimeEvent(helper, mvuEvents[key], notify);
+      }
+      if (runtimeMvu() && !runtimeSynced) {
+        runtimeSynced = true;
+        notify();
+      }
+      const runtimeEventNames = ['VARIABLE_INITIALIZED', 'VARIABLE_UPDATE_ENDED']
+        .map((key) => mvuEvents[key])
+        .filter(Boolean);
+      const complete = runtimeEventNames.length > 0
+        && runtimeEventNames.every((eventName) => subscribed.has(eventName));
+      if ((complete || retryCount >= 120) && retryTimer) {
+        clearInterval(retryTimer);
+        retryTimer = null;
+      }
+      return complete;
+    };
+    if (!bindRuntimeEvents()) {
+      retryTimer = setInterval(bindRuntimeEvents, 250);
+      retryTimer.unref?.();
+      this.#disposers.push(() => {
+        if (retryTimer) clearInterval(retryTimer);
+        retryTimer = null;
+      });
     }
     const context = this.context;
     for (const key of ['MESSAGE_RECEIVED', 'MESSAGE_UPDATED']) {
