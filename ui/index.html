@@ -16282,6 +16282,15 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     page.querySelector("[data-profile-avatar-library-picker]")?.remove();
   }
 
+  function lockProfileAvatarLibraryPointer(page, duration = 420) {
+    if (!page?.dataset) return;
+    page.dataset.profileAvatarLibraryPointerLockUntil = String(Date.now() + duration);
+  }
+
+  function profileAvatarLibraryPointerLocked(page) {
+    return Number(page?.dataset?.profileAvatarLibraryPointerLockUntil || 0) > Date.now();
+  }
+
   async function renderProfileAvatarLibraryPicker(page, picker, slotIndex) {
     if (!page || !picker) return;
     const index = Math.max(0, Math.min(3, Math.trunc(Number(slotIndex) || 0)));
@@ -16322,9 +16331,10 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       page.dataset.profileAvatarLibraryFeedback = "已导入 " + result.added.length + " 张。" + (result.rejected.length ? "\n未导入：" + result.rejected.join("；") : "");
       await renderProfileAvatarLibraryPicker(page, picker, index);
     });
-    picker.querySelectorAll("[data-profile-avatar-library-select]").forEach((button) => bindAvatarLibraryActivation(button, async () => {
+    picker.querySelectorAll("[data-profile-avatar-library-select]").forEach((button) => bindAvatarLibrarySelectionActivation(button, async () => {
       const source = await profileGetPhotoStorageIdb(avatarLibraryImageKey(button.getAttribute("data-profile-avatar-library-select")));
       if (!source) return;
+      lockProfileAvatarLibraryPointer(page);
       closeProfileAvatarLibraryPicker(page);
       profileSetPhotoSlot(page, index, source);
     }));
@@ -16334,7 +16344,10 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     const dialog = page?.querySelector?.("[data-profile-photo-dialog]");
     if (!dialog) return;
     const index = Math.max(0, Math.min(3, Math.trunc(Number(slotIndex) || 0)));
+    const current = dialog.querySelector("[data-profile-avatar-library-picker]");
+    if (current && Number(page.dataset.profileAvatarLibrarySlot || 0) === index) return;
     closeProfileAvatarLibraryPicker(page);
+    lockProfileAvatarLibraryPointer(page);
     page.dataset.profileAvatarLibrarySlot = String(index);
     const picker = document.createElement("div");
     picker.className = "st-profile-avatar-picker-dialog";
@@ -20016,6 +20029,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
         event.stopPropagation();
         const action = photoAction.getAttribute("data-profile-photo-action") || "";
         const slot = Number(photoAction.getAttribute("data-profile-photo-slot") || 0) || 0;
+        if (action === "change" && profileAvatarLibraryPointerLocked(page) && page.querySelector("[data-profile-avatar-library-picker]")) return;
         if (action === "close") closeProfilePhotoDialog(page);
         if (action === "change") openProfileAvatarLibraryPicker(page, slot);
         if (action === "delete") profileDeletePhotoSlot(page, slot);
@@ -20034,6 +20048,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       if (event.target?.closest?.("[data-profile-photo-dialog]") && !event.target?.closest?.(".st-profile-photo-card")) {
         event.preventDefault();
         event.stopPropagation();
+        if (profileAvatarLibraryPointerLocked(page)) return;
         closeProfilePhotoDialog(page);
         return;
       }
@@ -41954,6 +41969,27 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     };
     button.addEventListener("mousedown", activate);
     button.addEventListener("touchstart", activate, { passive: false });
+    button.addEventListener("keydown", activate);
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    });
+  }
+
+  function bindAvatarLibrarySelectionActivation(button, handler) {
+    if (!button || typeof handler !== "function") return;
+    const activate = (event) => {
+      if (event.type === "pointerup" && event.button !== undefined && event.button !== 0) return;
+      if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
+      if (button.dataset.avatarActionBusy === "true") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      button.dataset.avatarActionBusy = "true";
+      Promise.resolve(handler()).finally(() => {
+        if (button.isConnected) delete button.dataset.avatarActionBusy;
+      });
+    };
+    button.addEventListener("pointerup", activate);
     button.addEventListener("keydown", activate);
     button.addEventListener("click", (event) => {
       event.preventDefault();

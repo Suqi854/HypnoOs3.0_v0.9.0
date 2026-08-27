@@ -58,10 +58,12 @@ try {
   await photoDialog.locator('.st-profile-photo-preview[data-profile-photo-slot="0"]').dispatchEvent('mousedown', { button: 0 });
   const picker = profile.locator('[data-profile-avatar-library-picker]');
   await picker.waitFor({ state: 'visible' });
+  await page.waitForTimeout(500);
+  assert.equal(await picker.count(), 1, '头像库被同一次点击立即关闭或重复打开');
   assert.equal(await photoDialog.locator('.st-profile-photo-slot').count(), 4, '打开头像库后改变了原照片夹布局');
   assert.equal(await picker.locator('[data-profile-avatar-library-select]').count(), 1, '档案内头像库没有读取已上传头像');
   if (process.env.HYPNOOS_QA_SCREENSHOT) await profile.screenshot({ path: process.env.HYPNOOS_QA_SCREENSHOT });
-  await picker.locator('[data-profile-avatar-library-select]').dispatchEvent('mousedown', { button: 0 });
+  await picker.locator('[data-profile-avatar-library-select]').dispatchEvent('pointerup', { button: 0 });
   await picker.waitFor({ state: 'detached' });
   const slotSource = await photoDialog.locator('[data-profile-photo-slot="0"]').locator('xpath=ancestor::article[1]').locator('img').getAttribute('src');
   const source = await profile.locator('.st-person-photo img').getAttribute('src');
