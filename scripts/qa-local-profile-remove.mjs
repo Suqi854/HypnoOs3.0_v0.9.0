@@ -40,7 +40,9 @@ try {
       } catch {}
     }
     globalThis.__HYPNOOS_QA_MVU__ = () => current;
-    localStorage.setItem('hypnoos:profile-worldbook-roles:v1:global', JSON.stringify({ schema: 'HypnoProfileWorldbooks/v1', roles: { [name]: current.stat_data.角色[name] } }));
+    const profileScope = String(globalThis.__ST_HYPNOOS_CHAT_STORAGE_SCOPE__?.() || globalThis.__ST_HYPNOOS_FRONTEND_SLOT_SCOPE__?.() || 'global');
+    globalThis.__HYPNOOS_QA_PROFILE_SCOPE__ = profileScope;
+    localStorage.setItem('hypnoos:profile-worldbook-roles:v1:' + profileScope, JSON.stringify({ schema: 'HypnoProfileWorldbooks/v1', roles: { [name]: current.stat_data.角色[name] } }));
     localStorage.setItem('hypnoos:favorite-roles:v1:global', JSON.stringify([name]));
     localStorage.setItem('hypnoos:profile-gender-overrides:v1:global', JSON.stringify({ [name]: '女' }));
   }, roleName);
@@ -75,10 +77,10 @@ try {
     };
     return {
       runtimePresent: Boolean(globalThis.__HYPNOOS_QA_MVU__()?.stat_data?.角色?.[name]),
-      importedPresent: Boolean(read('hypnoos:profile-worldbook-roles:v1:global', '{}')?.roles?.[name]),
+      importedPresent: Boolean(read('hypnoos:profile-worldbook-roles:v1:' + globalThis.__HYPNOOS_QA_PROFILE_SCOPE__, '{}')?.roles?.[name]),
       favoritePresent: read('hypnoos:favorite-roles:v1:global', '[]').includes(name),
       genderPresent: Object.prototype.hasOwnProperty.call(read('hypnoos:profile-gender-overrides:v1:global', '{}'), name),
-      dismissed: read('hypnoos:dismissed-profile-roles:v1:global', '[]').includes(name),
+      dismissed: Object.keys(localStorage).filter((key) => key.startsWith('hypnoos:dismissed-profile-roles:v1:')).some((key) => read(key, '[]').includes(name)),
       dialogOpen: Boolean(document.querySelector('[data-profile-delete-dialog]')),
       dossierCardPresent: Boolean(document.querySelector('[data-profile-desk-role="' + CSS.escape(name) + '"]')),
       dossierDetailPresent: document.querySelector('.st-profile-app')?.dataset?.profileDeskMode === 'detail',
