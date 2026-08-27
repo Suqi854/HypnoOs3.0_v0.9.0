@@ -293,9 +293,11 @@ test('profile photo area and photo folder open the avatar library floating windo
   assert.ok(picker.includes('importAvatarLibraryFiles(files)'));
   assert.ok(picker.includes('bindAvatarLibrarySelectionActivation(button, async () =>'));
   assert.ok(picker.includes('data-profile-avatar-library-confirm'));
-  assert.ok(picker.includes('data-profile-avatar-library-photo-folder'));
+  assert.ok(!picker.includes('data-profile-avatar-library-photo-folder'));
+  assert.ok(open.includes('findPhoneRoot(page)'));
   assert.ok(open.includes('if (current && Number(page.dataset.profileAvatarLibrarySlot || 0) === index) return'));
   assert.ok(open.includes('lockProfileAvatarLibraryPointer(page)'));
+  assert.ok(photoArea.includes('openProfilePhotoDialog(page)'));
   assert.ok(photoArea.includes('openProfileAvatarLibraryPicker(page, selected)'));
   const directActions = functionBody('bindPersonProfileActionButtons');
   assert.ok(!directActions.includes('bindAvatarLibraryActivation(button, () => openProfilePhotoDialog(page))'));

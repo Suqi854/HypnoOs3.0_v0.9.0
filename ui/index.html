@@ -6549,21 +6549,21 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
 .st-profile-app .st-profile-photo-preview{border:3px solid #111;border-radius:0;background:#e6dfd4;color:#605953}
 .st-profile-app .st-profile-photo-warning{border:2px solid #111;border-radius:0;background:#fff;color:#111}
 .st-profile-app .st-profile-photo-warning p{color:#8d1327}
-.st-profile-app .st-profile-avatar-picker-dialog{position:absolute;inset:0;z-index:24;display:grid;place-items:center;padding:18px;background:var(--pf-modal-scrim);backdrop-filter:blur(6px)}
-.st-profile-app .st-profile-avatar-picker-card{width:min(100%,304px);max-height:calc(100% - 12px);overflow:auto;gap:10px}
-.st-profile-app .st-profile-avatar-picker-head{display:flex;align-items:end;justify-content:space-between;gap:10px}
-.st-profile-app .st-profile-avatar-picker-head small{color:#605953;font-size:10px;font-weight:900}
-.st-profile-app .st-profile-avatar-picker-toolbar{display:grid;grid-template-columns:1fr auto;gap:7px}
-.st-profile-app .st-profile-avatar-picker-toolbar button,.st-profile-app .st-profile-avatar-picker-card>button{min-height:31px;border:2px solid #111;border-radius:0;background:#fff;color:#111;font-family:"Arial Black","Noto Sans SC",sans-serif;cursor:pointer;clip-path:polygon(0 8%,100% 0,95% 100%,4% 90%)}
-.st-profile-app .st-profile-avatar-picker-toolbar button:first-child{background:var(--pf-accent);color:#fff}
-.st-profile-app .st-profile-avatar-picker-feedback{grid-column:1/-1;margin:0;color:#514a45;font-size:10px;line-height:1.45;white-space:pre-wrap}
-.st-profile-app .st-profile-avatar-picker-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-.st-profile-app .st-profile-avatar-picker-option{min-width:0;border:2px solid #111;background:#fff;padding:6px;display:grid;gap:5px;color:#111;cursor:pointer;text-align:left}
-.st-profile-app .st-profile-avatar-picker-option img{display:block;width:100%;aspect-ratio:4/5;object-fit:cover;background:#e6dfd4}
-.st-profile-app .st-profile-avatar-picker-option strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px}
-.st-profile-app .st-profile-avatar-picker-option.is-selected{border-color:var(--pf-accent);background:#eef7f4;box-shadow:0 0 0 2px var(--pf-accent)}
-.st-profile-app .st-profile-avatar-picker-confirm{width:100%;min-height:34px;border:2px solid #111;border-radius:0;background:var(--pf-accent);color:#fff;font-family:"Arial Black","Noto Sans SC",sans-serif;font-weight:950;cursor:pointer;clip-path:polygon(0 8%,100% 0,95% 100%,4% 90%)}
-.st-profile-app .st-profile-avatar-picker-empty{grid-column:1/-1;margin:0;padding:24px 8px;text-align:center;color:#605953;font-size:11px;font-weight:900}
+.st-profile-avatar-picker-dialog{position:absolute;inset:0;z-index:960;display:grid;place-items:center;padding:18px;background:rgba(9,9,12,.38);backdrop-filter:blur(1.5px)}
+.st-profile-avatar-picker-card{width:min(100%,304px);max-height:calc(100% - 12px);overflow:auto;gap:10px}
+.st-profile-avatar-picker-head{display:flex;align-items:end;justify-content:space-between;gap:10px}
+.st-profile-avatar-picker-head small{color:#605953;font-size:10px;font-weight:900}
+.st-profile-avatar-picker-toolbar{display:grid;grid-template-columns:1fr auto;gap:7px}
+.st-profile-avatar-picker-toolbar button,.st-profile-avatar-picker-card>button{min-height:31px;border:2px solid #111;border-radius:0;background:#fff;color:#111;font-family:"Arial Black","Noto Sans SC",sans-serif;cursor:pointer;clip-path:polygon(0 8%,100% 0,95% 100%,4% 90%)}
+.st-profile-avatar-picker-toolbar button:first-child{background:#ed1831;color:#fff}
+.st-profile-avatar-picker-feedback{grid-column:1/-1;margin:0;color:#514a45;font-size:10px;line-height:1.45;white-space:pre-wrap}
+.st-profile-avatar-picker-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.st-profile-avatar-picker-option{min-width:0;border:2px solid #111;background:#fff;padding:6px;display:grid;gap:5px;color:#111;cursor:pointer;text-align:left}
+.st-profile-avatar-picker-option img{display:block;width:100%;aspect-ratio:4/5;object-fit:cover;background:#e6dfd4}
+.st-profile-avatar-picker-option strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px}
+.st-profile-avatar-picker-option.is-selected{border-color:#ed1831;background:#eef7f4;box-shadow:0 0 0 2px #ed1831}
+.st-profile-avatar-picker-confirm{width:100%;min-height:34px;border:2px solid #111;border-radius:0;background:#ed1831;color:#fff;font-family:"Arial Black","Noto Sans SC",sans-serif;font-weight:950;cursor:pointer;clip-path:polygon(0 8%,100% 0,95% 100%,4% 90%)}
+.st-profile-avatar-picker-empty{grid-column:1/-1;margin:0;padding:24px 8px;text-align:center;color:#605953;font-size:11px;font-weight:900}
 .st-profile-app .st-profile-child-role-dialog{padding:7px}
 .st-profile-app .st-profile-child-role-card{
   width:min(100%,396px);max-height:calc(100% - 2px);padding:15px 11px 11px;gap:8px;
@@ -16265,7 +16265,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     delete page.dataset.profileAvatarLibrarySlot;
     delete page.dataset.profileAvatarLibrarySelected;
     delete page.dataset.profileAvatarLibraryFeedback;
-    page.querySelector("[data-profile-avatar-library-picker]")?.remove();
+    (findPhoneRoot(page) || page)?.querySelector("[data-profile-avatar-library-picker]")?.remove();
     if (rerender && page?.isConnected) renderPersonProfilePage(page);
   }
 
@@ -16343,7 +16343,6 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       '<div class="st-profile-avatar-picker-head"><h3>选择头像</h3><small>照片位 ' + (index + 1) + '</small></div>' +
       '<div class="st-profile-avatar-picker-toolbar">' +
         '<button type="button" data-profile-avatar-library-upload>上传到头像库</button>' +
-        '<button type="button" data-profile-avatar-library-photo-folder>照片夹</button>' +
         '<input type="file" data-profile-avatar-library-files accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>' +
         (page.dataset.profileAvatarLibraryFeedback ? '<p class="st-profile-avatar-picker-feedback" role="status" aria-live="polite">' + escapeHtml(page.dataset.profileAvatarLibraryFeedback) + '</p>' : '') +
       '</div>' +
@@ -16351,10 +16350,6 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       '<button type="button" class="st-profile-avatar-picker-confirm" data-profile-avatar-library-confirm>确定</button>' +
     '</section>';
     bindAvatarLibraryActivation(picker.querySelector("[data-profile-avatar-library-confirm]"), () => closeProfileAvatarLibraryPicker(page, true));
-    bindAvatarLibraryActivation(picker.querySelector("[data-profile-avatar-library-photo-folder]"), () => {
-      closeProfileAvatarLibraryPicker(page, false);
-      openProfilePhotoDialog(page);
-    });
     const input = picker.querySelector("[data-profile-avatar-library-files]");
     bindAvatarLibraryActivation(picker.querySelector("[data-profile-avatar-library-upload]"), () => {
       if (typeof input?.showPicker === "function") input.showPicker();
@@ -16380,11 +16375,14 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   }
 
   // 头像库悬浮窗：点角色照片区域或照片夹的“选择”按钮都会打开。
-  // 点选头像立即应用到对应照片位；只有底部“确定”按钮或边缘空白区域能退出。
+  // 悬浮窗挂在手机根节点上，覆盖整块手机屏幕：悬浮窗卡片之外的空白区域
+  // （手机边缘与悬浮窗之间的全部空白）都算边缘空白，点击即退出；
+  // 底部“确定”按钮同样退出。点选头像立即应用到对应照片位并高亮。
   function openProfileAvatarLibraryPicker(page, slotIndex) {
-    if (!page?.querySelector?.(".st-profile-detail-stage")) return;
+    const host = findPhoneRoot(page) || page?.querySelector?.(".st-profile-detail-stage");
+    if (!host) return;
     const index = Math.max(0, Math.min(3, Math.trunc(Number(slotIndex) || 0)));
-    const current = page.querySelector("[data-profile-avatar-library-picker]");
+    const current = host.querySelector("[data-profile-avatar-library-picker]");
     if (current && Number(page.dataset.profileAvatarLibrarySlot || 0) === index) return;
     closeProfileAvatarLibraryPicker(page, false);
     lockProfileAvatarLibraryPointer(page);
@@ -16403,17 +16401,19 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
         closeProfileAvatarLibraryPicker(page, true);
       }
     });
-    const stage = page.querySelector(".st-profile-detail-stage");
-    stage.appendChild(picker);
+    if (!host.style.position) host.style.position = "relative";
+    host.appendChild(picker);
     void renderProfileAvatarLibraryPicker(page, picker, index);
   }
 
-  // 点击档案里的角色照片区域：直接打开头像库悬浮窗，作用于当前选中的照片位。
+  // 点击档案里的角色照片区域：先保留照片夹主界面，再在其上弹出头像库悬浮窗，
+  // 作用于当前选中的照片位；退出悬浮窗后回到照片夹主界面。
   function openProfilePhotoAvatarPicker(page) {
     const context = currentEditableProfileContext(page);
     if (!context) return;
     const state = profilePhotoSlotsState(context.roleName, context.roleData);
     const selected = Math.max(0, Math.min(3, Math.trunc(Number(state?.selected) || 0)));
+    openProfilePhotoDialog(page);
     openProfileAvatarLibraryPicker(page, selected);
   }
 
@@ -20061,7 +20061,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
         event.stopPropagation();
         const action = photoAction.getAttribute("data-profile-photo-action") || "";
         const slot = Number(photoAction.getAttribute("data-profile-photo-slot") || 0) || 0;
-        if ((action === "pick" || action === "select") && profileAvatarLibraryPointerLocked(page) && page.querySelector("[data-profile-avatar-library-picker]")) return;
+        if ((action === "pick" || action === "select") && profileAvatarLibraryPointerLocked(page) && findPhoneRoot(page)?.querySelector("[data-profile-avatar-library-picker]")) return;
         if (action === "close") closeProfilePhotoDialog(page);
         if (action === "pick" || action === "select") openProfileAvatarLibraryPicker(page, slot);
         if (action === "local") {
@@ -20179,7 +20179,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       return;
     });
     page.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && page.querySelector("[data-profile-avatar-library-picker]")) {
+      if (event.key === "Escape" && findPhoneRoot(page)?.querySelector("[data-profile-avatar-library-picker]")) {
         event.preventDefault();
         event.stopPropagation();
         closeProfileAvatarLibraryPicker(page);
