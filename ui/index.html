@@ -6549,6 +6549,19 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
 .st-profile-app .st-profile-photo-preview{border:3px solid #111;border-radius:0;background:#e6dfd4;color:#605953}
 .st-profile-app .st-profile-photo-warning{border:2px solid #111;border-radius:0;background:#fff;color:#111}
 .st-profile-app .st-profile-photo-warning p{color:#8d1327}
+.st-profile-app .st-profile-avatar-picker-dialog{position:absolute;inset:0;z-index:3;display:grid;place-items:center;padding:18px;background:var(--pf-modal-scrim);backdrop-filter:blur(6px)}
+.st-profile-app .st-profile-avatar-picker-card{width:min(100%,304px);max-height:calc(100% - 12px);overflow:auto;gap:10px}
+.st-profile-app .st-profile-avatar-picker-head{display:flex;align-items:end;justify-content:space-between;gap:10px}
+.st-profile-app .st-profile-avatar-picker-head small{color:#605953;font-size:10px;font-weight:900}
+.st-profile-app .st-profile-avatar-picker-toolbar{display:grid;grid-template-columns:1fr auto;gap:7px}
+.st-profile-app .st-profile-avatar-picker-toolbar button,.st-profile-app .st-profile-avatar-picker-card>button{min-height:31px;border:2px solid #111;border-radius:0;background:#fff;color:#111;font-family:"Arial Black","Noto Sans SC",sans-serif;cursor:pointer;clip-path:polygon(0 8%,100% 0,95% 100%,4% 90%)}
+.st-profile-app .st-profile-avatar-picker-toolbar button:first-child{background:var(--pf-accent);color:#fff}
+.st-profile-app .st-profile-avatar-picker-feedback{grid-column:1/-1;margin:0;color:#514a45;font-size:10px;line-height:1.45;white-space:pre-wrap}
+.st-profile-app .st-profile-avatar-picker-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.st-profile-app .st-profile-avatar-picker-option{min-width:0;border:2px solid #111;background:#fff;padding:6px;display:grid;gap:5px;color:#111;cursor:pointer;text-align:left}
+.st-profile-app .st-profile-avatar-picker-option img{display:block;width:100%;aspect-ratio:4/5;object-fit:cover;background:#e6dfd4}
+.st-profile-app .st-profile-avatar-picker-option strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px}
+.st-profile-app .st-profile-avatar-picker-empty{grid-column:1/-1;margin:0;padding:24px 8px;text-align:center;color:#605953;font-size:11px;font-weight:900}
 .st-profile-app .st-profile-child-role-dialog{padding:7px}
 .st-profile-app .st-profile-child-role-card{
   width:min(100%,396px);max-height:calc(100% - 2px);padding:15px 11px 11px;gap:8px;
@@ -16268,6 +16281,80 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     renderPersonProfilePage(page);
   }
 
+  function closeProfileAvatarLibraryPicker(page) {
+    delete page.dataset.profileAvatarLibrarySlot;
+    delete page.dataset.profileAvatarLibraryFeedback;
+    page.querySelector("[data-profile-avatar-library-picker]")?.remove();
+  }
+
+  async function renderProfileAvatarLibraryPicker(page, picker, slotIndex) {
+    if (!page || !picker) return;
+    const index = Math.max(0, Math.min(3, Math.trunc(Number(slotIndex) || 0)));
+    const token = Date.now() + ":" + Math.random();
+    picker.dataset.profileAvatarLibraryRenderToken = token;
+    const records = await Promise.all(readAvatarLibraryIndex().map(async (item) => ({
+      item,
+      source: await profileGetPhotoStorageIdb(avatarLibraryImageKey(item.id)) || ""
+    })));
+    if (!picker.isConnected || picker.dataset.profileAvatarLibraryRenderToken !== token) return;
+    const options = records.filter((record) => record.source).map(({ item, source }) =>
+      '<button type="button" class="st-profile-avatar-picker-option" data-profile-avatar-library-select="' + escapeAttr(item.id) + '">' +
+        '<img src="' + escapeAttr(source) + '" alt="' + escapeAttr(item.name) + '">' +
+        '<strong>' + escapeHtml(item.name) + '</strong>' +
+      '</button>'
+    ).join("");
+    picker.innerHTML = '<section class="st-profile-photo-card st-profile-avatar-picker-card" role="document">' +
+      '<div class="st-profile-avatar-picker-head"><h3>选择头像</h3><small>照片位 ' + (index + 1) + '</small></div>' +
+      '<div class="st-profile-avatar-picker-toolbar">' +
+        '<button type="button" data-profile-avatar-library-upload>上传到头像库</button>' +
+        '<button type="button" data-profile-avatar-library-close>返回</button>' +
+        '<input type="file" data-profile-avatar-library-files accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>' +
+        (page.dataset.profileAvatarLibraryFeedback ? '<p class="st-profile-avatar-picker-feedback" role="status" aria-live="polite">' + escapeHtml(page.dataset.profileAvatarLibraryFeedback) + '</p>' : '') +
+      '</div>' +
+      '<div class="st-profile-avatar-picker-grid">' + (options || '<p class="st-profile-avatar-picker-empty">头像库为空，请先上传角色头像。</p>') + '</div>' +
+    '</section>';
+    bindAvatarLibraryActivation(picker.querySelector("[data-profile-avatar-library-close]"), () => closeProfileAvatarLibraryPicker(page));
+    const input = picker.querySelector("[data-profile-avatar-library-files]");
+    bindAvatarLibraryActivation(picker.querySelector("[data-profile-avatar-library-upload]"), () => {
+      if (typeof input?.showPicker === "function") input.showPicker();
+      else input?.click();
+    });
+    input?.addEventListener("change", async () => {
+      const files = Array.from(input.files || []);
+      if (!files.length) return;
+      page.dataset.profileAvatarLibraryFeedback = "正在校验并保存头像…";
+      const result = await importAvatarLibraryFiles(files);
+      page.dataset.profileAvatarLibraryFeedback = "已导入 " + result.added.length + " 张。" + (result.rejected.length ? "\n未导入：" + result.rejected.join("；") : "");
+      await renderProfileAvatarLibraryPicker(page, picker, index);
+    });
+    picker.querySelectorAll("[data-profile-avatar-library-select]").forEach((button) => bindAvatarLibraryActivation(button, async () => {
+      const source = await profileGetPhotoStorageIdb(avatarLibraryImageKey(button.getAttribute("data-profile-avatar-library-select")));
+      if (!source) return;
+      closeProfileAvatarLibraryPicker(page);
+      profileSetPhotoSlot(page, index, source);
+    }));
+  }
+
+  function openProfileAvatarLibraryPicker(page, slotIndex) {
+    const dialog = page?.querySelector?.("[data-profile-photo-dialog]");
+    if (!dialog) return;
+    const index = Math.max(0, Math.min(3, Math.trunc(Number(slotIndex) || 0)));
+    closeProfileAvatarLibraryPicker(page);
+    page.dataset.profileAvatarLibrarySlot = String(index);
+    const picker = document.createElement("div");
+    picker.className = "st-profile-avatar-picker-dialog";
+    picker.setAttribute("data-profile-avatar-library-picker", "");
+    picker.setAttribute("role", "dialog");
+    picker.setAttribute("aria-modal", "true");
+    picker.setAttribute("aria-label", "从头像库选择角色头像");
+    picker.innerHTML = '<section class="st-profile-photo-card st-profile-avatar-picker-card" role="document"><h3>选择头像</h3><p class="st-profile-avatar-picker-empty">正在读取头像库…</p></section>';
+    picker.addEventListener("mousedown", (event) => {
+      if (event.target === picker) closeProfileAvatarLibraryPicker(page);
+    });
+    dialog.appendChild(picker);
+    void renderProfileAvatarLibraryPicker(page, picker, index);
+  }
+
   function renderProfilePhotoDialog(roleName, roleData, resetWarning = false) {
     const state = profilePhotoSlotsState(roleName, roleData);
     const slots = normalizeProfilePhotoSlots(state.slots);
@@ -19583,6 +19670,17 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   }
 
   function bindPersonProfileActionButtons(page) {
+    page.querySelectorAll('[data-profile-action="upload-photo"]').forEach((button) => {
+      if (button.dataset.profilePhotoDirectBound === "true") return;
+      button.dataset.profilePhotoDirectBound = "true";
+      bindAvatarLibraryActivation(button, () => openProfilePhotoDialog(page));
+    });
+    page.querySelectorAll('[data-profile-photo-action="change"]').forEach((button) => {
+      if (button.dataset.profilePhotoChangeDirectBound === "true") return;
+      button.dataset.profilePhotoChangeDirectBound = "true";
+      const slot = Number(button.getAttribute("data-profile-photo-slot") || 0) || 0;
+      bindAvatarLibraryActivation(button, () => openProfileAvatarLibraryPicker(page, slot));
+    });
     const activateDelete = (button, event) => {
       if ((event.type === "pointerup" || event.type === "mousedown") && event.button !== undefined && event.button !== 0) return;
       if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
@@ -19930,7 +20028,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
         const action = photoAction.getAttribute("data-profile-photo-action") || "";
         const slot = Number(photoAction.getAttribute("data-profile-photo-slot") || 0) || 0;
         if (action === "close") closeProfilePhotoDialog(page);
-        if (action === "change") page.querySelector('[data-profile-photo-file-slot="' + slot + '"]')?.click();
+        if (action === "change") openProfileAvatarLibraryPicker(page, slot);
         if (action === "delete") profileDeletePhotoSlot(page, slot);
         if (action === "select") profileSelectPhotoSlot(page, slot);
         if (action === "reset-default") {
@@ -20041,6 +20139,12 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       return;
     });
     page.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && page.querySelector("[data-profile-avatar-library-picker]")) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeProfileAvatarLibraryPicker(page);
+        return;
+      }
       const eventSegmentButton = event.target?.closest?.("[data-profile-event-segment]");
       if (eventSegmentButton && page.contains(eventSegmentButton) && (event.key === "Enter" || event.key === " ")) {
         event.preventDefault();
@@ -41846,6 +41950,10 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     button.addEventListener("mousedown", activate);
     button.addEventListener("touchstart", activate, { passive: false });
     button.addEventListener("keydown", activate);
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    });
   }
 
   async function renderAvatarLibraryPage(page) {

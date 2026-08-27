@@ -205,8 +205,26 @@ test('avatar library applies uploaded images through host-safe controls', () => 
   assert.ok(binding.includes('button.addEventListener("mousedown"'));
   assert.ok(binding.includes('button.addEventListener("touchstart"'));
   assert.ok(binding.includes('button.addEventListener("keydown"'));
+  assert.ok(binding.includes('button.addEventListener("click"'));
   const render = functionBody('renderAvatarLibraryPage');
   assert.ok(render.includes('bindAvatarLibraryActivation(page.querySelector(\'[data-avatar-upload]\')'));
   assert.ok(render.includes('bindAvatarLibraryActivation(button, async () =>'));
   assert.ok(render.includes('profileSaveLocalPhoto(selectedRole, source)'));
+});
+
+test('profile photo replace opens the avatar library and applies to the requested slot', () => {
+  const picker = functionBody('renderProfileAvatarLibraryPicker');
+  const open = functionBody('openProfileAvatarLibraryPicker');
+  const profilePage = functionBody('bindPersonProfileEvents');
+  assert.ok(open.includes('data-profile-avatar-library-picker'));
+  assert.ok(open.includes('renderProfileAvatarLibraryPicker(page, picker, index)'));
+  assert.ok(picker.includes('readAvatarLibraryIndex()'));
+  assert.ok(picker.includes('profileGetPhotoStorageIdb(avatarLibraryImageKey'));
+  assert.ok(picker.includes('profileSetPhotoSlot(page, index, source)'));
+  assert.ok(picker.includes('importAvatarLibraryFiles(files)'));
+  const directActions = functionBody('bindPersonProfileActionButtons');
+  assert.ok(directActions.includes('bindAvatarLibraryActivation(button, () => openProfilePhotoDialog(page))'));
+  assert.ok(directActions.includes('bindAvatarLibraryActivation(button, () => openProfileAvatarLibraryPicker(page, slot))'));
+  assert.ok(profilePage.includes('if (action === "change") openProfileAvatarLibraryPicker(page, slot)'));
+  assert.ok(!profilePage.includes('if (action === "change") page.querySelector'));
 });
