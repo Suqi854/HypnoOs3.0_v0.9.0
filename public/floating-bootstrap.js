@@ -184,6 +184,23 @@
     var ACTION_FOLD_OPEN = "⟪HYPNOOS_ACTION_FOLD_V3⟫";
     var ACTION_FOLD_CLOSE = "⟪/HYPNOOS_ACTION_FOLD_V3⟫";
     var ACTION_FOLD_MARKER_RE = /⟪HYPNOOS_ACTION_FOLD_V3⟫([\s\S]*?)⟪\/HYPNOOS_ACTION_FOLD_V3⟫/;
+    var ACTION_FOLD_RAW_RE = /<\s*(本轮(?:APP)?操作)\s*>([\s\S]*?)<\s*\/\s*\1\s*>/i;
+
+    function actionFoldCandidate(value) {
+      var source = String(value || "");
+      return source.includes(ACTION_FOLD_OPEN) || /<\s*本轮(?:APP)?操作\s*>/i.test(source);
+    }
+
+    function matchActionFold(value) {
+      var source = String(value || "");
+      var markerMatch = source.match(ACTION_FOLD_MARKER_RE);
+      if (markerMatch && markerMatch.index != null) {
+        return { index: markerMatch.index, full: markerMatch[0], body: markerMatch[1] };
+      }
+      var rawMatch = source.match(ACTION_FOLD_RAW_RE);
+      if (!rawMatch || rawMatch.index == null) return null;
+      return { index: rawMatch.index, full: rawMatch[0], body: rawMatch[2] };
+    }
 
     function actionFoldText(value) {
       return String(value || "")
@@ -245,7 +262,7 @@
         { kind: "permission", regex: /<\s*变量权限\s*>\s*([\s\S]*?)\s*<\s*\/\s*变量权限\s*>/gi },
         { kind: "notice", regex: /<\s*AI提醒\s*>\s*([\s\S]*?)\s*<\s*\/\s*AI提醒\s*>/gi },
         { kind: "item", regex: /<\s*操作项\s*>\s*<\s*操作名\s*>\s*([\s\S]*?)\s*<\s*\/\s*操作名\s*>\s*<\s*操作内容\s*>\s*([\s\S]*?)\s*<\s*\/\s*操作内容\s*>\s*<\s*\/\s*操作项\s*>/gi },
-        { kind: "section", regex: /<\s*(相关变量|时钟|地图|学校|学校地图|催眠APP|催眠命令|催眠资源|催眠道具|成就和任务|成就|任务|规则|地点规则|打工|监控|邂逅|人物档案|库存|物品|派遣|警视厅|综合医院|医院|旧校舍|灵异|性格特调|改造|附身|课程表|日历|系统|设置|场景|事件|地点|APP)\s*>\s*([\s\S]*?)\s*<\s*\/\s*\1\s*>/gi }
+        { kind: "section", regex: /<\s*(本轮执行边界|相关变量|时钟|地图|学校|学校地图|催眠APP|催眠命令|催眠资源|催眠道具|成就和任务|成就|任务|规则|地点规则|打工|监控|邂逅|人物档案|库存|物品|派遣|警视厅|综合医院|医院|旧校舍|灵异|性格特调|改造|附身|课程表|日历|系统|设置|场景|事件|地点|APP)\s*>\s*([\s\S]*?)\s*<\s*\/\s*\1\s*>/gi }
       ];
       var selected = null;
       definitions.forEach(function (definition) {
@@ -309,7 +326,7 @@
     }
 
     function renderActionFoldRoot(targetDocument, root) {
-      if (!root || !String(root.textContent || "").includes(ACTION_FOLD_OPEN)) return false;
+      if (!root || !actionFoldCandidate(root.textContent)) return false;
       var walker = targetDocument.createTreeWalker(root, targetDocument.defaultView && targetDocument.defaultView.NodeFilter ? targetDocument.defaultView.NodeFilter.SHOW_TEXT : 4);
       var nodes = [];
       var source = "";
@@ -323,10 +340,10 @@
       }
       var rendered = false;
       for (var pass = 0; pass < 8; pass += 1) {
-        var match = source.match(ACTION_FOLD_MARKER_RE);
-        if (!match || match.index == null) break;
+        var match = matchActionFold(source);
+        if (!match) break;
         var startIndex = match.index;
-        var endIndex = startIndex + match[0].length;
+        var endIndex = startIndex + match.full.length;
         var start = nodes.find(function (item) { return startIndex >= item.start && startIndex <= item.end; });
         var end = nodes.slice().reverse().find(function (item) { return endIndex >= item.start && endIndex <= item.end; });
         if (!start || !end) break;
@@ -334,7 +351,7 @@
         range.setStart(start.node, Math.max(0, startIndex - start.start));
         range.setEnd(end.node, Math.max(0, endIndex - end.start));
         range.deleteContents();
-        range.insertNode(createActionFoldCard(targetDocument, match[1]));
+        range.insertNode(createActionFoldCard(targetDocument, match.body));
         rendered = true;
         return renderActionFoldRoot(targetDocument, root) || rendered;
       }
@@ -379,7 +396,7 @@
         actionFoldObserver = new host.MutationObserver(function (records) {
           var shouldRender = records.some(function (record) {
             var targetText = record.type === "characterData" ? record.target.nodeValue : record.target && record.target.textContent;
-            if (String(targetText || "").includes(ACTION_FOLD_OPEN)) return true;
+            if (actionFoldCandidate(targetText)) return true;
             return Array.prototype.some.call(record.addedNodes || [], function (node) {
               if (String(node && node.tagName || "").toLowerCase() === "iframe" && !actionFoldObservedFrames.has(node)) {
                 actionFoldObservedFrames.add(node);
@@ -392,7 +409,7 @@
                   try { iframe.addEventListener("load", scheduleActionFoldRender); } catch (_) {}
                 });
               } catch (_) {}
-              return String(node && node.textContent || "").includes(ACTION_FOLD_OPEN);
+              return actionFoldCandidate(node && node.textContent);
             });
           });
           if (shouldRender) scheduleActionFoldRender();

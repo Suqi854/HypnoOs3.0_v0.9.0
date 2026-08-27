@@ -289,6 +289,9 @@ test('profile photo replace opens the avatar library and applies to the requeste
   assert.ok(picker.includes('profileGetPhotoStorageIdb(avatarLibraryImageKey'));
   assert.ok(picker.includes('profileSetPhotoSlot(page, index, source)'));
   assert.ok(picker.includes('importAvatarLibraryFiles(files)'));
+  assert.ok(picker.includes('bindAvatarLibrarySelectionActivation(button, async () =>'));
+  assert.ok(open.includes('if (current && Number(page.dataset.profileAvatarLibrarySlot || 0) === index) return'));
+  assert.ok(open.includes('lockProfileAvatarLibraryPointer(page)'));
   const directActions = functionBody('bindPersonProfileActionButtons');
   assert.ok(directActions.includes('bindAvatarLibraryActivation(button, () => openProfilePhotoDialog(page))'));
   assert.ok(directActions.includes('bindAvatarLibraryActivation(button, () => openProfileAvatarLibraryPicker(page, slot))'));
@@ -296,4 +299,14 @@ test('profile photo replace opens the avatar library and applies to the requeste
   assert.ok(!profilePage.includes('if (action === "change") page.querySelector'));
   const photoDialog = functionBody('renderProfilePhotoDialog');
   assert.ok(photoDialog.includes('<button type="button" class="st-profile-photo-preview" data-profile-photo-action="change"'));
+});
+
+test('raw operation containers use the built-in fold renderer without a SillyTavern regex', () => {
+  assert.match(floatingHost, /ACTION_FOLD_RAW_RE\s*=\s*\/<\\s\*\(本轮/);
+  assert.ok(floatingHost.includes('return source.includes(ACTION_FOLD_OPEN) || /<\\s*本轮(?:APP)?操作\\s*>/i.test(source)'));
+  assert.ok(floatingHost.includes('var match = matchActionFold(source)'));
+  assert.ok(floatingHost.includes('range.insertNode(createActionFoldCard(targetDocument, match.body))'));
+  assert.ok(floatingHost.includes('label.textContent = "前端操作"'));
+  assert.ok(floatingHost.includes('title.textContent = "本轮操作"'));
+  assert.ok(floatingHost.includes('hint.textContent = "点击展开"'));
 });
