@@ -135,6 +135,7 @@ export class FloatingHost {
       listHypnosisRuleVersions() { return HYPNOSIS_RULES_API.listVersions(); },
       calculateHypnosisCost(commandId, parameters, version) { return HYPNOSIS_RULES_API.calculateCost(commandId, parameters, version); },
       calculateHypnosisBatchCost(items, options, version) { return HYPNOSIS_RULES_API.calculateBatchCost(items, options, version); },
+      calculateMcEnergyRecharge(options) { return HYPNOSIS_RULES_API.calculateMcRecharge(options); },
       getHypnosisRulePrompt(version) { return HYPNOSIS_RULES_API.buildPrompt(version); },
       setInput(text, options) { return host.setInput(text, { append: options?.append !== false }); },
       directSend(text) { return host.directSend(text); },

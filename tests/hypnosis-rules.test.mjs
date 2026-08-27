@@ -8,6 +8,7 @@ import {
   buildHypnosisRulePrompt,
   calculateHypnosisBatchCost,
   calculateHypnosisCost,
+  calculateMcEnergyRecharge,
   getHypnosisRules,
   listHypnosisRuleVersions,
   registerHypnosisRules,
@@ -46,6 +47,30 @@ test('all v4.3 billing formulas and result categories remain locked', () => {
   assert.equal(rules.commands.find((item) => item.id === 'vip5_open_space_common_sense').result, 'temporary-open-space-rule');
   assert.equal(rules.commands.some((item) => item.id === 'vip6_pregnancy_confirmation'), false);
   assert.throws(() => calculateHypnosisCost('model_created_command'), /未登记/);
+});
+
+test('MC recharge bills only the quantity that can fit below the energy cap', () => {
+  assert.deepEqual(calculateMcEnergyRecharge({ quantity: 10, currentEnergy: 24, maxEnergy: 25 }), {
+    requestedQuantity: 10,
+    billedQuantity: 1,
+    cost: 10,
+    gain: 1,
+    gainRate: 1,
+  });
+  assert.deepEqual(calculateMcEnergyRecharge({ quantity: 10, currentEnergy: 22, maxEnergy: 25, fatigued: true }), {
+    requestedQuantity: 10,
+    billedQuantity: 6,
+    cost: 60,
+    gain: 3,
+    gainRate: 0.5,
+  });
+  assert.deepEqual(calculateMcEnergyRecharge({ quantity: 5, currentEnergy: 25, maxEnergy: 25 }), {
+    requestedQuantity: 5,
+    billedQuantity: 0,
+    cost: 0,
+    gain: 0,
+    gainRate: 1,
+  });
 });
 
 test('full hypnosis prompt includes every enforcement section and command', () => {

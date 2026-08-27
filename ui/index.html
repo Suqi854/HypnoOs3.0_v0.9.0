@@ -9743,11 +9743,10 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
         const maxEnergy = hypnosisNumber(system["MC能量上限"] ?? system["_MC能量上限"], 0);
         const currentEnergy = hypnosisNumber(system["MC能量"] ?? system["_MC能量"], 0);
         const sleepy = /无精打采/.test(String(system["_buff"] || ""));
-        const gainRate = sleepy ? 0.5 : 1;
-        const requestedCost = qty * 10;
+        const quote = hypnosisMcEnergyRechargeQuote(qty, system);
+        const requestedCost = quote.cost;
+        const actualGain = quote.gain;
         if (money < requestedCost) return { ok: false, message: "零花钱不足，无法补充MC能量。" };
-        const rawGain = qty * gainRate;
-        const actualGain = maxEnergy > 0 ? Math.max(0, Math.min(rawGain, maxEnergy - currentEnergy)) : rawGain;
         if (actualGain <= 0) return { ok: false, message: "MC能量已达到上限。" };
         const nextMoney = hypnosisSetSystemNumber(system, "持有零花钱", money - requestedCost);
         const nextEnergy = hypnosisSetSystemNumber(system, "MC能量", currentEnergy + actualGain, ["_MC能量"]);
@@ -9759,16 +9758,18 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
             操作: "资源兑换",
             项目: "补充MC能量",
             暂存摘要: "补充MC能量｜MC能量 +" + formatOperationAmount(actualGain) + "点｜资金 ¥" + requestedCost.toLocaleString(),
-            购买数量: qty,
-            数量: qty + "点",
+            请求数量: quote.requestedQuantity,
+            购买数量: quote.billedQuantity,
+            数量: quote.billedQuantity + "点",
             兑换规则: "10円 = 1点MC能量",
             消耗零花钱: requestedCost,
             消耗资源: "资金 ¥" + requestedCost.toLocaleString(),
-            基础获得MC能量: qty,
+            基础获得MC能量: quote.billedQuantity,
             实际获得MC能量: actualGain,
             获得MC能量: actualGain,
             获得资源: "MC能量 +" + formatOperationAmount(actualGain) + "点",
             buff修正: sleepy ? "无精打采：实际获得量减半" : "无",
+            容量修正: quote.billedQuantity < quote.requestedQuantity ? "接近上限：只对实际可购买数量计费" : "无",
             前端处理: "已由前端直接扣除零花钱并写入MC能量",
             前端写入后持有零花钱: nextMoney,
             前端写入后MC能量: nextEnergy,
@@ -11744,12 +11745,48 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   function hypnosisLiteFeatureCost(feature, draft) {
     if (settingsCheatModeActive()) return 0;
     if (!feature || Number(feature.costValue || 0) <= 0) return 0;
-    const base = feature.id === "vip1_temp_sensitivity" ? 2 : Math.max(0, Math.floor(Number(feature.costValue || 0) || 0));
     const persons = hypnosisFeatureUsesPersonCount(feature) ? hypnosisFeaturePersonCount(feature, draft) : 1;
     const parts = hypnosisFeatureUsesPartCount(feature) ? hypnosisFeaturePartCount(feature, draft) : 1;
     const duration = hypnosisFeatureUsesDuration(feature) ? hypnosisFeatureDurationMinutes(feature, draft) : 1;
     const numeric = hypnosisFeatureNumericConfig(feature) ? hypnosisFeatureNumericValue(feature, draft) : 1;
+    try {
+      const quote = globalThis.__ST_HYPNOOS_CALCULATE_COST__?.(feature.id, {
+        persons,
+        parts,
+        minutes: duration,
+        sensitivity: feature.id === "vip1_temp_sensitivity" ? numeric : 100,
+        libido: feature.id === "vip1_estrus" ? numeric : 1,
+        memoryMinutes: feature.id === "vip1_memory_erase" ? numeric : 10
+      });
+      if (quote?.unit === "mc" && Number.isFinite(Number(quote.amount))) return Math.max(0, Math.floor(Number(quote.amount)));
+    } catch (error) {
+      console.warn("[HypnoOS] 核心催眠计费不可用，使用兼容公式", error);
+    }
+    const base = feature.id === "vip1_temp_sensitivity" ? 2 : Math.max(0, Math.floor(Number(feature.costValue || 0) || 0));
     return Math.max(0, Math.floor(base * persons * parts * duration * numeric));
+  }
+
+  function hypnosisMcEnergyRechargeQuote(quantity, system = getSystemState()) {
+    const currentEnergy = hypnosisNumber(system["MC能量"] ?? system["_MC能量"], 0);
+    const maxEnergy = hypnosisNumber(system["MC能量上限"] ?? system["_MC能量上限"], 0);
+    const fatigued = /无精打采/.test(String(system["_buff"] || ""));
+    try {
+      const quote = globalThis.__ST_HYPNOOS_CALCULATE_MC_RECHARGE__?.({ quantity, currentEnergy, maxEnergy, fatigued });
+      if (quote && Number.isFinite(Number(quote.cost)) && Number.isFinite(Number(quote.gain))) return quote;
+    } catch (error) {
+      console.warn("[HypnoOS] 核心MC补给计费不可用，使用兼容公式", error);
+    }
+    const requestedQuantity = Math.max(1, Math.floor(Number(quantity) || 1));
+    const gainRate = fatigued ? 0.5 : 1;
+    const remaining = maxEnergy > 0 ? Math.max(0, maxEnergy - currentEnergy) : Number.POSITIVE_INFINITY;
+    const billedQuantity = Number.isFinite(remaining) ? Math.min(requestedQuantity, Math.ceil(remaining / gainRate)) : requestedQuantity;
+    return {
+      requestedQuantity,
+      billedQuantity,
+      cost: billedQuantity * 10,
+      gain: Number.isFinite(remaining) ? Math.min(remaining, billedQuantity * gainRate) : billedQuantity * gainRate,
+      gainRate
+    };
   }
 
   function hypnosisLiteFeatureStarlightCost(feature, draft) {
@@ -11897,7 +11934,8 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     const currentRank = reactVipRank(reactCurrentVipTier(system));
     const customItemBlocked = currentRank < HYP_CUSTOM_ITEM_MIN_VIP_RANK;
     const customItemText = currentRank < HYP_CUSTOM_ITEM_MIN_VIP_RANK ? "需要VIP2" : "定制";
-    const energyPrice = qty * 10;
+    const energyQuote = hypnosisMcEnergyRechargeQuote(qty, system);
+    const energyPrice = energyQuote.cost;
     const maxEnergyPrice = qty * 100;
     return '<section class="st-lite-card st-graph-paper st-hypnosis-form">' +
       '<div class="st-graph-head"><strong>快速补给</strong><span>资金 ' + escapeHtml(settingsCheatModeActive() ? "∞" : "¥" + money.toLocaleString()) + ' / 星光点 ' + (settingsCheatModeActive() ? "∞" : starlight.toLocaleString()) + '</span></div>' +

@@ -163,6 +163,27 @@ export function calculateHypnosisBatchCost(items = [], options = {}, version = a
   return totals;
 }
 
+export function calculateMcEnergyRecharge({ quantity = 1, currentEnergy = 0, maxEnergy = 0, fatigued = false } = {}) {
+  const requestedQuantity = Math.max(1, Math.min(Number.MAX_SAFE_INTEGER, Math.floor(Number(quantity) || 1)));
+  const current = Math.max(0, Number(currentEnergy) || 0);
+  const maximum = Math.max(0, Number(maxEnergy) || 0);
+  const gainRate = fatigued ? 0.5 : 1;
+  const remaining = maximum > 0 ? Math.max(0, maximum - current) : Number.POSITIVE_INFINITY;
+  const billedQuantity = Number.isFinite(remaining)
+    ? Math.min(requestedQuantity, Math.ceil(remaining / gainRate))
+    : requestedQuantity;
+  const gain = Number.isFinite(remaining)
+    ? Math.min(remaining, billedQuantity * gainRate)
+    : billedQuantity * gainRate;
+  return {
+    requestedQuantity,
+    billedQuantity,
+    cost: billedQuantity * 10,
+    gain,
+    gainRate,
+  };
+}
+
 export function buildHypnosisRulePrompt(version = activeVersion) {
   const ruleset = registry.get(version);
   if (!ruleset) throw new Error(`未知催眠规则版本：${version}`);
@@ -196,5 +217,6 @@ export const HYPNOSIS_RULES_API = Object.freeze({
   listVersions: listHypnosisRuleVersions,
   calculateCost: calculateHypnosisCost,
   calculateBatchCost: calculateHypnosisBatchCost,
+  calculateMcRecharge: calculateMcEnergyRecharge,
   buildPrompt: buildHypnosisRulePrompt,
 });

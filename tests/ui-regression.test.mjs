@@ -167,3 +167,12 @@ test('hypnosis commands wait in phone input before host write or direct send', (
   assert.ok(floatingHost.includes('writeInput: function (text, options) { return callApi("setInput", [text, options]); }'));
   assert.ok(floatingCore.includes('this.host.setInput(command, { append: false })'));
 });
+
+test('hypnosis and MC recharge quotes use the canonical rule bridge', () => {
+  assert.ok(html.includes('__ST_HYPNOOS_CALCULATE_COST__?.(feature.id'));
+  assert.ok(html.includes('__ST_HYPNOOS_CALCULATE_MC_RECHARGE__?.({ quantity, currentEnergy, maxEnergy, fatigued })'));
+  assert.ok(html.includes('容量修正: quote.billedQuantity < quote.requestedQuantity'));
+  assert.ok(floatingHost.includes('__ST_HYPNOOS_CALCULATE_COST__'));
+  assert.ok(floatingHost.includes('__ST_HYPNOOS_CALCULATE_MC_RECHARGE__'));
+  assert.ok(floatingCore.includes('calculateMcEnergyRecharge(options)'));
+});
