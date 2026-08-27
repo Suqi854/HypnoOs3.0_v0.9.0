@@ -205,6 +205,19 @@ test('profile removal clears only phone-side profile data and hides the whole do
   assert.ok(binding.includes('void confirmProfileDeleteDialog(page)'));
 });
 
+test('profile roles are isolated per chat and technical worldbook entries are rejected', () => {
+  const scope = functionBody('adaptiveStorageScope');
+  const refresh = functionBody('refreshAdaptiveWorldbookRoleCache');
+  const filter = functionBody('isProfileWorldbookTechnicalName');
+  assert.ok(scope.includes('__ST_HYPNOOS_CHAT_STORAGE_SCOPE__'));
+  assert.ok(scope.includes('__ST_HYPNOOS_FRONTEND_SLOT_SCOPE__'));
+  assert.ok(refresh.includes('const scope = adaptiveStorageScope()'));
+  for (const label of ['初始化', 'APP操控', '更新格式']) assert.ok(filter.includes(label));
+  assert.ok(html.includes('if (!gender || isProfileWorldbookTechnicalName(name)) continue'));
+  assert.ok(html.includes('if (!name || isProfileWorldbookTechnicalName(name)) continue'));
+  assert.ok(html.includes('const DEFAULT_ROLE_NAMES = ["九鬼真白"]'));
+});
+
 test('avatar library applies uploaded images through host-safe controls', () => {
   const binding = functionBody('bindAvatarLibraryActivation');
   assert.ok(binding.includes('button.addEventListener("mousedown"'));
