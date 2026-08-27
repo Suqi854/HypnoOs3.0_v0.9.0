@@ -7,6 +7,7 @@ import { getRegionPack } from '../src/regions.js';
 
 const html = await readFile(new URL('../ui/index.html', import.meta.url), 'utf8');
 const floatingHost = await readFile(new URL('../public/floating-bootstrap.js', import.meta.url), 'utf8');
+const floatingCore = await readFile(new URL('../src/floating-host.js', import.meta.url), 'utf8');
 
 function functionBody(name) {
   const start = html.indexOf(`function ${name}(`);
@@ -154,4 +155,15 @@ test('VIP3 hypnosis trigger stays first and uses the permanent four-part contrac
   assert.ok(html.includes('永久催眠效果；无结束时间，直到明确解除或删除'));
   assert.ok(html.includes('hypnosisTriggerVariablePath(roleName, trigger)'));
   assert.ok(html.includes('parseHypnosisTriggerSpecification'));
+});
+
+test('hypnosis commands wait in phone input before host write or direct send', () => {
+  assert.ok(html.includes('Promise.resolve(appendAppOperation(operationPayload))'));
+  assert.ok(html.includes('APP操作已暂存，等待主界面确认'));
+  assert.ok(html.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__(block, { append: false })'));
+  assert.ok(html.includes('globalThis.__ST_HYPNOOS_DIRECT_SEND__(block)'));
+  assert.ok(floatingHost.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__'));
+  assert.ok(floatingCore.includes("script.dataset.revision = 'hypnoos3-1.0.0-input-flow'"));
+  assert.ok(floatingHost.includes('writeInput: function (text, options) { return callApi("setInput", [text, options]); }'));
+  assert.ok(floatingCore.includes('this.host.setInput(command, { append: false })'));
 });

@@ -2448,11 +2448,25 @@ html.st-hypnoos-booting.st-hypnoos-boot-failed .st-hypnoos-phone-preboot::after{
         return false;
       }
       const input = findOperationInput();
-      if (input) {
-        if (shouldWarnDuplicateOperation(input)) {
-          const proceed = await showOperationDuplicateWarning();
-          if (!proceed) return false;
+      if (input && shouldWarnDuplicateOperation(input)) {
+        const proceed = await showOperationDuplicateWarning();
+        if (!proceed) return false;
+      }
+      let written = false;
+      try {
+        if (typeof globalThis.__ST_HYPNOOS_WRITE_INPUT__ === "function") {
+          written = Boolean(await globalThis.__ST_HYPNOOS_WRITE_INPUT__(block, { append: false }));
         }
+      } catch (error) {
+        console.warn("[HypnoOS] 宿主输入桥写入失败，尝试同源输入框回退", error);
+      }
+      if (written) {
+        try { globalThis.__HYPNOOS_MARK_SENT_REWARD_OPERATIONS__?.(window.__ST_OPERATION_INPUT_LOG__); } catch {}
+        if (!window.__ST_READ_OPERATION_KEEP_AFTER_FLUSH__?.()) clearOperationInputLog();
+        else emitOperationQueueChanged();
+        return true;
+      }
+      if (input) {
         writeOperationBlockToInput(input, block);
         try { globalThis.__HYPNOOS_MARK_SENT_REWARD_OPERATIONS__?.(window.__ST_OPERATION_INPUT_LOG__); } catch {}
 	        if (!window.__ST_READ_OPERATION_KEEP_AFTER_FLUSH__?.()) clearOperationInputLog();
@@ -2463,10 +2477,7 @@ html.st-hypnoos-booting.st-hypnoos-boot-failed .st-hypnoos-phone-preboot::after{
         const target = window.parent && window.parent !== window ? window.parent : window.top;
         if (target && target !== window) {
           target.postMessage({ type: "HYPNOOS_APPEND_OPERATION", block }, "*");
-          try { globalThis.__HYPNOOS_MARK_SENT_REWARD_OPERATIONS__?.(window.__ST_OPERATION_INPUT_LOG__); } catch {}
-		          if (!window.__ST_READ_OPERATION_KEEP_AFTER_FLUSH__?.()) clearOperationInputLog();
-		          else emitOperationQueueChanged();
-	          return true;
+	          return false;
         }
       } catch {}
       console.info("[HypnoOS] 已记录APP操作", block);
@@ -2480,10 +2491,6 @@ html.st-hypnoos-booting.st-hypnoos-boot-failed .st-hypnoos-phone-preboot::after{
         return false;
       }
       const input = findOperationInput();
-      if (input && shouldWarnDuplicateOperation(input)) {
-        const proceed = await showOperationDuplicateWarning();
-        if (!proceed) return false;
-      }
       let sent = false;
       try {
         if (typeof globalThis.__ST_HYPNOOS_DIRECT_SEND__ === "function") {

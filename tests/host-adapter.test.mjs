@@ -55,6 +55,42 @@ test('selects the active swipe variable snapshot from SillyTavern message storag
   delete globalThis.SillyTavern;
 });
 
+test('host input bridge writes the pending turn and direct send uses the native send button', async () => {
+  const previousDocument = globalThis.document;
+  const previousEvent = globalThis.Event;
+  const events = [];
+  let clicks = 0;
+  const input = {
+    value: '旧内容',
+    dispatchEvent: (event) => events.push(event.type),
+    focus() {},
+  };
+  const send = {
+    disabled: false,
+    getAttribute: () => null,
+    click: () => { clicks += 1; },
+  };
+  globalThis.Event = class Event { constructor(type) { this.type = type; } };
+  globalThis.document = {
+    querySelector: (selector) => selector === '#send_but' ? send : input,
+    querySelectorAll: () => [],
+  };
+  try {
+    const host = new HostAdapter();
+    assert.equal(host.setInput('玩家输入\n<本轮操作>测试</本轮操作>', { append: false }), true);
+    assert.equal(input.value, '玩家输入\n<本轮操作>测试</本轮操作>');
+    assert.deepEqual(events, ['input', 'change']);
+    assert.equal(await host.directSend('直接发送内容'), true);
+    assert.equal(input.value, '直接发送内容');
+    assert.equal(clicks, 1);
+  } finally {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+    if (previousEvent === undefined) delete globalThis.Event;
+    else globalThis.Event = previousEvent;
+  }
+});
+
 test('optional TH and MVU mirrors preserve unrelated nested runtime fields', async () => {
   const previousDocument = globalThis.document;
   let th = { 第三方: { keep: true }, 系统: { 外部字段: '保留', MC能量: 1 } };

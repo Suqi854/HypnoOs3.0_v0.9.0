@@ -72,7 +72,7 @@ export class FloatingHost {
       if (!frame || event.source !== frame.contentWindow || event.origin !== location.origin || !event.data || typeof event.data !== 'object') return;
       if (event.data.type !== 'HYPNOOS_APPEND_OPERATION') return;
       const command = String(event.data.block || event.data.payload?.block || event.data.payload?.command || '').trim().slice(0, 20_000);
-      if (command) await this.store.queueOperation({ sourceApp: String(event.data.payload?.sourceApp || 'phone'), command });
+      if (command) this.host.setInput(command, { append: false });
     };
     addEventListener('message', onMessage);
     this.disposers.push(() => removeEventListener('message', onMessage));
@@ -87,7 +87,7 @@ export class FloatingHost {
     script.dataset.hostId = HOST_ID;
     script.dataset.registryEvent = 'HYPNOOS3_EXTENSION_FLOATING_REGISTRY_READY';
     script.dataset.storageKey = 'hypnoos3.extension.floatingPhone.ui.v1';
-    script.dataset.revision = 'hypnoos3-0.7.9';
+    script.dataset.revision = 'hypnoos3-1.0.0-input-flow';
     script.dataset.mode = 'host';
     script.async = false;
     document.head.append(script);
@@ -136,6 +136,7 @@ export class FloatingHost {
       calculateHypnosisCost(commandId, parameters, version) { return HYPNOSIS_RULES_API.calculateCost(commandId, parameters, version); },
       calculateHypnosisBatchCost(items, options, version) { return HYPNOSIS_RULES_API.calculateBatchCost(items, options, version); },
       getHypnosisRulePrompt(version) { return HYPNOSIS_RULES_API.buildPrompt(version); },
+      setInput(text, options) { return host.setInput(text, { append: options?.append !== false }); },
       directSend(text) { return host.directSend(text); },
       destroy: () => this.destroy(),
     };

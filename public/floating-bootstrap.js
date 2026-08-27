@@ -2165,6 +2165,7 @@
         "if(r.hasApi('setChatMessages'))globalThis.setChatMessages=function(){return r.guardedApi('setChatMessages',Array.prototype.slice.call(arguments))};" +
         "globalThis.getContext=function(){return r.getContext()};" +
         "globalThis.__ST_HYPNOOS_HOST_REQUEST_HEADERS__=function(){return r.getRequestHeaders()};" +
+        "globalThis.__ST_HYPNOOS_WRITE_INPUT__=function(t,o){return r.writeInput(t,o)};" +
         "globalThis.__ST_HYPNOOS_DIRECT_SEND__=function(t){return r.directSend(t)};" +
         "globalThis.__ST_HYPNOOS_READ_INFORMATION__=function(){return r.readInformation()};" +
         "globalThis.__ST_HYPNOOS_SELECT_INFORMATION_FLOOR__=function(id){return r.selectInformationFloor(id)};" +
@@ -2899,6 +2900,7 @@
         return "";
       },
       getRequestHeaders: hostRequestHeaders,
+      writeInput: function (text, options) { return callApi("setInput", [text, options]); },
       directSend: function (text) { return callApi("directSend", [text]); },
       readInformation: readInformationSnapshot,
       selectInformationFloor: function (id) {
