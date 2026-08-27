@@ -199,3 +199,14 @@ test('profile removal directly clears runtime and cached profile data', () => {
   assert.ok(binding.includes('data-profile-delete-dialog-direct-bound') || binding.includes('profileDeleteDialogDirectBound'));
   assert.ok(binding.includes('void confirmProfileDeleteDialog(page)'));
 });
+
+test('avatar library applies uploaded images through host-safe controls', () => {
+  const binding = functionBody('bindAvatarLibraryActivation');
+  assert.ok(binding.includes('button.addEventListener("mousedown"'));
+  assert.ok(binding.includes('button.addEventListener("touchstart"'));
+  assert.ok(binding.includes('button.addEventListener("keydown"'));
+  const render = functionBody('renderAvatarLibraryPage');
+  assert.ok(render.includes('bindAvatarLibraryActivation(page.querySelector(\'[data-avatar-upload]\')'));
+  assert.ok(render.includes('bindAvatarLibraryActivation(button, async () =>'));
+  assert.ok(render.includes('profileSaveLocalPhoto(selectedRole, source)'));
+});

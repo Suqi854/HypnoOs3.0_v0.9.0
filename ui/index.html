@@ -41830,6 +41830,24 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     document.head.appendChild(style);
   }
 
+  function bindAvatarLibraryActivation(button, handler) {
+    if (!button || typeof handler !== "function") return;
+    const activate = (event) => {
+      if (event.type === "mousedown" && event.button !== undefined && event.button !== 0) return;
+      if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
+      if (button.dataset.avatarActionBusy === "true") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      button.dataset.avatarActionBusy = "true";
+      Promise.resolve(handler()).finally(() => {
+        if (button.isConnected) delete button.dataset.avatarActionBusy;
+      });
+    };
+    button.addEventListener("mousedown", activate);
+    button.addEventListener("touchstart", activate, { passive: false });
+    button.addEventListener("keydown", activate);
+  }
+
   async function renderAvatarLibraryPage(page) {
     const token = Date.now() + ":" + Math.random();
     page.dataset.avatarRenderToken = token;
@@ -41847,7 +41865,10 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     page.querySelector('[data-lite-action="back"]')?.addEventListener("click", () => { const root = page.parentElement; setPhoneActiveApp(root, ""); page.remove(); void applyHomeWallpaper(root); });
     page.querySelector('[data-avatar-role]')?.addEventListener("change", (event) => { page.dataset.avatarRole = event.target.value || ""; void renderAvatarLibraryPage(page); });
     const input = page.querySelector('[data-avatar-files]');
-    page.querySelector('[data-avatar-upload]')?.addEventListener("click", () => input?.click());
+    bindAvatarLibraryActivation(page.querySelector('[data-avatar-upload]'), () => {
+      if (typeof input?.showPicker === "function") input.showPicker();
+      else input?.click();
+    });
     input?.addEventListener("change", async () => {
       page.dataset.avatarFeedback = "正在校验并保存头像…";
       await renderAvatarLibraryPage(page);
@@ -41855,14 +41876,14 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       page.dataset.avatarFeedback = "已导入 " + result.added.length + " 张。" + (result.rejected.length ? "\n未导入：" + result.rejected.join("；") : "");
       await renderAvatarLibraryPage(page);
     });
-    page.querySelectorAll('[data-avatar-apply]').forEach((button) => button.addEventListener("click", async () => {
+    page.querySelectorAll('[data-avatar-apply]').forEach((button) => bindAvatarLibraryActivation(button, async () => {
       const source = await profileGetPhotoStorageIdb(avatarLibraryImageKey(button.getAttribute("data-avatar-apply")));
       if (!source || !selectedRole) return;
       profileSaveLocalPhoto(selectedRole, source);
       page.dataset.avatarFeedback = "已将头像应用到“" + selectedRole + "”。";
       await renderAvatarLibraryPage(page);
     }));
-    page.querySelectorAll('[data-avatar-delete]').forEach((button) => button.addEventListener("click", async () => {
+    page.querySelectorAll('[data-avatar-delete]').forEach((button) => bindAvatarLibraryActivation(button, async () => {
       const id = button.getAttribute("data-avatar-delete");
       await profileRemovePhotoStorageIdb(avatarLibraryImageKey(id));
       writeAvatarLibraryIndex(readAvatarLibraryIndex().filter((item) => item.id !== id));
