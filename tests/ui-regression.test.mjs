@@ -106,6 +106,7 @@ test('information app selects six pets and toggles floating or wand storage mode
   assert.ok(floatingHost.includes('label.textContent = "催眠手机"'));
   assert.ok(floatingHost.includes('fa-mobile-screen-button extensionsMenuExtensionButton'));
   assert.ok(floatingHost.includes('if (stored && shellOpen) toggleShell(false)'));
+  assert.ok(floatingHost.includes('toggleShell(!shellOpen)'));
   assert.ok(floatingHost.includes('if (nextName !== "idle" && !petReadyAssets.has(petStateAsset(nextName))) nextName = "idle"'));
   assert.ok(!floatingHost.includes('nextName !== "held_scared" && !petReadyAssets.has'));
   assert.ok(!floatingHost.includes('label.textContent = "桌宠 · " + name'));
@@ -166,6 +167,29 @@ test('hypnosis commands wait in phone input before host write or direct send', (
   assert.ok(floatingCore.includes("script.dataset.revision = 'hypnoos3-1.0.0-input-flow'"));
   assert.ok(floatingHost.includes('writeInput: function (text, options) { return callApi("setInput", [text, options]); }'));
   assert.ok(floatingCore.includes('this.host.setInput(command, { append: false })'));
+});
+
+test('hypnosis target selection does not rerender the long command page', () => {
+  const render = functionBody('renderHypnosisLitePage');
+  const selectionStart = render.indexOf('"[data-hypnosis-select-option]"');
+  const selectionEnd = render.indexOf('"[data-hypnosis-tier-details]"', selectionStart);
+  const selectionBinding = render.slice(selectionStart, selectionEnd);
+  assert.ok(selectionBinding.includes('updateDraft((draft) =>'));
+  assert.ok(!selectionBinding.includes('rerenderPreservingScroll()'));
+});
+
+test('cheat mode writes finite refillable resources without intercepting commands', () => {
+  const grant = functionBody('settingsGrantCheatResources');
+  const payload = functionBody('settingsApplyCheatOperationPayload');
+  const prepare = functionBody('settingsPrepareCheatMutation');
+  assert.ok(html.includes('const SETTINGS_CHEAT_RESOURCE_VALUE = 99999999'));
+  assert.ok(grant.includes('rewardApplySystemMutation'));
+  assert.ok(grant.includes('system[key] = SETTINGS_CHEAT_RESOURCE_VALUE'));
+  assert.ok(payload.includes('return payload'));
+  assert.ok(!payload.includes('作弊模式资源规则'));
+  assert.ok(prepare.includes('return () => {}'));
+  assert.ok(html.includes('再次获取资源'));
+  assert.ok(!html.includes('MC能量 ∞ / ∞'));
 });
 
 test('hypnosis and MC recharge quotes use the canonical rule bridge', () => {

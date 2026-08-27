@@ -12151,7 +12151,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
         map[id] = Array.from(current);
         return { ...draft, [mapKey]: map };
       });
-      rerenderPreservingScroll();
+      // 勾选目标只更新草稿与当前 checkbox；整页重绘会让长列表跳回顶部。
     }));
     page.querySelectorAll("[data-hypnosis-tier-details]").forEach((details) => details.addEventListener("toggle", () => {
       updateDraft((draft) => {
@@ -17432,12 +17432,6 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   }
 
   function hypnosisIslandHtml(system) {
-    if (settingsCheatModeActive()) {
-      return '<div class="st-hypnosis-island-center">' +
-        '<div class="st-hypnosis-island-row"><strong>MC能量 ∞ / ∞</strong><small>VIP6</small></div>' +
-        '<span class="st-app-island-progress" style="--pct:100%"><i></i></span>' +
-      '</div>';
-    }
     const energy = Number(system?.["MC能量"] ?? 0) || 0;
     const maxEnergy = Number(system?.["MC能量上限"] ?? (energy || 1)) || 1;
     const safeMax = Math.max(1, maxEnergy);
@@ -26269,8 +26263,8 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     return {
       vip5: encounterVip5FromSystem(system),
       vip6: encounterVip6FromSystem(system),
-      money: settingsCheatModeActive() ? SETTINGS_CHEAT_INFINITY : Number.isFinite(money) ? Math.max(0, Math.floor(money)) : 0,
-      starlight: settingsCheatModeActive() ? SETTINGS_CHEAT_INFINITY : Number.isFinite(starlight) ? Math.max(0, Math.floor(starlight)) : 0,
+      money: Number.isFinite(money) ? Math.max(0, Math.floor(money)) : 0,
+      starlight: Number.isFinite(starlight) ? Math.max(0, Math.floor(starlight)) : 0,
       starlightVoucher: encounterInventoryItemCount(ENCOUNTER_SHOP_STARLIGHT_VOUCHER, stat),
       ruleCoupon: encounterInventoryItemCount(LOCATION_RULE_RADAR_ITEM, stat),
       timetableCoupon: encounterInventoryItemCount(TIMETABLE_MOD_COUPON_ITEM, stat),
@@ -39434,47 +39428,31 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     } catch { return false; }
   }
 
-  const SETTINGS_CHEAT_INFINITY = Number.MAX_SAFE_INTEGER;
+  const SETTINGS_CHEAT_RESOURCE_VALUE = 99999999;
   const SETTINGS_CHEAT_RESOURCE_KEYS = ["持有零花钱", "零花钱", "星光点", "MC能量", "_MC能量", "MC能量上限", "_MC能量上限"];
   const SETTINGS_CHEAT_VIP_KEYS = ["催眠APP订阅等级", "_催眠APP订阅等级", "VIP等级", "订阅等级", "订阅", "催眠APP订阅"];
 
   function settingsCheatSystemView(system) {
     if (!settingsCheatModeActive()) return system;
     const view = { ...system };
-    for (const key of SETTINGS_CHEAT_RESOURCE_KEYS) view[key] = SETTINGS_CHEAT_INFINITY;
     for (const key of SETTINGS_CHEAT_VIP_KEYS) view[key] = "VIP6";
     return view;
   }
 
   function settingsPrepareCheatMutation(system) {
-    if (!settingsCheatModeActive() || !system || typeof system !== "object") return () => {};
-    const keys = [...SETTINGS_CHEAT_RESOURCE_KEYS, ...SETTINGS_CHEAT_VIP_KEYS];
-    const snapshot = new Map(keys.map((key) => [key, { exists: Object.prototype.hasOwnProperty.call(system, key), value: system[key] }]));
-    for (const key of SETTINGS_CHEAT_RESOURCE_KEYS) system[key] = SETTINGS_CHEAT_INFINITY;
-    for (const key of SETTINGS_CHEAT_VIP_KEYS) system[key] = "VIP6";
-    return () => {
-      for (const [key, saved] of snapshot) {
-        if (saved.exists) system[key] = saved.value;
-        else delete system[key];
-      }
-    };
+    return () => {};
   }
 
   function settingsApplyCheatOperationPayload(payload) {
-    if (!settingsCheatModeActive() || !payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
-    const next = { ...payload };
-    const zeroFields = ["MC能量消耗", "星光点消耗", "消耗星光点", "消耗零花钱", "累计消耗星光点", "累计消耗零花钱", "买断价格"];
-    for (const key of zeroFields) if (Object.prototype.hasOwnProperty.call(next, key)) next[key] = "0（作弊模式无限资源，不扣除）";
-    for (const key of Object.keys(next)) {
-      if (/^前端写入后(?:持有零花钱|零花钱|星光点|MC能量|MC能量上限|催眠APP订阅等级)$/.test(key)) delete next[key];
-    }
-    for (const key of ["变量写入路径", "前端写入路径", "AI可写路径"]) {
-      if (!Array.isArray(next[key])) continue;
-      next[key] = next[key].filter((path) => !/^\/系统\/(?:持有零花钱|零花钱|星光点|MC能量|_MC能量|MC能量上限|_MC能量上限|催眠APP订阅等级|_催眠APP订阅等级|VIP等级)$/.test(String(path || "")));
-    }
-    next["作弊模式资源规则"] = "催眠手机内全部VIP已解锁，零花钱、星光点和MC能量均为无限；本操作不得读取、扣除、增加或覆盖这些原始变量，也不得修改任何世界书。";
-    next["AI执行规范"] = "作弊模式资源规则优先：不得修改零花钱、星光点、MC能量、MC能量上限或VIP变量；不得修改、启停或新增世界书。" + (next["AI执行规范"] ? "其余非资源规则继续执行：" + next["AI执行规范"] : "");
-    return next;
+    return payload;
+  }
+
+  async function settingsGrantCheatResources() {
+    return rewardApplySystemMutation((system) => {
+      for (const key of SETTINGS_CHEAT_RESOURCE_KEYS) system[key] = SETTINGS_CHEAT_RESOURCE_VALUE;
+      for (const key of SETTINGS_CHEAT_VIP_KEYS) system[key] = "VIP6";
+      return { ok: true, message: "作弊资源已写入。" };
+    });
   }
 
   function settingsTextPrompt(page, options = {}) {
@@ -39537,7 +39515,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   }
 
   async function settingsToggleCheatMode(page, active, cheatKey = "") {
-    if (active && String(cheatKey || "") !== SETTINGS_CHEAT_UNLOCK_KEY) {
+    if (active && !settingsCheatModeActive() && String(cheatKey || "") !== SETTINGS_CHEAT_UNLOCK_KEY) {
       page.dataset.settingsStatus = "作弊模式未解锁：密钥错误。";
       diagnosticLog("warn", "cheat.unlock.rejected", { reason: "invalid-key" });
       renderSettingsPage(page);
@@ -39552,11 +39530,20 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       renderSettingsPage(page);
       return;
     }
+    if (active) {
+      const granted = await settingsGrantCheatResources();
+      if (!granted?.ok) {
+        page.dataset.settingsStatus = "作弊模式已解锁，但资源写入失败：" + String(granted?.message || "当前楼层不可写");
+        diagnosticLog("error", "cheat.grant.failure", { message: String(granted?.message || "write-failed") });
+        renderSettingsPage(page);
+        return;
+      }
+    }
     try { window.__ST_SET_CHEAT_MODE_STATUS_REMINDER__?.(null); } catch {}
     page.dataset.settingsStatus = active
-      ? "作弊模式已开启：全部VIP已解锁，零花钱、星光点和MC能量均为无限。"
+      ? "作弊模式已开启：全部VIP已解锁，零花钱、星光点和MC能量已写入99999999，可再次点击补满。"
       : "作弊模式已关闭：已恢复读取原有VIP与资源变量。";
-    diagnosticLog("info", active ? "cheat.enabled" : "cheat.disabled", { scope: "phone-only", worldbookWrites: 0, variableWrites: 0 });
+    diagnosticLog("info", active ? "cheat.enabled" : "cheat.disabled", { scope: "phone-only", worldbookWrites: 0, variableWrites: active ? 1 : 0 });
     renderSettingsPage(page);
   }
 
@@ -40320,10 +40307,11 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
         '</section>' +
         '<section class="st-settings-panel st-settings-cheat-panel ' + (cheatActive ? "is-active" : "") + '">' +
           '<h3>作弊模式</h3>' +
-          '<p>当前状态：<strong>' + (cheatActive ? "已开启" : "未开启") + '</strong>。开启后解锁催眠手机全部VIP，并将零花钱、星光点和MC能量显示及使用为无限；不会修改世界书或玩家原变量。</p>' +
+          '<p>当前状态：<strong>' + (cheatActive ? "已开启" : "未开启") + '</strong>。输入密钥开启后解锁全部VIP，并把零花钱、星光点和MC能量写入99999999；可重复点击补满，不修改世界书。</p>' +
           (!cheatActive ? '<label><span>开启密钥</span><input class="st-settings-code st-settings-cheat-key" type="password" data-settings-cheat-key autocomplete="off" inputmode="numeric" placeholder="请输入密钥"></label>' : '') +
-          '<div class="st-settings-actions is-single">' +
-            '<button type="button" class="st-settings-button ' + (cheatActive ? "danger" : "primary") + '" data-settings-action="' + (cheatActive ? "cheat-off" : "cheat-on") + '"' + (cheatActive ? ' data-settings-cheat-indicator title="点击关闭作弊模式"' : '') + '>' + (cheatActive ? "作弊模式开启中" : "开启作弊模式") + '</button>' +
+          '<div class="st-settings-actions ' + (cheatActive ? "is-two" : "is-single") + '">' +
+            '<button type="button" class="st-settings-button primary" data-settings-action="cheat-on"' + (cheatActive ? ' data-settings-cheat-indicator title="再次补满作弊资源"' : '') + '>' + (cheatActive ? "再次获取资源" : "开启作弊模式") + '</button>' +
+            (cheatActive ? '<button type="button" class="st-settings-button danger" data-settings-action="cheat-off">关闭作弊模式</button>' : '') +
           '</div>' +
         '</section>' +
         '<section class="st-settings-panel">' +

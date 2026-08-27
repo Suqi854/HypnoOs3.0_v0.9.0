@@ -1832,7 +1832,7 @@
           event.preventDefault();
           event.stopPropagation();
           menu.style.display = "none";
-          toggleShell(true);
+          toggleShell(!shellOpen);
         });
         button.addEventListener("keydown", function (event) {
           if (event.key !== "Enter" && event.key !== " ") return;
