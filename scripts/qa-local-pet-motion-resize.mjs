@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const modules = process.env.CODEX_NODE_MODULES;
@@ -10,6 +11,8 @@ const browser = await chromium.launch({ headless: true, executablePath: process.
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
 const page = await context.newPage();
 const storageKey = 'hypnoos3.extension.floatingPhone.ui.v1';
+const petScreenshotDirectory = process.env.HYPNOOS_QA_PET_SCREENSHOT_DIR || '';
+if (petScreenshotDirectory) await mkdir(petScreenshotDirectory, { recursive: true });
 
 function nondecreasing(values) {
   return values.every((value, index) => index === 0 || value + 0.2 >= values[index - 1]);
@@ -50,13 +53,12 @@ try {
     await frame.evaluate((petId) => globalThis.__ST_HYPNOOS_SELECT_INFORMATION_PET__(petId), id);
     await page.waitForFunction((petId) => {
       const launcher = document.querySelector('#hypnoos3-extension-floating-phone-host')?.shadowRoot?.querySelector('.launcher.pet-ready');
-      return launcher?.dataset.petCharacter === petId;
+      return launcher?.dataset.petCharacter === petId && launcher?.dataset.petState === 'idle';
     }, id);
-    const layers = await page.evaluate(() => {
+    const spriteState = await page.evaluate(() => {
       const root = document.querySelector('#hypnoos3-extension-floating-phone-host').shadowRoot;
-      const underlay = root.querySelector('.pet-sprite-underlay');
-      const main = root.querySelector('.pet-sprite-main');
-      if (!underlay || !main) {
+      const sprite = root.querySelector('.pet-sprite');
+      if (!sprite) {
         return {
           missing: true,
           launcherHtml: root.querySelector('.launcher')?.innerHTML || '',
@@ -64,14 +66,18 @@ try {
         };
       }
       return {
-        underlayOpacity: Number(getComputedStyle(underlay).opacity),
-        underlayImage: getComputedStyle(underlay).backgroundImage,
-        mainImage: getComputedStyle(main).backgroundImage,
+        opacity: Number(getComputedStyle(sprite).opacity),
+        image: getComputedStyle(sprite).backgroundImage,
+        underlayCount: root.querySelectorAll('.pet-sprite-underlay').length,
       };
     });
-    assert.equal(layers.missing, undefined, `本地酒馆仍在运行旧悬浮宿主：${JSON.stringify(layers)}`);
-    assert.ok(layers.underlayOpacity > 0.9, `${id} 的身体补洞层没有显示`);
-    assert.equal(layers.underlayImage, layers.mainImage, `${id} 的补洞层没有同步当前动作帧`);
+    assert.equal(spriteState.missing, undefined, `本地酒馆仍在运行旧悬浮宿主：${JSON.stringify(spriteState)}`);
+    assert.ok(spriteState.opacity > 0.9, `${id} 的桌宠主体没有显示`);
+    assert.match(spriteState.image, new RegExp(`/${id}/${id}-idle-v5\\.png`), `${id} 没有加载重建后的动作条`);
+    assert.equal(spriteState.underlayCount, 0, `${id} 仍被旧模糊补层重复渲染`);
+    if (petScreenshotDirectory) {
+      await page.locator('#hypnoos3-extension-floating-phone-host').locator('.launcher').screenshot({ path: join(petScreenshotDirectory, `${id}.png`), animations: 'disabled' });
+    }
   }
 
   await frame.evaluate(() => globalThis.__ST_HYPNOOS_SELECT_INFORMATION_PET__('miku'));
@@ -157,7 +163,7 @@ try {
   assert.deepEqual(errors, [], `浏览器控制台错误：${errors.join('\n')}`);
 
   if (process.env.HYPNOOS_QA_SCREENSHOT) await page.screenshot({ path: process.env.HYPNOOS_QA_SCREENSHOT, fullPage: true });
-  console.log('PASS local SillyTavern pet repair layers, click/hold/drag actions and compositor resize');
+  console.log('PASS local SillyTavern rebuilt pet sprites, click/hold/drag actions and compositor resize');
 } finally {
   try {
     await page.evaluate((key) => {

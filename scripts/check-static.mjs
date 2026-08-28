@@ -113,7 +113,7 @@ expect(floatingHost.includes('var petDisplayMode = "floating"') && floatingHost.
 expect(floatingHost.includes('label.textContent = "催眠手机"') && floatingHost.includes('if (stored && shellOpen) toggleShell(false)'), '收纳模式没有显示催眠手机或关闭已打开的手机');
 expect(floatingHost.includes('toggleShell(!shellOpen)'), '魔法棒催眠手机入口不能再次点击关闭');
 expect(floatingHost.includes('if (nextName !== "idle" && !petReadyAssets.has(petStateAsset(nextName))) nextName = "idle"'), '桌宠动作素材未就绪时没有回退到 idle，仍可能出现空白帧');
-expect(floatingHost.includes('pet-sprite pet-sprite-underlay') && floatingHost.includes('pet-sprite pet-sprite-main'), '四个导入桌宠缺少补洞渲染层');
+expect(floatingHost.includes("<span class='pet-sprite'></span>") && !floatingHost.includes('pet-sprite-underlay'), '完整桌宠素材仍被模糊补层重复渲染');
 expect(floatingHost.includes("data-pet-state='unique_a'") && floatingHost.includes("data-pet-state='unique_b'") && floatingHost.includes("data-pet-state='held_scared'") && floatingHost.includes("data-pet-state='landing'"), '桌宠单击、长按、拖拽或落地缺少独立动画');
 expect(floatingHost.includes('petMotionFrame = requestFrame(advancePetFrame)'), '桌宠帧动画没有使用浏览器动画帧调度');
 expect(floatingHost.includes('host.requestAnimationFrame.bind(host)'), '动画帧调度仍被限制在局部作用域或丢失宿主绑定');

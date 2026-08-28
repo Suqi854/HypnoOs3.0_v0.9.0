@@ -132,7 +132,6 @@
     var suppressLauncherClick = false;
     var petVisual = null;
     var petSprite = null;
-    var petSpriteUnderlay = null;
     var petMenu = null;
     var wandPetEntry = null;
     var wandObserver = null;
@@ -1453,36 +1452,28 @@
       if (!petSprite) return;
       var meta = petStateMeta(petState);
       var visualScale = meta.directional && petDirection !== PET_BASE_FACING ? -1 : 1;
-      [petSpriteUnderlay, petSprite].filter(Boolean).forEach(function (layer) {
-        layer.style.setProperty("--pet-facing-scale", String(visualScale));
-      });
+      petSprite.style.setProperty("--pet-facing-scale", String(visualScale));
     }
 
     function applyPetStateAppearance() {
       if (!petSprite) return;
       var meta = petStateMeta(petState);
       var backgroundImage = "url('" + petAssetUrl(petStateAsset(petState)).replace(/'/g, "%27") + "')";
-      [petSpriteUnderlay, petSprite].filter(Boolean).forEach(function (layer) {
-        layer.style.backgroundImage = backgroundImage;
-        layer.style.backgroundSize = (meta.total * PET_RENDER_SIZE) + "px " + PET_RENDER_SIZE + "px";
-        layer.style.setProperty("--pet-lift", "0px");
-      });
+      petSprite.style.backgroundImage = backgroundImage;
+      petSprite.style.backgroundSize = (meta.total * PET_RENDER_SIZE) + "px " + PET_RENDER_SIZE + "px";
+      petSprite.style.setProperty("--pet-lift", "0px");
       if (launcher) {
         launcher.dataset.petState = petState;
         launcher.dataset.petCharacter = petCharacterId;
       }
       var visualScale = meta.directional && petDirection !== PET_BASE_FACING ? -1 : 1;
-      [petSpriteUnderlay, petSprite].filter(Boolean).forEach(function (layer) {
-        layer.style.setProperty("--pet-facing-scale", String(visualScale));
-      });
+      petSprite.style.setProperty("--pet-facing-scale", String(visualScale));
     }
 
     function applyPetFrame() {
       if (!petSprite) return;
       var position = (-petFrame * PET_RENDER_SIZE) + "px 0";
-      [petSpriteUnderlay, petSprite].filter(Boolean).forEach(function (layer) {
-        layer.style.backgroundPosition = position;
-      });
+      petSprite.style.backgroundPosition = position;
     }
 
     function petClampToHabitat(x, y) {
@@ -1920,7 +1911,7 @@
       return [
         "*{box-sizing:border-box}[hidden]{display:none!important}",
         ".launcher{pointer-events:auto;position:fixed;right:22px;bottom:90px;width:96px;height:96px;border:0;padding:0;border-radius:28px;background:transparent;color:#fff;display:block;cursor:grab;touch-action:none;user-select:none;z-index:3;overflow:visible}",
-        ".launcher:focus-visible{outline:3px solid rgba(125,211,252,.96);outline-offset:3px}.launcher.dragging{cursor:grabbing}.pet-visual{position:absolute;z-index:1;inset:0;width:96px;height:96px;transform-origin:50% 100%;will-change:transform}.pet-sprite{position:absolute;inset:0;width:96px;height:96px;background-repeat:no-repeat;image-rendering:auto;filter:drop-shadow(0 7px 5px rgba(2,6,23,.58));transform:translateY(var(--pet-lift,0)) scaleX(var(--pet-facing-scale,1));transform-origin:50% 100%;opacity:0;transition:filter .16s ease}.launcher.pet-ready .pet-sprite{opacity:1}.pet-sprite-main{z-index:1}.pet-sprite-underlay{z-index:0;opacity:0!important}.launcher.pet-ready[data-pet-character='miku'] .pet-sprite-underlay,.launcher.pet-ready[data-pet-character='rem'] .pet-sprite-underlay,.launcher.pet-ready[data-pet-character='mai'] .pet-sprite-underlay,.launcher.pet-ready[data-pet-character='umaru'] .pet-sprite-underlay{opacity:.96!important;filter:blur(.85px) saturate(1.08) contrast(1.04)}.launcher:hover .pet-sprite-main,.launcher.active .pet-sprite-main{filter:drop-shadow(0 8px 5px rgba(30,64,175,.58)) drop-shadow(0 0 5px rgba(125,211,252,.34))}.launcher.dragging .pet-sprite-main{transition:none;filter:drop-shadow(0 12px 7px rgba(2,6,23,.54))}@keyframes pet-click-reaction{0%{transform:translate3d(0,0,0) scale(1)}28%{transform:translate3d(0,-10px,0) scale(1.06,.94)}58%{transform:translate3d(0,2px,0) scale(.96,1.04)}100%{transform:translate3d(0,0,0) scale(1)}}@keyframes pet-long-reaction{0%,100%{transform:rotate(0) scale(1)}20%{transform:rotate(-7deg) scale(1.04)}40%{transform:rotate(7deg) scale(.98)}60%{transform:rotate(-5deg) scale(1.04)}80%{transform:rotate(4deg) scale(1)}}@keyframes pet-held-reaction{0%,100%{transform:translate3d(0,-3px,0) rotate(-3deg)}50%{transform:translate3d(0,2px,0) rotate(3deg)}}@keyframes pet-land-reaction{0%{transform:translate3d(0,-7px,0) scale(.94,1.07)}45%{transform:translate3d(0,3px,0) scale(1.08,.9)}75%{transform:translate3d(0,-2px,0) scale(.98,1.02)}100%{transform:none}}.launcher[data-pet-state='unique_a'] .pet-visual{animation:pet-click-reaction .72s cubic-bezier(.2,.82,.25,1)}.launcher[data-pet-state='unique_b'] .pet-visual{animation:pet-long-reaction .82s ease-in-out}.launcher[data-pet-state='held_scared'] .pet-visual{animation:pet-held-reaction .28s ease-in-out infinite}.launcher[data-pet-state='landing'] .pet-visual{animation:pet-land-reaction .62s cubic-bezier(.2,.8,.25,1)}",
+        ".launcher:focus-visible{outline:3px solid rgba(125,211,252,.96);outline-offset:3px}.launcher.dragging{cursor:grabbing}.pet-visual{position:absolute;z-index:1;inset:0;width:96px;height:96px;transform-origin:50% 100%;will-change:transform}.pet-sprite{position:absolute;inset:0;width:96px;height:96px;background-repeat:no-repeat;image-rendering:auto;filter:drop-shadow(0 7px 5px rgba(2,6,23,.58));transform:translateY(var(--pet-lift,0)) scaleX(var(--pet-facing-scale,1));transform-origin:50% 100%;opacity:0;transition:filter .16s ease}.launcher.pet-ready .pet-sprite{opacity:1}.launcher:hover .pet-sprite,.launcher.active .pet-sprite{filter:drop-shadow(0 8px 5px rgba(30,64,175,.58)) drop-shadow(0 0 5px rgba(125,211,252,.34))}.launcher.dragging .pet-sprite{transition:none;filter:drop-shadow(0 12px 7px rgba(2,6,23,.54))}@keyframes pet-click-reaction{0%{transform:translate3d(0,0,0) scale(1)}28%{transform:translate3d(0,-10px,0) scale(1.06,.94)}58%{transform:translate3d(0,2px,0) scale(.96,1.04)}100%{transform:translate3d(0,0,0) scale(1)}}@keyframes pet-long-reaction{0%,100%{transform:rotate(0) scale(1)}20%{transform:rotate(-7deg) scale(1.04)}40%{transform:rotate(7deg) scale(.98)}60%{transform:rotate(-5deg) scale(1.04)}80%{transform:rotate(4deg) scale(1)}}@keyframes pet-held-reaction{0%,100%{transform:translate3d(0,-3px,0) rotate(-3deg)}50%{transform:translate3d(0,2px,0) rotate(3deg)}}@keyframes pet-land-reaction{0%{transform:translate3d(0,-7px,0) scale(.94,1.07)}45%{transform:translate3d(0,3px,0) scale(1.08,.9)}75%{transform:translate3d(0,-2px,0) scale(.98,1.02)}100%{transform:none}}.launcher[data-pet-state='unique_a'] .pet-visual{animation:pet-click-reaction .72s cubic-bezier(.2,.82,.25,1)}.launcher[data-pet-state='unique_b'] .pet-visual{animation:pet-long-reaction .82s ease-in-out}.launcher[data-pet-state='held_scared'] .pet-visual{animation:pet-held-reaction .28s ease-in-out infinite}.launcher[data-pet-state='landing'] .pet-visual{animation:pet-land-reaction .62s cubic-bezier(.2,.8,.25,1)}",
         ".pet-fallback{position:absolute;left:15px;top:15px;width:66px;height:66px;border:1px solid rgba(196,116,255,.7);border-radius:24px;background:linear-gradient(145deg,#58115d,#19142d 62%,#0b1022);box-shadow:0 16px 44px rgba(20,0,35,.48),inset 0 1px rgba(255,255,255,.18);display:grid;place-items:center;transition:opacity .18s ease}.launcher.pet-ready .pet-fallback{opacity:0;pointer-events:none}.pet-fallback svg{width:30px;height:30px}",
 ".pet-menu{position:fixed;z-index:4;width:120px;height:56px;pointer-events:none;opacity:0;transform:translateY(8px) scale(.9);transform-origin:50% 100%;transition:opacity .14s ease,transform .14s ease}.pet-menu.open{pointer-events:auto;opacity:1;transform:none}.pet-menu button{position:absolute;top:0;width:56px;height:56px;padding:0;border:1px solid rgba(226,232,240,.7);border-radius:50%;background:linear-gradient(145deg,rgba(30,41,59,.97),rgba(15,23,42,.98));box-shadow:0 8px 22px rgba(2,6,23,.48),inset 0 1px rgba(255,255,255,.14);color:#f8fafc;font:850 11px/1.1 system-ui;cursor:pointer;touch-action:manipulation}.pet-menu button[data-pet-action='choose']{left:0}.pet-menu button[data-pet-action='settings']{left:64px}.pet-menu button:hover,.pet-menu button:focus-visible{border-color:#a5f3fc;background:linear-gradient(145deg,#155e75,#172554);outline:2px solid rgba(165,243,252,.72);outline-offset:2px}",
         ".launcher i{position:absolute;z-index:2;right:1px;top:1px;min-width:20px;height:20px;padding:0 5px;border:2px solid rgba(255,255,255,.88);border-radius:10px;background:#f25aa6;color:white;font:800 11px/16px system-ui;text-align:center;box-shadow:0 3px 8px rgba(15,23,42,.46)}@media(prefers-reduced-motion:reduce){.pet-sprite,.pet-fallback,.pet-visual{transition:none!important;animation:none!important}}",
@@ -2282,14 +2273,13 @@
       shell.style.cssText = "position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:2147481900;";
       shadow = shell.attachShadow({ mode: "open" });
       shadow.innerHTML = "<style>" + shellCss() + "</style>" +
-        "<button class='launcher' type='button' aria-label='打开悬浮手机' aria-haspopup='menu' aria-expanded='false'><span class='pet-visual' aria-hidden='true'><span class='pet-sprite pet-sprite-underlay'></span><span class='pet-sprite pet-sprite-main'></span></span><span class='pet-fallback' aria-hidden='true'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8'><rect x='6' y='2.5' width='12' height='19' rx='3'/><path d='M10 5h4M11 18.5h2'/></svg></span><i>0</i></button>" +
+        "<button class='launcher' type='button' aria-label='打开悬浮手机' aria-haspopup='menu' aria-expanded='false'><span class='pet-visual' aria-hidden='true'><span class='pet-sprite'></span></span><span class='pet-fallback' aria-hidden='true'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8'><rect x='6' y='2.5' width='12' height='19' rx='3'/><path d='M10 5h4M11 18.5h2'/></svg></span><i>0</i></button>" +
 "<nav class='pet-menu' role='menu' aria-label='桌宠菜单' aria-hidden='true'><button type='button' role='menuitem' data-pet-action='choose'>选择</button><button type='button' role='menuitem' data-pet-action='settings'>通用</button></nav>" +
         "<section class='panel' aria-label='HypnoOS 悬浮手机'><aside class='map-extra-chain-host' aria-label='更多地图区域' aria-hidden='true'></aside><aside class='work-lever-host' aria-label='打工滚筒摇杆'><button class='work-lever' type='button' data-work-lever-host aria-label='拉动或点击摇杆切换下一份工作'><span class='work-lever__body'><svg viewBox='0 0 126 150' aria-hidden='true'><defs><linearGradient id='workLeverTube' x1='0' y1='0' x2='1' y2='0'><stop offset='0' stop-color='#aeb8b1'/><stop offset='.42' stop-color='#647169'/><stop offset='.72' stop-color='#303a34'/><stop offset='1' stop-color='#151b17'/></linearGradient><radialGradient id='workLeverKnob' cx='.32' cy='.25' r='.72'><stop offset='0' stop-color='#ffd36b'/><stop offset='.22' stop-color='#df850d'/><stop offset='.68' stop-color='#91340b'/><stop offset='1' stop-color='#431506'/></radialGradient></defs><path class='work-lever__tube-shadow' d='M44 31V101Q44 120 63 120H126'/><path class='work-lever__tube' d='M44 31V101Q44 120 63 120H126'/><path class='work-lever__tube-shine' d='M44 35V99Q44 113 61 113H122'/><circle class='work-lever__knob-ring' cx='44' cy='28' r='33'/><circle class='work-lever__knob-core' cx='44' cy='28' r='27'/></svg></span></button></aside><aside class='hypnosis-judgement-perch' aria-hidden='true'><span class='hypnosis-judgement-figure is-demon'><img class='hypnosis-judgement-figure__rear' alt='' draggable='false' src='" + escapeHtml(String(config.assetBase || "").replace(/\/?$/, "/") + "profile-ui/hypnosis-demon-side-v3.png") + "'><img class='hypnosis-judgement-figure__front' alt='' draggable='false' src='" + escapeHtml(String(config.assetBase || "").replace(/\/?$/, "/") + "profile-ui/hypnosis-demon-side-v3.png") + "'></span><span class='hypnosis-judgement-figure is-angel'><img class='hypnosis-judgement-figure__rear' alt='' draggable='false' src='" + escapeHtml(String(config.assetBase || "").replace(/\/?$/, "/") + "profile-ui/hypnosis-angel-side-v3.png") + "'><img class='hypnosis-judgement-figure__front' alt='' draggable='false' src='" + escapeHtml(String(config.assetBase || "").replace(/\/?$/, "/") + "profile-ui/hypnosis-angel-side-v3.png") + "'></span></aside><aside class='encounter-detail-host' aria-hidden='true'></aside><aside class='profile-neighbor-host' aria-label='相邻人物档案'><button class='profile-neighbor-rail prev' type='button' data-kicker='PREV' data-profile-neighbor='prev'></button><button class='profile-neighbor-rail next' type='button' data-kicker='NEXT' data-profile-neighbor='next'></button></aside><aside class='encounter-possession-decor-host' aria-hidden='true' hidden><img alt='' draggable='false' src='" + escapeHtml(String(config.assetBase || "").replace(/\/?$/, "/") + "profile-ui/profile-possession-top-grip-v1.png") + "'></aside><aside class='profile-possession-host' aria-label='附身控制'><button class='profile-possession-grip' type='button' data-profile-possession-host='' aria-pressed='false'><img alt='' draggable='false' src='" + escapeHtml(String(config.assetBase || "").replace(/\/?$/, "/") + "profile-ui/profile-possession-top-grip-v1.png") + "'></button></aside><div class='phone-wrap'><iframe class='phone' title='HypnoOS 手机前端' scrolling='no'></iframe><div class='variable-format-dialog' role='dialog' aria-modal='true' aria-hidden='true'><section class='variable-format-dialog__card'><strong data-variable-format-title>变量格式检查</strong><p data-variable-format-body></p><div class='variable-format-dialog__actions'><button type='button' data-variable-format-close>关闭</button><button type='button' data-variable-format-repair>清理并补齐</button></div></section></div></div><span class='drag-edge top' data-phone-drag></span><span class='drag-edge right' data-phone-drag></span><span class='drag-edge bottom' data-phone-drag></span><span class='drag-edge left' data-phone-drag></span><span class='drag-grip' data-phone-drag aria-label='拖动手机'></span><span class='resize-corner left' data-phone-resize='left'></span><span class='resize-corner right' data-phone-resize='right'></span><aside class='sidecar'><section class='resource-panel loading' aria-label='当前楼层资源'><div class='resource-row money'><span>零花钱</span><strong data-resource-money>--</strong></div><div class='resource-row starlight'><span>星光点</span><strong data-resource-starlight>--</strong></div><div class='resource-row energy'><span>MC能量</span><strong data-resource-energy>--</strong></div></section><button class='variable-format-toggle' type='button'>变量格式检查</button><span class='readonly'>历史楼层 · 只读；切回当前楼后才能操作</span><button class='pet-character-toggle' type='button'>人物 · 爱丽莎</button><button class='floor-toggle' type='button' aria-expanded='false'>楼层</button><section class='floor-drawer'><span class='floor-title'></span><button class='mode' type='button'>跟随视口</button><select class='select' aria-label='选择变量楼层'></select><span class='badge'></span></section></aside></section>";
       hostDocument.body.appendChild(shell);
       launcher = shadow.querySelector(".launcher");
       petVisual = shadow.querySelector(".pet-visual");
-      petSprite = shadow.querySelector(".pet-sprite-main");
-      petSpriteUnderlay = shadow.querySelector(".pet-sprite-underlay");
+      petSprite = shadow.querySelector(".pet-sprite");
       petMenu = shadow.querySelector(".pet-menu");
       ensureWandPetEntry();
       if (!wandObserver && typeof host.MutationObserver === "function") {
@@ -3084,7 +3074,6 @@
         petMenuOpen = false;
         petVisual = null;
         petSprite = null;
-        petSpriteUnderlay = null;
         if (profileOpenTimer) host.clearTimeout(profileOpenTimer);
         profileOpenTimer = 0;
         pendingProfileRole = "";

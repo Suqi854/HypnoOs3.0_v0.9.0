@@ -3,28 +3,56 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from collections import deque
+
 from PIL import Image
 
 
 FRAME_SIZE = 96
 CHARACTERS = ("miku", "rem", "mai", "umaru")
-ACTION_GROUPS = ("drag", "unique-a", "unique-b")
+ACTION_GROUPS = ("idle", "drag", "unique-a", "unique-b", "enter", "exit", "landing")
 
 
-def harden_strip(path: Path, check: bool) -> int:
+def count_enclosed_transparent_pixels(path: Path) -> int:
     source = Image.open(path).convert("RGBA")
     if source.height != FRAME_SIZE or source.width % FRAME_SIZE:
         raise ValueError(f"unexpected pet strip dimensions: {path} ({source.size})")
-    alpha = source.getchannel("A")
-    partial = sum(alpha.histogram()[1:255])
-    if partial and not check:
-        source.putalpha(alpha.point(lambda value: 255 if value else 0))
-        source.save(path, optimize=True)
-    return partial
+    enclosed = 0
+    for frame_index in range(source.width // FRAME_SIZE):
+        alpha = source.crop((frame_index * FRAME_SIZE, 0, (frame_index + 1) * FRAME_SIZE, FRAME_SIZE)).getchannel("A")
+        pixels = alpha.load()
+        outside = bytearray(FRAME_SIZE * FRAME_SIZE)
+        queue: deque[tuple[int, int]] = deque()
+
+        def seed(x: int, y: int) -> None:
+            offset = y * FRAME_SIZE + x
+            if outside[offset] or pixels[x, y] > 16:
+                return
+            outside[offset] = 1
+            queue.append((x, y))
+
+        for x in range(FRAME_SIZE):
+            seed(x, 0)
+            seed(x, FRAME_SIZE - 1)
+        for y in range(1, FRAME_SIZE - 1):
+            seed(0, y)
+            seed(FRAME_SIZE - 1, y)
+        while queue:
+            x, y = queue.popleft()
+            for next_x, next_y in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+                if 0 <= next_x < FRAME_SIZE and 0 <= next_y < FRAME_SIZE:
+                    seed(next_x, next_y)
+        enclosed += sum(
+            1
+            for y in range(FRAME_SIZE)
+            for x in range(FRAME_SIZE)
+            if pixels[x, y] <= 16 and not outside[y * FRAME_SIZE + x]
+        )
+    return enclosed
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Harden transformed pet action strips without filling intentional silhouette gaps.")
+    parser = argparse.ArgumentParser(description="Check imported pet strips for transparent holes inside character silhouettes.")
     parser.add_argument("--asset-root", type=Path, default=Path("public/assets/pet/v5"))
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
@@ -34,15 +62,15 @@ def main() -> None:
     for character in CHARACTERS:
         for group in ACTION_GROUPS:
             path = args.asset_root / character / f"{character}-{group}-v5.png"
-            count = harden_strip(path, args.check)
+            count = count_enclosed_transparent_pixels(path)
             total += count
             if count:
                 unresolved.append((path, count))
 
     if args.check and unresolved:
         details = ", ".join(f"{path}:{count}" for path, count in unresolved)
-        raise SystemExit(f"pet action strips still contain partially transparent body pixels: {details}")
-    print(f"{'checked' if args.check else 'hardened'} {total} partially transparent action pixels")
+        raise SystemExit(f"pet action strips still contain enclosed transparent body pixels: {details}")
+    print(f"checked {total} enclosed transparent body pixels")
 
 
 if __name__ == "__main__":
