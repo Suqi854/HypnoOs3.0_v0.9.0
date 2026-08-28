@@ -1919,8 +1919,8 @@ html.st-hypnoos-booting.st-hypnoos-boot-failed .st-hypnoos-phone-preboot::after{
     const buildPendingOperationText = (entries = window.__ST_OPERATION_INPUT_LOG__) => {
       const parts = [];
       const playerInput = readOperationNote();
-      if (playerInput) parts.push(playerInput);
       if (Array.isArray(entries) && entries.length) parts.push(buildOperationBlock(entries));
+      if (playerInput) parts.push(playerInput);
       return parts.join("\n");
     };
     const stripOperationBlocks = (value) => String(value || "").replace(OPERATION_BLOCK_RE, "").replace(/[ \t]*\n{3,}/g, "\n\n").trim();
@@ -1929,7 +1929,7 @@ html.st-hypnoos-booting.st-hypnoos-boot-failed .st-hypnoos-phone-preboot::after{
       const playerInput = readOperationNote();
       const stripped = stripOperationBlocks(current);
       const base = playerInput ? "" : stripped;
-      const next = base ? base + "\n" + block : block;
+      const next = base ? block + "\n" + base : block;
       if ("value" in input) input.value = next;
       else input.textContent = next;
       input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -4182,7 +4182,7 @@ var __webpack_exports__ = __webpack_require__("./src/催眠APP前端/index.tsx")
       if (!input) continue;
       const current = "value" in input ? input.value : input.textContent;
       const base = String(current || "").replace(/<本轮(?:APP)?操作>[\s\S]*?<\/本轮(?:APP)?操作>/g, "").trim();
-      const next = base ? base.replace(/\s*$/, "") + "\n" + block : block;
+      const next = base ? block + "\n" + base.replace(/\s*$/, "") : block;
       if ("value" in input) input.value = next;
       else input.textContent = next;
       input.dispatchEvent(new Event("input", { bubbles: true }));

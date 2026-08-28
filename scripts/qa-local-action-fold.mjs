@@ -18,7 +18,7 @@ try {
     const root = document.createElement('div');
     root.id = 'hypnoos-action-fold-qa';
     root.className = 'mes_text';
-    root.textContent = '<本轮操作>\n<本轮执行边界>测试边界</本轮执行边界>\n<操作项><操作名>拿起水杯</操作名><操作内容>备注=拿起水杯</操作内容></操作项>\n</本轮操作>';
+    root.textContent = '<本轮操作>\n<本轮执行边界>测试边界</本轮执行边界>\n<操作项><操作名>拿起水杯</操作名><操作内容>备注=拿起水杯</操作内容></操作项>\n</本轮操作>\n陈珊珊拿杯水';
     document.body.appendChild(root);
   });
   const fold = page.locator('#hypnoos-action-fold-qa details[data-hypnoos-action-fold="v3"]');
@@ -29,6 +29,11 @@ try {
   await summary.click();
   assert.notEqual(await fold.getAttribute('open'), null, '点击后没有展开本轮操作');
   assert.match(await fold.locator('[data-hypnoos-action-body="v3"]').innerText(), /拿起水杯/);
+  const order = await page.locator('#hypnoos-action-fold-qa').evaluate((root) => ({
+    fold: Array.from(root.childNodes).indexOf(root.querySelector('details[data-hypnoos-action-fold="v3"]')),
+    text: Array.from(root.childNodes).findIndex((node) => node.nodeType === Node.TEXT_NODE && node.textContent.includes('陈珊珊拿杯水')),
+  }));
+  assert.ok(order.fold >= 0 && order.text > order.fold, `玩家本轮输入没有位于前端操作下方：${JSON.stringify(order)}`);
   await page.evaluate(() => document.querySelector('#hypnoos-action-fold-qa')?.remove());
   console.log('PASS local SillyTavern built-in action fold');
 } finally {

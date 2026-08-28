@@ -75,6 +75,18 @@ try {
     assert.ok(spriteState.opacity > 0.9, `${id} 的桌宠主体没有显示`);
     assert.match(spriteState.image, new RegExp(`/${id}/${id}-idle-v5\\.png`), `${id} 没有加载重建后的动作条`);
     assert.equal(spriteState.underlayCount, 0, `${id} 仍被旧模糊补层重复渲染`);
+    const animationNames = await page.evaluate(() => {
+      const launcher = document.querySelector('#hypnoos3-extension-floating-phone-host').shadowRoot.querySelector('.launcher');
+      const visual = launcher.querySelector('.pet-visual');
+      const result = [];
+      for (const state of ['unique_a', 'unique_b', 'held_scared']) {
+        launcher.dataset.petState = state;
+        result.push(getComputedStyle(visual).animationName);
+      }
+      launcher.dataset.petState = 'idle';
+      return result;
+    });
+    assert.deepEqual(animationNames, [`pet-${id}-click`, `pet-${id}-long`, `pet-${id}-drag`], `${id} 没有使用各自的单击、长按和拖拽动作`);
     if (petScreenshotDirectory) {
       await page.locator('#hypnoos3-extension-floating-phone-host').locator('.launcher').screenshot({ path: join(petScreenshotDirectory, `${id}.png`), animations: 'disabled' });
     }

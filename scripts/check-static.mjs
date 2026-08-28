@@ -20,7 +20,7 @@ for (const path of [manifest.js, manifest.css, 'capability-contract.json']) {
 const ui = await readFile(new URL('ui/index.html', root));
 const uiText = ui.toString('utf8');
 const uiHash = createHash('sha256').update(uiText.replace(/\r\n/g, '\n')).digest('hex');
-expect(uiHash === 'fe2d6594117abf6b45854aaec500c1b298d42f40d887c601fab01424d9cc2642', `UI 基线哈希变化：${uiHash}`);
+expect(uiHash === '880b8148944c3d19715a3711e2434c56b9c4839247c74710111753483651c3f9', `UI 基线哈希变化：${uiHash}`);
 const hypnosisRulesSource = await readFile(new URL('src/hypnosis-rules.js', root), 'utf8');
 expect(uiText.includes('html,body,#app{width:100%;height:100%;min-height:0;margin:0;overflow:hidden!important;overscroll-behavior:none}#app{contain:strict}'), '手机前端缺少满屏滚动锁');
 expect(uiText.includes('window.__ST_OPEN_PENDING_INPUT_APP__'), '手机前端缺少本轮输入应用入口');
@@ -115,6 +115,20 @@ expect(floatingHost.includes('toggleShell(!shellOpen)'), '魔法棒催眠手机�
 expect(floatingHost.includes('if (nextName !== "idle" && !petReadyAssets.has(petStateAsset(nextName))) nextName = "idle"'), '桌宠动作素材未就绪时没有回退到 idle，仍可能出现空白帧');
 expect(floatingHost.includes("<span class='pet-sprite'></span>") && !floatingHost.includes('pet-sprite-underlay'), '完整桌宠素材仍被模糊补层重复渲染');
 expect(floatingHost.includes("data-pet-state='unique_a'") && floatingHost.includes("data-pet-state='unique_b'") && floatingHost.includes("data-pet-state='held_scared'") && floatingHost.includes("data-pet-state='landing'"), '桌宠单击、长按、拖拽或落地缺少独立动画');
+for (const id of ['miku', 'rem', 'mai', 'umaru']) {
+  for (const action of ['click', 'long', 'drag']) {
+    expect(floatingHost.includes(`@keyframes pet-${id}-${action}`), `${id} 缺少独立的 ${action} 动画`);
+  }
+  expect(floatingHost.includes(`[data-pet-character='${id}'][data-pet-state='unique_a']`) && floatingHost.includes(`[data-pet-character='${id}'][data-pet-state='unique_b']`) && floatingHost.includes(`[data-pet-character='${id}'][data-pet-state='held_scared']`), `${id} 的独立交互动作没有完整绑定`);
+}
+for (const id of ['alisa', 'hyakka']) {
+  expect(!floatingHost.includes(`[data-pet-character='${id}'][data-pet-state=`), `${id} 的 4.3 动作不应被新增覆盖`);
+}
+const pendingStart = uiText.indexOf('const buildPendingOperationText =');
+const pendingEnd = uiText.indexOf('const stripOperationBlocks =', pendingStart);
+const pendingSource = uiText.slice(pendingStart, pendingEnd);
+expect(pendingSource.indexOf('parts.push(buildOperationBlock(entries))') < pendingSource.indexOf('parts.push(playerInput)'), '本轮输入仍把玩家文字放在前端操作之前');
+expect(uiText.includes('const next = base ? block + "\\n" + base : block;'), '输入框回退仍把前端操作放在玩家文字之后');
 expect(floatingHost.includes('petMotionFrame = requestFrame(advancePetFrame)'), '桌宠帧动画没有使用浏览器动画帧调度');
 expect(floatingHost.includes('host.requestAnimationFrame.bind(host)'), '动画帧调度仍被限制在局部作用域或丢失宿主绑定');
 expect(floatingHost.includes('transform:translateZ(0) scale(var(--phone-scale))') && !floatingHost.includes('isolation:isolate;transform:scale(var(--phone-scale))'), '手机缩放没有统一作用于整个容器');

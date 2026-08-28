@@ -132,6 +132,17 @@ test('information app selects six pets and toggles floating or wand storage mode
   assert.ok(floatingHost.includes("<span class='pet-sprite'></span>"), '桌宠缺少单层清晰渲染');
   assert.ok(!floatingHost.includes('pet-sprite-underlay'), '完整桌宠素材仍被模糊补层重复渲染');
   assert.ok(floatingHost.includes("data-pet-state='unique_a'") && floatingHost.includes("data-pet-state='unique_b'") && floatingHost.includes("data-pet-state='held_scared'") && floatingHost.includes("data-pet-state='landing'"), '桌宠单击、长按、拖拽或落地缺少独立动画');
+  for (const id of ['miku', 'rem', 'mai', 'umaru']) {
+    for (const action of ['click', 'long', 'drag']) {
+      assert.ok(floatingHost.includes(`@keyframes pet-${id}-${action}`), `${id} 缺少独立的 ${action} 动画`);
+    }
+    assert.ok(floatingHost.includes(`[data-pet-character='${id}'][data-pet-state='unique_a']`), `${id} 单击动作没有独立绑定`);
+    assert.ok(floatingHost.includes(`[data-pet-character='${id}'][data-pet-state='unique_b']`), `${id} 长按动作没有独立绑定`);
+    assert.ok(floatingHost.includes(`[data-pet-character='${id}'][data-pet-state='held_scared']`), `${id} 拖拽动作没有独立绑定`);
+  }
+  for (const id of ['alisa', 'hyakka']) {
+    assert.ok(!floatingHost.includes(`[data-pet-character='${id}'][data-pet-state=`), `${id} 的 4.3 动作不应被新增覆盖`);
+  }
   assert.ok(floatingHost.includes('petMotionFrame = requestFrame(advancePetFrame)'), '桌宠帧动画没有使用浏览器动画帧调度');
   assert.ok(floatingHost.includes('host.requestAnimationFrame.bind(host)'), '动画帧调度仍被限制在局部作用域或丢失宿主绑定');
   assert.ok(!floatingHost.includes('if (event.pointerType !== "mouse") {\n        var longPressPointerId'), '桌宠长按仍仅支持触屏');
@@ -223,7 +234,7 @@ test('hypnosis commands wait in phone input before host write or direct send', (
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__(block, { append: false })'));
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_DIRECT_SEND__(block)'));
   assert.ok(floatingHost.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__'));
-  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-pet-source-rebuild'"));
+  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-input-order-unique-pets'"));
   assert.ok(floatingCore.includes("scriptUrl.searchParams.set('revision', FRONTEND_REVISION)"));
   assert.ok(floatingCore.includes('script.dataset.revision = FRONTEND_REVISION'));
   assert.ok(floatingHost.includes('writeInput: function (text, options) { return callApi("setInput", [text, options]); }'));
@@ -264,6 +275,15 @@ test('cheat mode writes finite refillable resources without intercepting command
   assert.ok(!setStarlight.includes('settingsCheatModeActive'));
   assert.ok(!deductStarlight.includes('settingsCheatModeActive'));
   assert.ok(!information.includes('settingsCheatModeActive'));
+});
+
+test('pending input keeps frontend operations above the player turn text', () => {
+  const pendingStart = html.indexOf('const buildPendingOperationText =');
+  const pendingEnd = html.indexOf('const stripOperationBlocks =', pendingStart);
+  const pending = html.slice(pendingStart, pendingEnd);
+  assert.ok(pending.indexOf('parts.push(buildOperationBlock(entries))') < pending.indexOf('parts.push(playerInput)'));
+  assert.ok(html.includes('const next = base ? block + "\\n" + base : block;'));
+  assert.ok(html.includes('const next = base ? block + "\\n" + base.replace(/\\s*$/, "") : block;'));
 });
 
 test('hypnosis and MC recharge quotes use the canonical rule bridge', () => {
