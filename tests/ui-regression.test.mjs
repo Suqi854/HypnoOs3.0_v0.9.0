@@ -16,6 +16,13 @@ function functionBody(name) {
   return html.slice(start, next < 0 ? html.length : next);
 }
 
+function functionBodyFrom(source, name) {
+  const start = source.indexOf(`function ${name}(`);
+  assert.notEqual(start, -1, `missing function ${name}`);
+  const next = source.indexOf('\n    function ', start + 1);
+  return source.slice(start, next < 0 ? source.length : next);
+}
+
 test('critical phone apps remain registered under the existing 4.3 surface', () => {
   const ids = new Set(PHONE_APPS.map((app) => app.id));
   for (const id of ['hypnosis', 'profile-female', 'profile-male', 'calendar', 'timetable', 'achievements', 'map', 'work', 'monitor', 'encounter']) {
@@ -135,6 +142,13 @@ test('phone resize is frame-coalesced without forced layout reads per pointer mo
   assert.ok(!move.includes('getBoundingClientRect'));
   assert.ok(flush.includes('Math.floor(430 * scale)'));
   assert.ok(flush.includes('clampPosition(x, resizeState.top, size)'));
+});
+
+test('mobile keyboard keeps the phone stable while a text field is active', () => {
+  const activeInput = functionBodyFrom(floatingHost, 'phoneHasActiveTextInput');
+  assert.ok(activeInput.includes('frame.contentDocument.activeElement'));
+  assert.ok(activeInput.includes('tagName === "TEXTAREA"'));
+  assert.ok(floatingHost.includes('if (phoneHasActiveTextInput()) return'));
 });
 
 test('model connector explains SiliconFlow balance failures', () => {
@@ -290,6 +304,9 @@ test('profile photo area opens photo folder; folder slots open the avatar librar
   assert.ok(picker.includes('profileSetPhotoSlotLive(page, index, source)'));
   assert.ok(picker.includes('importAvatarLibraryFiles(files)'));
   assert.ok(picker.includes('bindAvatarLibrarySelectionActivation(button, async () =>'));
+  assert.ok(picker.includes('option.classList.toggle("is-selected", selected)'));
+  const liveSelection = picker.slice(picker.indexOf('profileSetPhotoSlotLive(page, index, source)'), picker.indexOf('}));', picker.indexOf('profileSetPhotoSlotLive(page, index, source)')));
+  assert.ok(!liveSelection.includes('renderProfileAvatarLibraryPicker'));
   assert.ok(picker.includes('data-profile-avatar-library-confirm'));
   assert.ok(!picker.includes('data-profile-avatar-library-photo-folder'));
   assert.ok(open.includes('findPhoneRoot(page)'));
@@ -311,6 +328,16 @@ test('profile photo area opens photo folder; folder slots open the avatar librar
   assert.ok(profileAction.includes('if (action === "upload-photo")'));
   assert.ok(profileAction.includes('openProfilePhotoDialog(page)'));
   assert.ok(!profileAction.includes('openProfilePhotoAvatarPicker(page)'));
+});
+
+test('hypnosis start uses a touch-safe activation path before mobile blur rerenders', () => {
+  const binding = functionBody('bindHypnosisStartActivation');
+  const render = functionBody('renderHypnosisLitePage');
+  assert.ok(binding.includes('button.addEventListener("mousedown"'));
+  assert.ok(binding.includes('button.addEventListener("touchstart"'));
+  assert.ok(binding.includes('button.addEventListener("keydown"'));
+  assert.ok(binding.includes('button.addEventListener("click"'));
+  assert.ok(render.includes('bindHypnosisStartActivation(startButton, startHypnosis)'));
 });
 
 test('raw operation containers use the built-in fold renderer without a SillyTavern regex', () => {

@@ -12219,7 +12219,8 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       });
       input.addEventListener("blur", rerenderPreservingScroll, { once: true });
     }));
-    page.querySelector("[data-hypnosis-start]")?.addEventListener("click", () => {
+    const startButton = page.querySelector("[data-hypnosis-start]");
+    const startHypnosis = () => {
       if (hasPendingHypnosisStartOperation()) {
         page.dataset.hypnosisNotice = "催眠操作已在暂存区。";
         rerenderPreservingScroll();
@@ -12368,11 +12369,34 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       if (totalStarlightCost) operationPayload["星光点消耗"] = totalStarlightCost + "点";
       if (soundwaveMode) operationPayload["声波额外消耗"] = "100点";
       if (selectionMode) operationPayload["选择模式"] = "开启";
-      Promise.resolve(appendAppOperation(operationPayload)).then((added) => {
+      return Promise.resolve(appendAppOperation(operationPayload)).then((added) => {
         if (added) playHypnosisTranceAnimation(page);
         page.dataset.hypnosisNotice = added ? actionText + "已暂存。" : actionText + "已在暂存区。";
         rerenderPreservingScroll();
       });
+    };
+    bindHypnosisStartActivation(startButton, startHypnosis);
+  }
+
+  function bindHypnosisStartActivation(button, handler) {
+    if (!button || typeof handler !== "function") return;
+    const activate = (event) => {
+      if (event.type === "mousedown" && event.button !== undefined && event.button !== 0) return;
+      if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
+      if (button.dataset.hypnosisStartBusy === "true") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      button.dataset.hypnosisStartBusy = "true";
+      Promise.resolve(handler()).finally(() => {
+        if (button.isConnected) delete button.dataset.hypnosisStartBusy;
+      });
+    };
+    button.addEventListener("mousedown", activate);
+    button.addEventListener("touchstart", activate, { passive: false });
+    button.addEventListener("keydown", activate);
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
     });
   }
 
@@ -16370,7 +16394,11 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       if (!source) return;
       page.dataset.profileAvatarLibrarySelected = String(itemId || "");
       profileSetPhotoSlotLive(page, index, source);
-      await renderProfileAvatarLibraryPicker(page, picker, index);
+      picker.querySelectorAll("[data-profile-avatar-library-select]").forEach((option) => {
+        const selected = option === button;
+        option.classList.toggle("is-selected", selected);
+        option.setAttribute("aria-pressed", selected ? "true" : "false");
+      });
     }));
   }
 

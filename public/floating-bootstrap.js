@@ -2890,7 +2890,18 @@
         selectFloor(id, "follow");
       }
     };
+    function phoneHasActiveTextInput() {
+      try {
+        var active = frame && frame.contentDocument && frame.contentDocument.activeElement;
+        if (!active) return false;
+        var tagName = String(active.tagName || "").toUpperCase();
+        return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT" || Boolean(active.isContentEditable);
+      } catch (_) {
+        return false;
+      }
+    }
     hostResizeHandler = function () {
+      if (phoneHasActiveTextInput()) return;
       if (launcher) applySavedLauncherPosition();
       if (panel) applySavedPosition();
     };

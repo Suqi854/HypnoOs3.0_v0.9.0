@@ -51,19 +51,40 @@ try {
   await frame.evaluate((name) => globalThis.__ST_OPEN_FEMALE_PROFILE_APP__('info', name), roleName);
   const profile = frame.locator('.st-profile-app');
   await profile.waitFor({ state: 'visible' });
-  await profile.locator('[data-profile-action="upload-photo"]').dispatchEvent('mousedown', { button: 0 });
+  await profile.locator('[data-profile-action="upload-photo"]').click();
   const photoDialog = profile.locator('[data-profile-photo-dialog]');
   await photoDialog.waitFor({ state: 'visible' });
   assert.equal(await photoDialog.locator('.st-profile-photo-slot').count(), 4, '照片夹不再保持四个槽位');
-  await photoDialog.locator('.st-profile-photo-preview[data-profile-photo-slot="0"]').dispatchEvent('mousedown', { button: 0 });
-  const picker = profile.locator('[data-profile-avatar-library-picker]');
+  await photoDialog.locator('.st-profile-photo-preview[data-profile-photo-slot="0"]').click();
+  const picker = frame.locator('[data-profile-avatar-library-picker]');
   await picker.waitFor({ state: 'visible' });
   await page.waitForTimeout(500);
   assert.equal(await picker.count(), 1, '头像库被同一次点击立即关闭或重复打开');
   assert.equal(await photoDialog.locator('.st-profile-photo-slot').count(), 4, '打开头像库后改变了原照片夹布局');
   assert.equal(await picker.locator('[data-profile-avatar-library-select]').count(), 1, '档案内头像库没有读取已上传头像');
+  await picker.locator('.st-profile-avatar-picker-grid').evaluate((grid) => {
+    const option = grid.querySelector('[data-profile-avatar-library-select]');
+    for (let index = 0; index < 24; index += 1) {
+      const clone = option.cloneNode(true);
+      clone.removeAttribute('data-profile-avatar-library-select');
+      clone.setAttribute('aria-hidden', 'true');
+      clone.tabIndex = -1;
+      grid.appendChild(clone);
+    }
+    grid.appendChild(option);
+  });
+  const scrollBefore = await picker.locator('.st-profile-avatar-picker-card').evaluate((card) => {
+    card.scrollTop = card.scrollHeight;
+    return card.scrollTop;
+  });
+  assert.ok(scrollBefore > 0, '头像库测试没有形成可滚动列表');
   if (process.env.HYPNOOS_QA_SCREENSHOT) await profile.screenshot({ path: process.env.HYPNOOS_QA_SCREENSHOT });
   await picker.locator('[data-profile-avatar-library-select]').dispatchEvent('pointerup', { button: 0 });
+  await picker.waitFor({ state: 'visible' });
+  const scrollAfter = await picker.locator('.st-profile-avatar-picker-card').evaluate((card) => card.scrollTop);
+  assert.equal(scrollAfter, scrollBefore, '选择头像后头像库滚动位置发生变化');
+  assert.equal(await picker.locator('[data-profile-avatar-library-select]').getAttribute('aria-pressed'), 'true', '所选头像没有保持高亮');
+  await picker.locator('[data-profile-avatar-library-confirm]').dispatchEvent('mousedown', { button: 0 });
   await picker.waitFor({ state: 'detached' });
   const slotSource = await photoDialog.locator('[data-profile-photo-slot="0"]').locator('xpath=ancestor::article[1]').locator('img').getAttribute('src');
   const source = await profile.locator('.st-person-photo img').getAttribute('src');
