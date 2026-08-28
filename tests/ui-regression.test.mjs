@@ -279,14 +279,12 @@ test('avatar library applies uploaded images through host-safe controls', () => 
   assert.ok(render.includes('profileSaveLocalPhoto(selectedRole, source)'));
 });
 
-test('profile photo area and photo folder open the avatar library floating window and apply live', () => {
+test('profile photo area opens photo folder; folder slots open the avatar library floating window', () => {
   const picker = functionBody('renderProfileAvatarLibraryPicker');
   const open = functionBody('openProfileAvatarLibraryPicker');
-  const photoArea = functionBody('openProfilePhotoAvatarPicker');
   const profilePage = functionBody('bindPersonProfileEvents');
   assert.ok(open.includes('data-profile-avatar-library-picker'));
   assert.ok(open.includes('renderProfileAvatarLibraryPicker(page, picker, index)'));
-  assert.ok(open.includes('.st-profile-detail-stage'));
   assert.ok(picker.includes('readAvatarLibraryIndex()'));
   assert.ok(picker.includes('profileGetPhotoStorageIdb(avatarLibraryImageKey'));
   assert.ok(picker.includes('profileSetPhotoSlotLive(page, index, source)'));
@@ -297,8 +295,7 @@ test('profile photo area and photo folder open the avatar library floating windo
   assert.ok(open.includes('findPhoneRoot(page)'));
   assert.ok(open.includes('if (current && Number(page.dataset.profileAvatarLibrarySlot || 0) === index) return'));
   assert.ok(open.includes('lockProfileAvatarLibraryPointer(page)'));
-  assert.ok(photoArea.includes('openProfilePhotoDialog(page)'));
-  assert.ok(photoArea.includes('openProfileAvatarLibraryPicker(page, selected)'));
+  assert.ok(!html.includes('function openProfilePhotoAvatarPicker'));
   const directActions = functionBody('bindPersonProfileActionButtons');
   assert.ok(!directActions.includes('bindAvatarLibraryActivation(button, () => openProfilePhotoDialog(page))'));
   assert.ok(profilePage.includes('if (action === "pick" || action === "select") openProfileAvatarLibraryPicker(page, slot)'));
@@ -312,7 +309,8 @@ test('profile photo area and photo folder open the avatar library floating windo
   assert.ok(!photoDialog.includes('data-profile-photo-action="change"'));
   const profileAction = functionBody('runPersonProfileAction');
   assert.ok(profileAction.includes('if (action === "upload-photo")'));
-  assert.ok(profileAction.includes('openProfilePhotoAvatarPicker(page)'));
+  assert.ok(profileAction.includes('openProfilePhotoDialog(page)'));
+  assert.ok(!profileAction.includes('openProfilePhotoAvatarPicker(page)'));
 });
 
 test('raw operation containers use the built-in fold renderer without a SillyTavern regex', () => {

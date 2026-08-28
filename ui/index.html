@@ -16302,7 +16302,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
           photoButton.innerHTML = '<img alt="' + escapeAttr(displayName) + '" src="' + escapeAttr(image) + '">';
         }
       } else if (img) {
-        photoButton.innerHTML = '<div class="st-person-photo-empty">点击照片区域<br>选择头像</div>';
+        photoButton.innerHTML = '<div class="st-person-photo-empty">点击照片区域<br>管理图片</div>';
       }
     }
     page.querySelectorAll("[data-profile-photo-slot-cell]").forEach((cell) => {
@@ -16404,17 +16404,6 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     if (!host.style.position) host.style.position = "relative";
     host.appendChild(picker);
     void renderProfileAvatarLibraryPicker(page, picker, index);
-  }
-
-  // 点击档案里的角色照片区域：先保留照片夹主界面，再在其上弹出头像库悬浮窗，
-  // 作用于当前选中的照片位；退出悬浮窗后回到照片夹主界面。
-  function openProfilePhotoAvatarPicker(page) {
-    const context = currentEditableProfileContext(page);
-    if (!context) return;
-    const state = profilePhotoSlotsState(context.roleName, context.roleData);
-    const selected = Math.max(0, Math.min(3, Math.trunc(Number(state?.selected) || 0)));
-    openProfilePhotoDialog(page);
-    openProfileAvatarLibraryPicker(page, selected);
   }
 
   function renderProfilePhotoDialog(roleName, roleData, resetWarning = false) {
@@ -19507,7 +19496,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       return;
     }
     if (action === "upload-photo") {
-      openProfilePhotoAvatarPicker(page);
+      openProfilePhotoDialog(page);
       return;
     }
   }
@@ -20237,7 +20226,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       }
       if ((event.key === "Enter" || event.key === " ") && event.target?.closest?.('[data-profile-action="upload-photo"]')) {
         event.preventDefault();
-        openProfilePhotoAvatarPicker(page);
+        openProfilePhotoDialog(page);
       }
       if (event.key === "Escape" && page.dataset.profilePickerOpen === "true") {
         event.preventDefault();
@@ -20566,8 +20555,8 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
             '<div class="st-person-photo-tabs-wrap" data-profile-nav-set="' + escapeAttr(navSet) + '" style="--profile-nav-normal-art:url(' + escapeAttr(JSON.stringify(ST_PROFILE_NAV_NORMAL_ART)) + ');--profile-nav-confidential-art:url(' + escapeAttr(JSON.stringify(ST_PROFILE_NAV_CONFIDENTIAL_ART)) + ')">' +
               '<nav class="st-person-tabs st-person-tabs-left" aria-label="档案分页左侧">' + leftTabsHtml + '</nav>' +
               '<div class="st-person-photo-wrap">' +
-                '<button class="st-person-photo" type="button" data-profile-action="upload-photo" title="选择头像">' +
-                  (photo ? '<img alt="' + escapeAttr(profileDisplayNameText(roleName, roleData)) + '" src="' + escapeAttr(photo) + '">' : '<div class="st-person-photo-empty">点击照片区域<br>选择头像</div>') +
+                '<button class="st-person-photo" type="button" data-profile-action="upload-photo" title="管理照片">' +
+                  (photo ? '<img alt="' + escapeAttr(profileDisplayNameText(roleName, roleData)) + '" src="' + escapeAttr(photo) + '">' : '<div class="st-person-photo-empty">点击照片区域<br>管理图片</div>') +
                 '</button>' +
               '</div>' +
               '<nav class="st-person-tabs st-person-tabs-right" aria-label="档案分页右侧">' + rightTabsHtml + '</nav>' +
