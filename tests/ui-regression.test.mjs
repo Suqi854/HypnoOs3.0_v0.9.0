@@ -146,9 +146,20 @@ test('phone resize is frame-coalesced without forced layout reads per pointer mo
 
 test('mobile keyboard keeps the phone stable while a text field is active', () => {
   const activeInput = functionBodyFrom(floatingHost, 'phoneHasActiveTextInput');
+  const bindEditing = functionBodyFrom(floatingHost, 'bindPhoneTextEditingState');
+  const updatePanel = functionBody('updateOperationSidePanel');
+  const bindPanel = functionBody('bindOperationSidePanel');
   assert.ok(activeInput.includes('frame.contentDocument.activeElement'));
+  assert.ok(activeInput.includes('phoneTextEditing'));
   assert.ok(activeInput.includes('tagName === "TEXTAREA"'));
+  assert.ok(bindEditing.includes('doc.addEventListener("focusin"'));
+  assert.ok(bindEditing.includes('doc.addEventListener("focusout"'));
+  assert.ok(bindEditing.includes('}, 600)'));
   assert.ok(floatingHost.includes('if (phoneHasActiveTextInput()) return'));
+  assert.ok(updatePanel.includes('document.activeElement?.closest?.("[data-operation-note]")'));
+  assert.ok(updatePanel.includes('if (activeNote && panel.contains(activeNote)) return'));
+  assert.ok(bindPanel.includes('writeOperationPanelNote(noteInput.value, { emit: false })'));
+  assert.ok(!bindPanel.includes('writeOperationPanelNote(noteInput.value, { emit: true })'));
 });
 
 test('model connector explains SiliconFlow balance failures', () => {
@@ -221,14 +232,27 @@ test('cheat mode writes finite refillable resources without intercepting command
   const grant = functionBody('settingsGrantCheatResources');
   const payload = functionBody('settingsApplyCheatOperationPayload');
   const prepare = functionBody('settingsPrepareCheatMutation');
+  const information = functionBody('informationValue');
+  const setStarlight = functionBody('encounterSetStarlight');
+  const deductStarlight = functionBody('encounterDeductStarlight');
   assert.ok(html.includes('const SETTINGS_CHEAT_RESOURCE_VALUE = 99999999'));
+  assert.ok(html.includes('const SETTINGS_CHEAT_MODE_STORAGE_KEY = SETTINGS_CHEAT_MODE_STORAGE_PREFIX + "phone"'));
+  assert.ok(grant.includes('__ST_HYPNOOS_GRANT_CHEAT_RESOURCES__'));
+  assert.ok(floatingHost.includes('__ST_HYPNOOS_GRANT_CHEAT_RESOURCES__'));
+  assert.ok(floatingCore.includes('grantCheatResources(value)'));
   assert.ok(grant.includes('rewardApplySystemMutation'));
   assert.ok(grant.includes('system[key] = SETTINGS_CHEAT_RESOURCE_VALUE'));
   assert.ok(payload.includes('return payload'));
   assert.ok(!payload.includes('作弊模式资源规则'));
   assert.ok(prepare.includes('return () => {}'));
   assert.ok(html.includes('再次获取资源'));
-  assert.ok(!html.includes('MC能量 ∞ / ∞'));
+  assert.ok(!html.includes('∞'));
+  assert.ok(!html.includes('if (!settingsCheatModeActive() && money < costMoney)'));
+  assert.ok(!html.includes('if (!settingsCheatModeActive() && current < cost)'));
+  assert.ok(!html.includes('if (!settingsCheatModeActive()) data.stat["系统"]["星光点"]'));
+  assert.ok(!setStarlight.includes('settingsCheatModeActive'));
+  assert.ok(!deductStarlight.includes('settingsCheatModeActive'));
+  assert.ok(!information.includes('settingsCheatModeActive'));
 });
 
 test('hypnosis and MC recharge quotes use the canonical rule bridge', () => {

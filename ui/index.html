@@ -11952,10 +11952,10 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     const energyPrice = energyQuote.cost;
     const maxEnergyPrice = qty * 100;
     return '<section class="st-lite-card st-graph-paper st-hypnosis-form">' +
-      '<div class="st-graph-head"><strong>快速补给</strong><span>资金 ' + escapeHtml(settingsCheatModeActive() ? "∞" : "¥" + money.toLocaleString()) + ' / 星光点 ' + (settingsCheatModeActive() ? "∞" : starlight.toLocaleString()) + '</span></div>' +
+      '<div class="st-graph-head"><strong>快速补给</strong><span>资金 ' + escapeHtml("¥" + money.toLocaleString()) + ' / 星光点 ' + starlight.toLocaleString() + '</span></div>' +
       '<section class="st-hypnosis-summary">' +
-        '<span><strong>' + escapeHtml(settingsCheatModeActive() ? "∞" : String(system["MC能量"] ?? 0)) + '</strong>MC能量</span>' +
-        '<span><strong>' + escapeHtml(settingsCheatModeActive() ? "∞" : String(system["MC能量上限"] ?? 0)) + '</strong>上限</span>' +
+        '<span><strong>' + escapeHtml(String(system["MC能量"] ?? 0)) + '</strong>MC能量</span>' +
+        '<span><strong>' + escapeHtml(String(system["MC能量上限"] ?? 0)) + '</strong>上限</span>' +
         '<span><strong>' + escapeHtml(String(suspicion) + "%") + '</strong>可疑度</span>' +
       '</section>' +
       '<div class="st-hypnosis-form-grid">' +
@@ -26354,7 +26354,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     }
     const money = Math.max(0, Math.floor(Number(data.stat["系统"]["持有零花钱"] ?? 0) || 0));
     const costMoney = count * ENCOUNTER_SHOP_MONEY_PER_STARLIGHT;
-    if (!settingsCheatModeActive() && money < costMoney) {
+    if (money < costMoney) {
       encounterSetStatus(page, "零花钱不足，兑换比例为10000:1。");
       return;
     }
@@ -26366,10 +26366,8 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       encounterSetStatus(page, "兑换券扣除失败。");
       return;
     }
-    if (!settingsCheatModeActive()) {
-      data.stat["系统"]["持有零花钱"] = money - costMoney;
-      data.stat["系统"]["星光点"] = Math.max(0, Math.floor(Number(data.stat["系统"]["星光点"] ?? 0) || 0)) + count;
-    }
+    data.stat["系统"]["持有零花钱"] = money - costMoney;
+    data.stat["系统"]["星光点"] = Math.max(0, Math.floor(Number(data.stat["系统"]["星光点"] ?? 0) || 0)) + count;
     await encounterReplaceMvuData(data);
     await appendAppOperation({
       来源: "邂逅",
@@ -26406,11 +26404,11 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     }
     const cost = count * ENCOUNTER_SHOP_RULE_COUPON_PRICE;
     const current = Math.max(0, Math.floor(Number(data.stat["系统"]["星光点"] ?? 0) || 0));
-    if (!settingsCheatModeActive() && current < cost) {
+    if (current < cost) {
       encounterSetStatus(page, "星光点不足，常识修改雷达每个100星光点。");
       return;
     }
-    if (!settingsCheatModeActive()) data.stat["系统"]["星光点"] = current - cost;
+    data.stat["系统"]["星光点"] = current - cost;
     encounterAddInventoryItem(data.stat, LOCATION_RULE_RADAR_ITEM, count, "催眠APP出售给VIP6用户的一次性高级广范围雷达；在地图的地点规则抽屉中写入一条永久规则时消耗1个。");
     await encounterReplaceMvuData(data);
     await appendAppOperation({
@@ -26446,11 +26444,11 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     }
     const cost = count * TIMETABLE_MOD_COUPON_PRICE;
     const current = Math.max(0, Math.floor(Number(data.stat["系统"]["星光点"] ?? 0) || 0));
-    if (!settingsCheatModeActive() && current < cost) {
+    if (current < cost) {
       encounterSetStatus(page, "星光点不足，课程表魔改券每张" + TIMETABLE_MOD_COUPON_PRICE + "星光点。");
       return;
     }
-    if (!settingsCheatModeActive()) data.stat["系统"]["星光点"] = current - cost;
+    data.stat["系统"]["星光点"] = current - cost;
     encounterAddInventoryItemDetailed(data.stat, TIMETABLE_MOD_COUPON_ITEM, count, "用于在课程表APP中修改当天剩余课程中的一节。前端保存单格修改时扣券，并同步课程表只读日程字段。");
     await encounterReplaceMvuData(data);
     await appendAppOperation({
@@ -26496,11 +26494,11 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       return;
     }
     const current = Math.max(0, Math.floor(Number(data.stat["系统"]["星光点"] ?? 0) || 0));
-    if (!settingsCheatModeActive() && current < SPECIAL_LOCATION_PASS_PRICE) {
+    if (current < SPECIAL_LOCATION_PASS_PRICE) {
       encounterSetStatus(page, "星光点不足，准入证需要" + SPECIAL_LOCATION_PASS_PRICE + "点。");
       return;
     }
-    if (!settingsCheatModeActive()) data.stat["系统"]["星光点"] = current - SPECIAL_LOCATION_PASS_PRICE;
+    data.stat["系统"]["星光点"] = current - SPECIAL_LOCATION_PASS_PRICE;
     encounterAddInventoryItemDetailed(data.stat, itemName, 1, "催眠APP官方援助渠道提供的" + (location?.label || "特殊地点") + "进入资格；不代表瞬移，也不无视门禁时间。");
     await encounterReplaceMvuData(data);
     await appendAppOperation({
@@ -27548,8 +27546,8 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
         '<h3>邂逅商店</h3>' +
         '<p>APP开放的特权商店。VIP5可进入并使用“' + escapeHtml(ENCOUNTER_SHOP_STARLIGHT_VOUCHER) + '”兑换星光点，也可购买特殊地点准入证；常识修改雷达和课程表魔改券仅限VIP6。</p>' +
         '<div class="st-encounter-shop-meta">' +
-          '<span><strong>' + (settingsCheatModeActive() ? "∞" : state.money.toLocaleString()) + '</strong>零花钱</span>' +
-          '<span><strong>' + (settingsCheatModeActive() ? "∞" : state.starlight) + '</strong>星光点</span>' +
+          '<span><strong>' + state.money.toLocaleString() + '</strong>零花钱</span>' +
+          '<span><strong>' + state.starlight + '</strong>星光点</span>' +
           '<span><strong>' + state.starlightVoucher + '</strong>兑换券</span>' +
           '<span><strong>' + state.ruleCoupon + '</strong>常识修改雷达</span>' +
           '<span><strong>' + state.timetableCoupon + '</strong>课表券</span>' +
@@ -28433,7 +28431,6 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
 	  }
 
   async function encounterSetStarlight(value) {
-    if (settingsCheatModeActive()) return true;
     const data = encounterCurrentMvuData();
     if (!data) return false;
     data.stat["系统"] = data.stat["系统"] && typeof data.stat["系统"] === "object" && !Array.isArray(data.stat["系统"]) ? data.stat["系统"] : {};
@@ -29006,7 +29003,6 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
 
 	  async function encounterDeductStarlight(price) {
     const cost = Math.max(0, Math.floor(Number(price) || 0));
-    if (settingsCheatModeActive()) return { ok: true, previous: encounterCurrentStarlight(), current: encounterCurrentStarlight(), cheated: true };
     const data = encounterCurrentMvuData();
     if (!data) return { ok: cost === 0, previous: encounterCurrentStarlight(), reason: "MVU变量接口未就绪。" };
     data.stat["系统"] = data.stat["系统"] && typeof data.stat["系统"] === "object" && !Array.isArray(data.stat["系统"]) ? data.stat["系统"] : {};
@@ -39484,6 +39480,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
 	  }
 
   const SETTINGS_CHEAT_MODE_STORAGE_PREFIX = "hypnoos.settings.cheatMode.v1:";
+  const SETTINGS_CHEAT_MODE_STORAGE_KEY = SETTINGS_CHEAT_MODE_STORAGE_PREFIX + "phone";
   // 修改这里即可更换作弊模式密钥；不要把密钥写入世界书、导出包或日志。
   const SETTINGS_CHEAT_UNLOCK_KEY = "666666";
 
@@ -39494,14 +39491,20 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   }
 
   function settingsCheatModeActive() {
-    try { return localStorage.getItem(settingsCheatModeStorageKey()) === "1"; } catch {}
+    try {
+      return localStorage.getItem(SETTINGS_CHEAT_MODE_STORAGE_KEY) === "1"
+        || localStorage.getItem(settingsCheatModeStorageKey()) === "1";
+    } catch {}
     return false;
   }
 
   function settingsSetCheatModeActive(active) {
     try {
-      if (active) localStorage.setItem(settingsCheatModeStorageKey(), "1");
-      else localStorage.removeItem(settingsCheatModeStorageKey());
+      if (active) localStorage.setItem(SETTINGS_CHEAT_MODE_STORAGE_KEY, "1");
+      else {
+        localStorage.removeItem(SETTINGS_CHEAT_MODE_STORAGE_KEY);
+        localStorage.removeItem(settingsCheatModeStorageKey());
+      }
       return settingsCheatModeActive() === Boolean(active);
     } catch { return false; }
   }
@@ -39526,9 +39529,21 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   }
 
   async function settingsGrantCheatResources() {
+    if (typeof window.__ST_HYPNOOS_GRANT_CHEAT_RESOURCES__ === "function") {
+      try {
+        const state = await window.__ST_HYPNOOS_GRANT_CHEAT_RESOURCES__(SETTINGS_CHEAT_RESOURCE_VALUE);
+        if (state && typeof state === "object") return { ok: true, message: "作弊资源已写入。" };
+      } catch (error) {
+        return { ok: false, message: String(error?.message || error || "HypnoState写入失败") };
+      }
+    }
     return rewardApplySystemMutation((system) => {
-      for (const key of SETTINGS_CHEAT_RESOURCE_KEYS) system[key] = SETTINGS_CHEAT_RESOURCE_VALUE;
-      for (const key of SETTINGS_CHEAT_VIP_KEYS) system[key] = "VIP6";
+      for (const key of SETTINGS_CHEAT_RESOURCE_KEYS) {
+        if (["持有零花钱", "星光点", "MC能量", "MC能量上限"].includes(key) || Object.prototype.hasOwnProperty.call(system, key)) system[key] = SETTINGS_CHEAT_RESOURCE_VALUE;
+      }
+      for (const key of SETTINGS_CHEAT_VIP_KEYS) {
+        if (key === "催眠APP订阅等级" || Object.prototype.hasOwnProperty.call(system, key)) system[key] = "VIP6";
+      }
       return { ok: true, message: "作弊资源已写入。" };
     });
   }
@@ -41835,7 +41850,6 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   }
 
   function informationValue(value) {
-    if (settingsCheatModeActive()) return "∞";
     if (value === undefined || value === null || value === "") return "--";
     const number = Number(value);
     return Number.isFinite(number) ? new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(number) : String(value);
@@ -42637,6 +42651,8 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     const panel = document.getElementById("st-operation-side-panel");
     if (!panel) return;
     if (panel.dataset.operationNoteComposing === "true") return;
+    const activeNote = document.activeElement?.closest?.("[data-operation-note]");
+    if (activeNote && panel.contains(activeNote)) return;
     syncOperationSidePanelSize(panel);
     const items = getPendingOperationViews();
     const count = pendingOperationCount();
@@ -42738,8 +42754,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       const noteInput = event.target?.closest?.("[data-operation-note]");
       if (!noteInput) return;
       panel.dataset.operationNoteComposing = "";
-      writeOperationPanelNote(noteInput.value, { emit: true });
-      updateOperationSidePanel();
+      writeOperationPanelNote(noteInput.value, { emit: false });
     });
     panel.addEventListener("change", (event) => {
       const toggle = event.target?.closest?.("[data-operation-keep-after-flush]");

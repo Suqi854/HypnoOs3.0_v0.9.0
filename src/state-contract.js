@@ -52,8 +52,8 @@ export function normalizeState(value, regionPack) {
     resources: {
       ...base.resources,
       ...resources,
-      mcEnergy: clamp(resources.mcEnergy ?? base.resources.mcEnergy, 0, 1_000_000),
-      mcEnergyMax: clamp(resources.mcEnergyMax ?? base.resources.mcEnergyMax, 1, 1_000_000),
+      mcEnergy: clamp(resources.mcEnergy ?? base.resources.mcEnergy, 0, 1_000_000_000),
+      mcEnergyMax: clamp(resources.mcEnergyMax ?? base.resources.mcEnergyMax, 1, 1_000_000_000),
       mcPoints: clamp(resources.mcPoints ?? base.resources.mcPoints, 0, 1_000_000_000),
       money: clamp(resources.money ?? base.resources.money, 0, 1_000_000_000_000),
       suspicion: clamp(resources.suspicion ?? base.resources.suspicion, 0, 100),

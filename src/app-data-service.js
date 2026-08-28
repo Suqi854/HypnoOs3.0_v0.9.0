@@ -57,6 +57,21 @@ export class AppDataService {
     return this.store.importLegacyVariables(stat);
   }
 
+  grantCheatResources(value = 99_999_999) {
+    const amount = Math.max(0, Math.floor(Number(value) || 0));
+    const legacy = this.readLegacyVariables();
+    const system = isRecord(legacy.系统) ? legacy.系统 : (legacy.系统 = {});
+    for (const key of ['持有零花钱', '星光点', 'MC能量', 'MC能量上限']) system[key] = amount;
+    for (const key of ['零花钱', '_MC能量', '_MC能量上限']) {
+      if (Object.prototype.hasOwnProperty.call(system, key)) system[key] = amount;
+    }
+    system.催眠APP订阅等级 = 'VIP6';
+    for (const key of ['_催眠APP订阅等级', 'VIP等级', '订阅等级', '订阅', '催眠APP订阅']) {
+      if (Object.prototype.hasOwnProperty.call(system, key)) system[key] = 'VIP6';
+    }
+    return this.store.importLegacyVariables(legacy);
+  }
+
   getWorldbookNames() { return this.host.getWorldbookNames(); }
   getCharacterWorldbookNames() { return this.host.getCharacterWorldbookNames(); }
   getWorldbook(name) { return this.host.loadWorldbook(name); }

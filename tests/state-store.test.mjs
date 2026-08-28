@@ -163,6 +163,37 @@ test('phone bridge reads and writes HypnoState even when external runtimes disag
   assert.equal(imports[2].系统.持有零花钱, 1400);
 });
 
+test('finite cheat resources survive normalization and remain spendable through the phone bridge', async () => {
+  const saved = createDefaultState(getRegionPack('cn'));
+  const host = new StubHost({ saved });
+  const store = new StateStore(host, new MemorySettings());
+  await store.initialize();
+  const service = new AppDataService(host, store);
+  await service.grantCheatResources();
+  const bridge = createStateBridge(host, service);
+
+  const before = bridge.Mvu.getMvuData().stat_data.系统;
+  assert.equal(before.持有零花钱, 99_999_999);
+  assert.equal(before.星光点, 99_999_999);
+  assert.equal(before.MC能量, 99_999_999);
+  assert.equal(before.MC能量上限, 99_999_999);
+  assert.equal(before.零花钱, undefined);
+  assert.equal(before._MC能量, undefined);
+  assert.equal(before.VIP等级, undefined);
+
+  const next = bridge.Mvu.getMvuData();
+  next.stat_data.系统.持有零花钱 -= 10_000;
+  next.stat_data.系统.星光点 -= 100;
+  next.stat_data.系统.MC能量 -= 1_000;
+  await bridge.Mvu.replaceMvuData(next);
+
+  const after = store.state.resources;
+  assert.equal(after.money, 99_989_999);
+  assert.equal(after.mcPoints, 99_999_899);
+  assert.equal(after.mcEnergy, 99_998_999);
+  assert.equal(after.mcEnergyMax, 99_999_999);
+});
+
 test('chat switching reloads each chat state and preserves its roles and app data', async () => {
   const chatA = {
     characterId: 0,

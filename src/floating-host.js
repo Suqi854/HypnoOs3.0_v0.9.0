@@ -127,6 +127,7 @@ export class FloatingHost {
         } };
       },
       getHypnoAppData(appId) { return dataService.readAppData(appId); },
+      grantCheatResources(value) { return dataService.grantCheatResources(value); },
       getWorldbookNames() { return dataService.getWorldbookNames(); },
       getCharWorldbookNames() { return dataService.getCharacterWorldbookNames(); },
       getWorldbook(name) { return dataService.getWorldbook(name); },

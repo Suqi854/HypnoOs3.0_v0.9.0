@@ -9,7 +9,9 @@ const out = new URL('../dist/HypnoOS3.0/', import.meta.url);
 const outPath = fileURLToPath(out);
 const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 const zipPath = new URL(`../dist/HypnoOS3.0-v${packageJson.version}.zip`, import.meta.url);
-await rm(new URL('../dist/', import.meta.url), { recursive: true, force: true });
+await mkdir(new URL('../dist/', import.meta.url), { recursive: true });
+await rm(out, { recursive: true, force: true });
+await rm(zipPath, { force: true });
 await mkdir(out, { recursive: true });
 for (const path of ['manifest.json', 'capability-contract.json', 'index.js', 'style.css', 'README.md', 'NOTICE.md', 'LICENSE-PENDING.md', 'docs', 'src', 'ui', 'public']) {
   await cp(new URL(path, root), new URL(path, out), { recursive: true });

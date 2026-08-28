@@ -175,6 +175,8 @@
     var fetchController = null;
     var hostClickHandler = null;
     var hostResizeHandler = null;
+    var phoneTextEditing = false;
+    var phoneTextEditingClearTimer = 0;
     var actionFoldObserver = null;
     var actionFoldRenderFrame = 0;
     var actionFoldObservedFrames = new WeakSet();
@@ -2199,6 +2201,7 @@
         "globalThis.__ST_HYPNOOS_SWITCH_INFORMATION_PET__=function(){return r.switchInformationPet()};" +
         "globalThis.__ST_HYPNOOS_SELECT_INFORMATION_PET__=function(id){return r.selectInformationPet(id)};" +
         "globalThis.__ST_HYPNOOS_TOGGLE_INFORMATION_PET_MODE__=function(){return r.toggleInformationPetMode()};" +
+        "globalThis.__ST_HYPNOOS_GRANT_CHEAT_RESOURCES__=function(v){return r.grantCheatResources(v)};" +
         "globalThis.__ST_HYPNOOS_UPDATE_PROFILE_NEIGHBORS__=function(p){return r.updateProfileNeighbors(p)};" +
         "globalThis.__ST_HYPNOOS_UPDATE_PROFILE_POSSESSION__=function(p){return r.updateProfilePossession(p)};" +
         "globalThis.__ST_HYPNOOS_UPDATE_ENCOUNTER_POSSESSION_DECOR__=function(p){return r.updateEncounterPossessionDecor(p)};" +
@@ -2499,6 +2502,7 @@
         handle.addEventListener("pointerdown", beginResize);
       });
       frame.addEventListener("load", function () {
+        bindPhoneTextEditingState();
         consumePendingProfileRole();
         host.setTimeout(function () { notifyStages(); }, 0);
         host.setTimeout(function () { notifyStages(); }, 350);
@@ -2893,12 +2897,36 @@
     function phoneHasActiveTextInput() {
       try {
         var active = frame && frame.contentDocument && frame.contentDocument.activeElement;
-        if (!active) return false;
+        if (!active) return phoneTextEditing;
         var tagName = String(active.tagName || "").toUpperCase();
-        return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT" || Boolean(active.isContentEditable);
+        return phoneTextEditing || tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT" || Boolean(active.isContentEditable);
       } catch (_) {
-        return false;
+        return phoneTextEditing;
       }
+    }
+    function bindPhoneTextEditingState() {
+      try {
+        var doc = frame && frame.contentDocument;
+        if (!doc || doc.__hypnoosPhoneTextEditingBound) return;
+        doc.__hypnoosPhoneTextEditingBound = true;
+        var isEditable = function (target) {
+          var tagName = String(target && target.tagName || "").toUpperCase();
+          return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT" || Boolean(target && target.isContentEditable);
+        };
+        doc.addEventListener("focusin", function (event) {
+          if (!isEditable(event.target)) return;
+          if (phoneTextEditingClearTimer) host.clearTimeout(phoneTextEditingClearTimer);
+          phoneTextEditingClearTimer = 0;
+          phoneTextEditing = true;
+        }, true);
+        doc.addEventListener("focusout", function () {
+          if (phoneTextEditingClearTimer) host.clearTimeout(phoneTextEditingClearTimer);
+          phoneTextEditingClearTimer = host.setTimeout(function () {
+            phoneTextEditingClearTimer = 0;
+            phoneTextEditing = isEditable(doc.activeElement);
+          }, 600);
+        }, true);
+      } catch (_) {}
     }
     hostResizeHandler = function () {
       if (phoneHasActiveTextInput()) return;
@@ -2981,6 +3009,9 @@
       },
       toggleInformationPetMode: function () {
         return setPetDisplayMode(petDisplayMode === "stored" ? "floating" : "stored");
+      },
+      grantCheatResources: function (value) {
+        return callApi("grantCheatResources", [value]);
       },
       phoneApi: phoneApi,
       notifyStages: notifyStages,

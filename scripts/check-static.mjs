@@ -20,7 +20,7 @@ for (const path of [manifest.js, manifest.css, 'capability-contract.json']) {
 const ui = await readFile(new URL('ui/index.html', root));
 const uiText = ui.toString('utf8');
 const uiHash = createHash('sha256').update(uiText.replace(/\r\n/g, '\n')).digest('hex');
-expect(uiHash === 'f6f9a1efd59e33269e199fa47f88acb463c94b2cc3b38ef335210f5f8108cf2c', `UI 基线哈希变化：${uiHash}`);
+expect(uiHash === 'fe2d6594117abf6b45854aaec500c1b298d42f40d887c601fab01424d9cc2642', `UI 基线哈希变化：${uiHash}`);
 const hypnosisRulesSource = await readFile(new URL('src/hypnosis-rules.js', root), 'utf8');
 expect(uiText.includes('html,body,#app{width:100%;height:100%;min-height:0;margin:0;overflow:hidden!important;overscroll-behavior:none}#app{contain:strict}'), '手机前端缺少满屏滚动锁');
 expect(uiText.includes('window.__ST_OPEN_PENDING_INPUT_APP__'), '手机前端缺少本轮输入应用入口');
@@ -79,7 +79,7 @@ expect(uiText.includes("html: '<strong>档案</strong>'"), '男女档案顶部�
 expect(uiText.includes('const SETTINGS_CHEAT_UNLOCK_KEY = "666666"') && uiText.includes('data-settings-cheat-key'), '作弊模式缺少独立密钥门控');
 expect(uiText.includes('data-settings-cheat-indicator') && uiText.includes('再次获取资源') && uiText.includes('.st-settings-cheat-panel.is-active .st-settings-button.danger'), '作弊模式缺少重复补充资源或关闭控件');
 expect(uiText.includes('settingsCheatSystemView') && uiText.includes('settingsGrantCheatResources') && uiText.includes('SETTINGS_CHEAT_RESOURCE_VALUE = 99999999'), '作弊模式缺少VIP覆盖或有限资源写入');
-expect(!uiText.includes('MC能量 ∞ / ∞') && uiText.includes('全部VIP已解锁'), '作弊模式仍伪装无限资源或缺少VIP解锁反馈');
+expect(!uiText.includes('∞') && uiText.includes('全部VIP已解锁'), '作弊模式仍伪装无限资源或缺少VIP解锁反馈');
 expect(!uiText.includes('settingsSetCheatModeWorldbooks') && !uiText.includes('settingsCheatModePayload') && !uiText.includes('settingsCheatModeReminder'), '作弊模式仍与世界书或剧情暂存耦合');
 expect(!uiText.includes('const confirmed = await encounterConfirm(page, {\n      title: active ? "开启作弊模式"'), '正确密钥后仍有额外确认阻断作弊模式');
 expect(!uiText.includes('openAdaptiveWorldApp(calendarTile, "calendar")'), '日历仍被统一卡片页覆盖');
