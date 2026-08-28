@@ -6,7 +6,7 @@
   "description": "通用、可适配世界书的 SillyTavern 催眠手机 UI Extension",
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "check": "node scripts/check-static.mjs",
+    "check": "node scripts/check-static.mjs && python scripts/repair-pet-alpha.py --check",
     "build": "npm run check && npm test && node scripts/build.mjs",
     "preview": "node scripts/preview.mjs"
   },
