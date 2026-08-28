@@ -130,7 +130,9 @@
     var resizePendingPoint = null;
     var launcherDragState = null;
     var suppressLauncherClick = false;
+    var petVisual = null;
     var petSprite = null;
+    var petSpriteUnderlay = null;
     var petMenu = null;
     var wandPetEntry = null;
     var wandObserver = null;
@@ -166,6 +168,9 @@
     var petMotionQuery = null;
     var petMotionHandler = null;
     var petVisibilityHandler = null;
+    var requestFrame = host.requestAnimationFrame
+      ? host.requestAnimationFrame.bind(host)
+      : function (callback) { return host.setTimeout(function () { callback(Date.now()); }, 16); };
     var stageSubscribers = new Set();
     var shellOpen = false;
     var storageKey = config.storageKey;
@@ -386,8 +391,7 @@
 
     function scheduleActionFoldRender() {
       if (actionFoldRenderFrame || !hostDocument.body) return;
-      var requestFrame = host.requestAnimationFrame || function (callback) { return host.setTimeout(callback, 0); };
-      actionFoldRenderFrame = requestFrame.call(host, function () {
+      actionFoldRenderFrame = requestFrame(function () {
         actionFoldRenderFrame = 0;
         renderActionFoldMarkers();
       });
@@ -1307,11 +1311,8 @@
       var viewportHeight = viewport.height;
       var widthAllowance = Math.max(1, viewportWidth - 16);
       var heightAllowance = Math.max(1, viewportHeight - 16);
-      var saved = readUiState();
-      var preferred = normalizedPhoneScale(requestedScale === undefined ? saved.scale : requestedScale);
+      var preferred = normalizedPhoneScale(requestedScale === undefined ? readUiState().scale : requestedScale);
       var scale = Math.min(preferred, widthAllowance / baseWidth, heightAllowance / baseHeight);
-      panel.style.width = Math.max(1, Math.floor(baseWidth * scale)) + "px";
-      panel.style.height = Math.max(1, Math.floor(baseHeight * scale)) + "px";
       panel.style.setProperty("--phone-scale", String(scale));
       panel.dataset.phoneScale = String(scale);
       return scale;
@@ -1452,26 +1453,36 @@
       if (!petSprite) return;
       var meta = petStateMeta(petState);
       var visualScale = meta.directional && petDirection !== PET_BASE_FACING ? -1 : 1;
-      petSprite.style.setProperty("--pet-facing-scale", String(visualScale));
+      [petSpriteUnderlay, petSprite].filter(Boolean).forEach(function (layer) {
+        layer.style.setProperty("--pet-facing-scale", String(visualScale));
+      });
     }
 
     function applyPetStateAppearance() {
       if (!petSprite) return;
       var meta = petStateMeta(petState);
-      petSprite.style.backgroundImage = "url('" + petAssetUrl(petStateAsset(petState)).replace(/'/g, "%27") + "')";
-      petSprite.style.backgroundSize = (meta.total * PET_RENDER_SIZE) + "px " + PET_RENDER_SIZE + "px";
-      petSprite.style.setProperty("--pet-lift", "0px");
+      var backgroundImage = "url('" + petAssetUrl(petStateAsset(petState)).replace(/'/g, "%27") + "')";
+      [petSpriteUnderlay, petSprite].filter(Boolean).forEach(function (layer) {
+        layer.style.backgroundImage = backgroundImage;
+        layer.style.backgroundSize = (meta.total * PET_RENDER_SIZE) + "px " + PET_RENDER_SIZE + "px";
+        layer.style.setProperty("--pet-lift", "0px");
+      });
       if (launcher) {
         launcher.dataset.petState = petState;
         launcher.dataset.petCharacter = petCharacterId;
       }
       var visualScale = meta.directional && petDirection !== PET_BASE_FACING ? -1 : 1;
-      petSprite.style.setProperty("--pet-facing-scale", String(visualScale));
+      [petSpriteUnderlay, petSprite].filter(Boolean).forEach(function (layer) {
+        layer.style.setProperty("--pet-facing-scale", String(visualScale));
+      });
     }
 
     function applyPetFrame() {
       if (!petSprite) return;
-      petSprite.style.backgroundPosition = (-petFrame * PET_RENDER_SIZE) + "px 0";
+      var position = (-petFrame * PET_RENDER_SIZE) + "px 0";
+      [petSpriteUnderlay, petSprite].filter(Boolean).forEach(function (layer) {
+        layer.style.backgroundPosition = position;
+      });
     }
 
     function petClampToHabitat(x, y) {
@@ -1556,10 +1567,18 @@
       setPetState("idle");
     }
 
-    function advancePetFrame() {
-      petTimer = 0;
+    function advancePetFrame(timestamp) {
+      petMotionFrame = 0;
       if (!petSprite || !launcher) return;
       var meta = petStateMeta(petState);
+      var now = Number(timestamp) || Date.now();
+      var interval = 1000 / Math.min(16, Math.max(1, meta.fps));
+      if (!petMotionLast) petMotionLast = now;
+      if (now - petMotionLast < interval) {
+        petMotionFrame = requestFrame(advancePetFrame);
+        return;
+      }
+      petMotionLast = now - ((now - petMotionLast) % interval);
       petFrame += 1;
       if (petFrame > meta.end) {
         petLoops += 1;
@@ -1570,7 +1589,7 @@
         petFrame = meta.start;
       }
       applyPetFrame();
-      petTimer = host.setTimeout(advancePetFrame, Math.round(1000 / Math.min(16, Math.max(1, meta.fps))));
+      petMotionFrame = requestFrame(advancePetFrame);
     }
 
     function setPetState(name, options) {
@@ -1592,7 +1611,8 @@
         if (petState === "idle") schedulePetActivity();
         return;
       }
-      petTimer = host.setTimeout(advancePetFrame, Math.round(1000 / Math.min(16, Math.max(1, meta.fps))));
+      petMotionLast = 0;
+      petMotionFrame = requestFrame(advancePetFrame);
     }
 
     function pausePetAutonomy() {
@@ -1681,8 +1701,7 @@
           loadPetAsset(characterId, group).catch(function () {});
         });
       };
-      if (host.requestIdleCallback) host.requestIdleCallback(start, { timeout: 1400 });
-      else host.setTimeout(start, 260);
+      start();
     }
 
     function loadPetAssets() {
@@ -1901,13 +1920,13 @@
       return [
         "*{box-sizing:border-box}[hidden]{display:none!important}",
         ".launcher{pointer-events:auto;position:fixed;right:22px;bottom:90px;width:96px;height:96px;border:0;padding:0;border-radius:28px;background:transparent;color:#fff;display:block;cursor:grab;touch-action:none;user-select:none;z-index:3;overflow:visible}",
-        ".launcher:focus-visible{outline:3px solid rgba(125,211,252,.96);outline-offset:3px}.launcher.dragging{cursor:grabbing}.pet-sprite{position:absolute;inset:0;width:96px;height:96px;background-repeat:no-repeat;image-rendering:auto;filter:drop-shadow(0 7px 5px rgba(2,6,23,.58));transform:translateY(var(--pet-lift,0)) scaleX(var(--pet-facing-scale,1));transform-origin:50% 100%;opacity:0;transition:filter .16s ease}.launcher.pet-ready .pet-sprite{opacity:1}.launcher:hover .pet-sprite,.launcher.active .pet-sprite{filter:drop-shadow(0 8px 5px rgba(30,64,175,.58)) drop-shadow(0 0 5px rgba(125,211,252,.34))}.launcher.dragging .pet-sprite{transition:none;filter:drop-shadow(0 12px 7px rgba(2,6,23,.54))}",
+        ".launcher:focus-visible{outline:3px solid rgba(125,211,252,.96);outline-offset:3px}.launcher.dragging{cursor:grabbing}.pet-visual{position:absolute;z-index:1;inset:0;width:96px;height:96px;transform-origin:50% 100%;will-change:transform}.pet-sprite{position:absolute;inset:0;width:96px;height:96px;background-repeat:no-repeat;image-rendering:auto;filter:drop-shadow(0 7px 5px rgba(2,6,23,.58));transform:translateY(var(--pet-lift,0)) scaleX(var(--pet-facing-scale,1));transform-origin:50% 100%;opacity:0;transition:filter .16s ease}.launcher.pet-ready .pet-sprite{opacity:1}.pet-sprite-main{z-index:1}.pet-sprite-underlay{z-index:0;opacity:0!important}.launcher.pet-ready[data-pet-character='miku'] .pet-sprite-underlay,.launcher.pet-ready[data-pet-character='rem'] .pet-sprite-underlay,.launcher.pet-ready[data-pet-character='mai'] .pet-sprite-underlay,.launcher.pet-ready[data-pet-character='umaru'] .pet-sprite-underlay{opacity:.96!important;filter:blur(.85px) saturate(1.08) contrast(1.04)}.launcher:hover .pet-sprite-main,.launcher.active .pet-sprite-main{filter:drop-shadow(0 8px 5px rgba(30,64,175,.58)) drop-shadow(0 0 5px rgba(125,211,252,.34))}.launcher.dragging .pet-sprite-main{transition:none;filter:drop-shadow(0 12px 7px rgba(2,6,23,.54))}@keyframes pet-click-reaction{0%{transform:translate3d(0,0,0) scale(1)}28%{transform:translate3d(0,-10px,0) scale(1.06,.94)}58%{transform:translate3d(0,2px,0) scale(.96,1.04)}100%{transform:translate3d(0,0,0) scale(1)}}@keyframes pet-long-reaction{0%,100%{transform:rotate(0) scale(1)}20%{transform:rotate(-7deg) scale(1.04)}40%{transform:rotate(7deg) scale(.98)}60%{transform:rotate(-5deg) scale(1.04)}80%{transform:rotate(4deg) scale(1)}}@keyframes pet-held-reaction{0%,100%{transform:translate3d(0,-3px,0) rotate(-3deg)}50%{transform:translate3d(0,2px,0) rotate(3deg)}}@keyframes pet-land-reaction{0%{transform:translate3d(0,-7px,0) scale(.94,1.07)}45%{transform:translate3d(0,3px,0) scale(1.08,.9)}75%{transform:translate3d(0,-2px,0) scale(.98,1.02)}100%{transform:none}}.launcher[data-pet-state='unique_a'] .pet-visual{animation:pet-click-reaction .72s cubic-bezier(.2,.82,.25,1)}.launcher[data-pet-state='unique_b'] .pet-visual{animation:pet-long-reaction .82s ease-in-out}.launcher[data-pet-state='held_scared'] .pet-visual{animation:pet-held-reaction .28s ease-in-out infinite}.launcher[data-pet-state='landing'] .pet-visual{animation:pet-land-reaction .62s cubic-bezier(.2,.8,.25,1)}",
         ".pet-fallback{position:absolute;left:15px;top:15px;width:66px;height:66px;border:1px solid rgba(196,116,255,.7);border-radius:24px;background:linear-gradient(145deg,#58115d,#19142d 62%,#0b1022);box-shadow:0 16px 44px rgba(20,0,35,.48),inset 0 1px rgba(255,255,255,.18);display:grid;place-items:center;transition:opacity .18s ease}.launcher.pet-ready .pet-fallback{opacity:0;pointer-events:none}.pet-fallback svg{width:30px;height:30px}",
 ".pet-menu{position:fixed;z-index:4;width:120px;height:56px;pointer-events:none;opacity:0;transform:translateY(8px) scale(.9);transform-origin:50% 100%;transition:opacity .14s ease,transform .14s ease}.pet-menu.open{pointer-events:auto;opacity:1;transform:none}.pet-menu button{position:absolute;top:0;width:56px;height:56px;padding:0;border:1px solid rgba(226,232,240,.7);border-radius:50%;background:linear-gradient(145deg,rgba(30,41,59,.97),rgba(15,23,42,.98));box-shadow:0 8px 22px rgba(2,6,23,.48),inset 0 1px rgba(255,255,255,.14);color:#f8fafc;font:850 11px/1.1 system-ui;cursor:pointer;touch-action:manipulation}.pet-menu button[data-pet-action='choose']{left:0}.pet-menu button[data-pet-action='settings']{left:64px}.pet-menu button:hover,.pet-menu button:focus-visible{border-color:#a5f3fc;background:linear-gradient(145deg,#155e75,#172554);outline:2px solid rgba(165,243,252,.72);outline-offset:2px}",
-        ".launcher i{position:absolute;z-index:2;right:1px;top:1px;min-width:20px;height:20px;padding:0 5px;border:2px solid rgba(255,255,255,.88);border-radius:10px;background:#f25aa6;color:white;font:800 11px/16px system-ui;text-align:center;box-shadow:0 3px 8px rgba(15,23,42,.46)}@media(prefers-reduced-motion:reduce){.pet-sprite,.pet-fallback{transition:none!important}}",
-        ".panel{pointer-events:auto;position:fixed;width:430px;height:812px;border:0;border-radius:38px;background:transparent;box-shadow:none;overflow:visible;z-index:2;display:none;isolation:isolate;--floor-sidecar-width:270px;--phone-scale:1}",
+        ".launcher i{position:absolute;z-index:2;right:1px;top:1px;min-width:20px;height:20px;padding:0 5px;border:2px solid rgba(255,255,255,.88);border-radius:10px;background:#f25aa6;color:white;font:800 11px/16px system-ui;text-align:center;box-shadow:0 3px 8px rgba(15,23,42,.46)}@media(prefers-reduced-motion:reduce){.pet-sprite,.pet-fallback,.pet-visual{transition:none!important;animation:none!important}}",
+        ".panel{pointer-events:auto;position:fixed;width:430px;height:812px;border:0;border-radius:38px;background:transparent;box-shadow:none;overflow:visible;z-index:2;display:none;isolation:isolate;--floor-sidecar-width:270px;--phone-scale:1;transform:translateZ(0) scale(var(--phone-scale));transform-origin:0 0;backface-visibility:hidden;will-change:transform}",
         ".panel.open{display:block}",
-".phone-wrap{position:absolute;z-index:4;left:0;top:0;width:430px;height:812px;border:1px solid rgba(221,184,255,.3);border-radius:inherit;background:transparent;box-shadow:0 20px 60px rgba(0,0,0,.42);overflow:hidden;isolation:isolate;transform:scale(var(--phone-scale));transform-origin:0 0}.phone-wrap:after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07);pointer-events:none;z-index:8}.phone{display:block;width:430px;height:812px;border:0;background:transparent}",
+".phone-wrap{position:absolute;z-index:4;left:0;top:0;width:430px;height:812px;border:1px solid rgba(221,184,255,.3);border-radius:inherit;background:transparent;box-shadow:0 20px 60px rgba(0,0,0,.42);overflow:hidden;isolation:isolate;contain:layout paint;backface-visibility:hidden}.phone-wrap:after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07);pointer-events:none;z-index:8}.phone{display:block;width:430px;height:812px;border:0;background:transparent}",
         ".location-rule-radar{position:absolute;left:50%;top:-112px;width:min(230px,62%);height:160px;object-fit:contain;object-position:center bottom;pointer-events:none;user-select:none;-webkit-user-drag:none;opacity:0;transform:translate3d(-50%,-142px,0) rotate(-5deg) scale(.86);transform-origin:50% 86%;transition:transform .7s cubic-bezier(.16,.92,.2,1.12),opacity .24s ease;will-change:transform,opacity}.location-rule-radar.rear{z-index:3;filter:drop-shadow(0 19px 15px rgba(0,0,0,.64))}.location-rule-radar.front{z-index:6;clip-path:inset(70% 0 0 0);filter:drop-shadow(0 7px 5px rgba(0,0,0,.78))}.panel.location-rule-radar-visible .location-rule-radar{opacity:1;transform:translate3d(-50%,0,0) rotate(0) scale(1)}.panel.location-rule-radar-hiding .location-rule-radar{opacity:0;transform:translate3d(-50%,-154px,0) rotate(4deg) scale(.82);transition-duration:.52s,.2s}@media(max-width:760px){.location-rule-radar{top:-96px;width:min(202px,68%);height:140px}}",
         ".work-lever-host{position:absolute;z-index:8;left:-126px;top:164px;width:126px;height:176px;display:none;pointer-events:none;user-select:none;perspective:440px}.panel.work-lever-visible .work-lever-host{display:block}.work-lever{position:absolute;inset:0;border:0;padding:0;background:transparent;pointer-events:auto;cursor:grab;touch-action:none;overflow:visible}.work-lever:active,.work-lever.is-pulling{cursor:grabbing}.work-lever__body{position:absolute;inset:0;display:block;transform-origin:126px 120px;transform-style:preserve-3d;transform:rotateX(0deg);transition:transform .31s cubic-bezier(.18,.82,.25,1.18),filter .22s ease;filter:drop-shadow(8px 13px 9px rgba(0,0,0,.56))}.work-lever__body svg{position:absolute;inset:0;width:126px;height:150px;overflow:visible}.work-lever__tube-shadow{fill:none;stroke:#080b09;stroke-width:32;stroke-linecap:round;stroke-linejoin:round}.work-lever__tube{fill:none;stroke:url(#workLeverTube);stroke-width:22;stroke-linecap:round;stroke-linejoin:round}.work-lever__tube-shine{fill:none;stroke:rgba(255,255,255,.2);stroke-width:4;stroke-linecap:round;stroke-linejoin:round;transform:translate(-4px,-1px)}.work-lever__knob-ring{fill:#090b0a}.work-lever__knob-core{fill:url(#workLeverKnob)}.work-lever.is-pulling .work-lever__body{transform:rotateX(67deg);filter:drop-shadow(4px 5px 4px rgba(0,0,0,.5)) brightness(1.08);transition-duration:.17s}@media(max-width:760px){.work-lever-host{left:-116px;transform:scale(.92);transform-origin:right top}}",
         ".map-extra-chain-host{position:absolute;z-index:7;right:calc(100% - 18px);top:118px;width:176px;display:none;pointer-events:none;filter:drop-shadow(0 18px 16px rgba(0,0,0,.65));font-family:Impact,'Arial Black','Noto Sans SC',sans-serif;user-select:none}.panel.map-extra-chain-visible .map-extra-chain-host{display:block}.map-extra-chain{display:grid;gap:5px;pointer-events:auto}.map-extra-chain__head{justify-self:end;max-width:160px;padding:7px 9px 7px 12px;border:3px solid #080808;background:#f3eee4;color:#080808;box-shadow:5px 5px 0 #ed1831;font:950 12px/1.1 Impact,'Arial Black','Noto Sans SC',sans-serif;letter-spacing:.04em;transform:rotate(-2deg);clip-path:polygon(4% 0,100% 5%,94% 100%,0 88%);display:flex;align-items:center;gap:8px}.map-extra-chain__head strong{min-width:0}.map-extra-chain__head button{flex:0 0 27px;width:27px;height:27px;border:2px solid #080808;background:#ed1831;color:#fff;font:950 18px/1 Impact,sans-serif;cursor:pointer;box-shadow:2px 2px 0 #080808}.map-extra-chain__belt{display:grid;gap:2px}.map-extra-chain__row{position:relative;width:160px;margin-left:auto}.map-extra-chain__item{position:relative;width:160px;min-height:47px;border:3px solid #080808;background:#f3eee4;color:#080808;padding:7px 25px 7px 13px;text-align:left;cursor:pointer;pointer-events:auto;box-shadow:5px 4px 0 #ed1831;clip-path:polygon(0 8%,92% 0,100% 48%,92% 100%,0 92%,7% 50%);font:950 12px/1.2 'Arial Black','Noto Sans SC',sans-serif;white-space:normal;overflow-wrap:anywhere;transition:translate .16s ease,filter .16s ease}.map-extra-chain__item:before{content:'';position:absolute;right:9px;top:50%;width:9px;height:9px;border:3px solid #080808;border-radius:50%;background:#ed1831;transform:translateY(-50%)}.map-extra-chain__row:after{content:'';position:absolute;right:12px;top:calc(100% - 1px);width:3px;height:9px;background:#080808}.map-extra-chain__row:last-child:after{display:none}.map-extra-chain__item:hover,.map-extra-chain__item.active{translate:-9px 0;filter:brightness(1.08)}.map-extra-chain__item.active{background:#ed1831;color:#fff;box-shadow:5px 4px 0 #f3eee4}.map-extra-chain__item.favorite{padding-left:29px}.map-extra-chain__item.favorite span:before{content:'★';position:absolute;left:11px;color:#ed1831}.map-extra-chain__delete{position:absolute;z-index:3;right:7px;top:50%;width:25px;height:25px;border:2px solid #080808;background:#ed1831;color:#fff;box-shadow:2px 2px 0 #080808;font:950 17px/1 Impact,sans-serif;cursor:pointer;pointer-events:auto;transform:translateY(-50%) rotate(2deg)}.map-extra-chain__row.deletable .map-extra-chain__item{padding-right:37px}.map-extra-chain__row.deletable .map-extra-chain__item:before{display:none}.map-extra-chain__delete:hover{filter:brightness(1.1);transform:translateY(-50%) rotate(-3deg) scale(1.06)}.map-extra-chain__pager{justify-self:end;display:flex;align-items:center;gap:5px;margin-top:4px;pointer-events:auto}.map-extra-chain__pager button{width:34px;height:30px;border:3px solid #080808;background:#f3eee4;color:#080808;box-shadow:3px 3px 0 #ed1831;font:950 15px/1 Impact,sans-serif;cursor:pointer}.map-extra-chain__pager button:disabled{opacity:.32;cursor:default}.map-extra-chain__pager span{padding:5px 8px;background:#080808;color:#fff;font:950 10px/1 Impact,sans-serif;letter-spacing:.08em}@media(max-width:760px){.map-extra-chain-host{right:calc(100% - 14px);top:112px;width:148px}.map-extra-chain__head,.map-extra-chain__row,.map-extra-chain__item{max-width:136px}.map-extra-chain__item{font-size:10px;min-height:42px}}",
@@ -2263,12 +2282,14 @@
       shell.style.cssText = "position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:2147481900;";
       shadow = shell.attachShadow({ mode: "open" });
       shadow.innerHTML = "<style>" + shellCss() + "</style>" +
-        "<button class='launcher' type='button' aria-label='打开悬浮手机' aria-haspopup='menu' aria-expanded='false'><span class='pet-sprite' aria-hidden='true'></span><span class='pet-fallback' aria-hidden='true'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8'><rect x='6' y='2.5' width='12' height='19' rx='3'/><path d='M10 5h4M11 18.5h2'/></svg></span><i>0</i></button>" +
+        "<button class='launcher' type='button' aria-label='打开悬浮手机' aria-haspopup='menu' aria-expanded='false'><span class='pet-visual' aria-hidden='true'><span class='pet-sprite pet-sprite-underlay'></span><span class='pet-sprite pet-sprite-main'></span></span><span class='pet-fallback' aria-hidden='true'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8'><rect x='6' y='2.5' width='12' height='19' rx='3'/><path d='M10 5h4M11 18.5h2'/></svg></span><i>0</i></button>" +
 "<nav class='pet-menu' role='menu' aria-label='桌宠菜单' aria-hidden='true'><button type='button' role='menuitem' data-pet-action='choose'>选择</button><button type='button' role='menuitem' data-pet-action='settings'>通用</button></nav>" +
         "<section class='panel' aria-label='HypnoOS 悬浮手机'><aside class='map-extra-chain-host' aria-label='更多地图区域' aria-hidden='true'></aside><aside class='work-lever-host' aria-label='打工滚筒摇杆'><button class='work-lever' type='button' data-work-lever-host aria-label='拉动或点击摇杆切换下一份工作'><span class='work-lever__body'><svg viewBox='0 0 126 150' aria-hidden='true'><defs><linearGradient id='workLeverTube' x1='0' y1='0' x2='1' y2='0'><stop offset='0' stop-color='#aeb8b1'/><stop offset='.42' stop-color='#647169'/><stop offset='.72' stop-color='#303a34'/><stop offset='1' stop-color='#151b17'/></linearGradient><radialGradient id='workLeverKnob' cx='.32' cy='.25' r='.72'><stop offset='0' stop-color='#ffd36b'/><stop offset='.22' stop-color='#df850d'/><stop offset='.68' stop-color='#91340b'/><stop offset='1' stop-color='#431506'/></radialGradient></defs><path class='work-lever__tube-shadow' d='M44 31V101Q44 120 63 120H126'/><path class='work-lever__tube' d='M44 31V101Q44 120 63 120H126'/><path class='work-lever__tube-shine' d='M44 35V99Q44 113 61 113H122'/><circle class='work-lever__knob-ring' cx='44' cy='28' r='33'/><circle class='work-lever__knob-core' cx='44' cy='28' r='27'/></svg></span></button></aside><aside class='hypnosis-judgement-perch' aria-hidden='true'><span class='hypnosis-judgement-figure is-demon'><img class='hypnosis-judgement-figure__rear' alt='' draggable='false' src='" + escapeHtml(String(config.assetBase || "").replace(/\/?$/, "/") + "profile-ui/hypnosis-demon-side-v3.png") + "'><img class='hypnosis-judgement-figure__front' alt='' draggable='false' src='" + escapeHtml(String(config.assetBase || "").replace(/\/?$/, "/") + "profile-ui/hypnosis-demon-side-v3.png") + "'></span><span class='hypnosis-judgement-figure is-angel'><img class='hypnosis-judgement-figure__rear' alt='' draggable='false' src='" + escapeHtml(String(config.assetBase || "").replace(/\/?$/, "/") + "profile-ui/hypnosis-angel-side-v3.png") + "'><img class='hypnosis-judgement-figure__front' alt='' draggable='false' src='" + escapeHtml(String(config.assetBase || "").replace(/\/?$/, "/") + "profile-ui/hypnosis-angel-side-v3.png") + "'></span></aside><aside class='encounter-detail-host' aria-hidden='true'></aside><aside class='profile-neighbor-host' aria-label='相邻人物档案'><button class='profile-neighbor-rail prev' type='button' data-kicker='PREV' data-profile-neighbor='prev'></button><button class='profile-neighbor-rail next' type='button' data-kicker='NEXT' data-profile-neighbor='next'></button></aside><aside class='encounter-possession-decor-host' aria-hidden='true' hidden><img alt='' draggable='false' src='" + escapeHtml(String(config.assetBase || "").replace(/\/?$/, "/") + "profile-ui/profile-possession-top-grip-v1.png") + "'></aside><aside class='profile-possession-host' aria-label='附身控制'><button class='profile-possession-grip' type='button' data-profile-possession-host='' aria-pressed='false'><img alt='' draggable='false' src='" + escapeHtml(String(config.assetBase || "").replace(/\/?$/, "/") + "profile-ui/profile-possession-top-grip-v1.png") + "'></button></aside><div class='phone-wrap'><iframe class='phone' title='HypnoOS 手机前端' scrolling='no'></iframe><div class='variable-format-dialog' role='dialog' aria-modal='true' aria-hidden='true'><section class='variable-format-dialog__card'><strong data-variable-format-title>变量格式检查</strong><p data-variable-format-body></p><div class='variable-format-dialog__actions'><button type='button' data-variable-format-close>关闭</button><button type='button' data-variable-format-repair>清理并补齐</button></div></section></div></div><span class='drag-edge top' data-phone-drag></span><span class='drag-edge right' data-phone-drag></span><span class='drag-edge bottom' data-phone-drag></span><span class='drag-edge left' data-phone-drag></span><span class='drag-grip' data-phone-drag aria-label='拖动手机'></span><span class='resize-corner left' data-phone-resize='left'></span><span class='resize-corner right' data-phone-resize='right'></span><aside class='sidecar'><section class='resource-panel loading' aria-label='当前楼层资源'><div class='resource-row money'><span>零花钱</span><strong data-resource-money>--</strong></div><div class='resource-row starlight'><span>星光点</span><strong data-resource-starlight>--</strong></div><div class='resource-row energy'><span>MC能量</span><strong data-resource-energy>--</strong></div></section><button class='variable-format-toggle' type='button'>变量格式检查</button><span class='readonly'>历史楼层 · 只读；切回当前楼后才能操作</span><button class='pet-character-toggle' type='button'>人物 · 爱丽莎</button><button class='floor-toggle' type='button' aria-expanded='false'>楼层</button><section class='floor-drawer'><span class='floor-title'></span><button class='mode' type='button'>跟随视口</button><select class='select' aria-label='选择变量楼层'></select><span class='badge'></span></section></aside></section>";
       hostDocument.body.appendChild(shell);
       launcher = shadow.querySelector(".launcher");
-      petSprite = shadow.querySelector(".pet-sprite");
+      petVisual = shadow.querySelector(".pet-visual");
+      petSprite = shadow.querySelector(".pet-sprite-main");
+      petSpriteUnderlay = shadow.querySelector(".pet-sprite-underlay");
       petMenu = shadow.querySelector(".pet-menu");
       ensureWandPetEntry();
       if (!wandObserver && typeof host.MutationObserver === "function") {
@@ -2545,21 +2566,19 @@
       launcher.classList.add("dragging");
       try { launcher.setPointerCapture(event.pointerId); } catch (_) {}
       clearPetMenuLongPress();
-      if (event.pointerType !== "mouse") {
-        var longPressPointerId = event.pointerId;
-        petMenuLongPressTimer = host.setTimeout(function () {
-          petMenuLongPressTimer = 0;
-          if (!launcherDragState || launcherDragState.pointerId !== longPressPointerId || launcherDragState.moved) return;
-          var held = launcherDragState;
-          launcherDragState = null;
-          launcher.classList.remove("dragging");
-          try {
-            if (launcher.hasPointerCapture && launcher.hasPointerCapture(held.pointerId)) launcher.releasePointerCapture(held.pointerId);
-          } catch (_) {}
-          suppressLauncherClick = true;
-          openPetMenu(false);
-        }, 500);
-      }
+      var longPressPointerId = event.pointerId;
+      petMenuLongPressTimer = host.setTimeout(function () {
+        petMenuLongPressTimer = 0;
+        if (!launcherDragState || launcherDragState.pointerId !== longPressPointerId || launcherDragState.moved) return;
+        var held = launcherDragState;
+        launcherDragState = null;
+        launcher.classList.remove("dragging");
+        try {
+          if (launcher.hasPointerCapture && launcher.hasPointerCapture(held.pointerId)) launcher.releasePointerCapture(held.pointerId);
+        } catch (_) {}
+        suppressLauncherClick = true;
+        openPetMenu(false);
+      }, 500);
       event.preventDefault();
       event.stopPropagation();
     }
@@ -2663,6 +2682,7 @@
         top: rect.top,
         right: rect.right
       };
+      panel.classList.add("resizing");
       try { event.currentTarget.setPointerCapture(event.pointerId); } catch (_) {}
       host.addEventListener("pointermove", moveResize, true);
       host.addEventListener("pointerup", endResize, true);
@@ -2682,11 +2702,11 @@
       if (!resizeState || !resizePendingPoint) return;
       var point = resizePendingPoint;
       resizePendingPoint = null;
-      var horizontal = (point.x - resizeState.startX) / 430 * (resizeState.corner === "left" ? -1 : 1);
-      var vertical = (point.y - resizeState.startY) / 812;
-      var delta = Math.abs(horizontal) >= Math.abs(vertical) ? horizontal : vertical;
+      var horizontal = (point.x - resizeState.startX) * (resizeState.corner === "left" ? -1 : 1);
+      var vertical = point.y - resizeState.startY;
+      var delta = (horizontal * 430 + vertical * 812) / (430 * 430 + 812 * 812);
       var scale = syncPanelSize(resizeState.startScale + delta);
-      var size = { width: Math.max(1, Math.floor(430 * scale)), height: Math.max(1, Math.floor(812 * scale)) };
+      var size = { width: Math.max(1, 430 * scale), height: Math.max(1, 812 * scale) };
       var x = resizeState.corner === "left" ? resizeState.right - size.width : resizeState.left;
       var next = clampPosition(x, resizeState.top, size);
       panel.style.left = next.x + "px";
@@ -2700,6 +2720,7 @@
       var ended = resizeState;
       resizeState = null;
       resizePendingPoint = null;
+      panel?.classList.remove("resizing");
       if (resizeAnimationFrame) {
         try { host.cancelAnimationFrame?.(resizeAnimationFrame); } catch (_) {}
         resizeAnimationFrame = 0;
@@ -3061,7 +3082,9 @@
         petLoadsInFlight = 0;
         petMenu = null;
         petMenuOpen = false;
+        petVisual = null;
         petSprite = null;
+        petSpriteUnderlay = null;
         if (profileOpenTimer) host.clearTimeout(profileOpenTimer);
         profileOpenTimer = 0;
         pendingProfileRole = "";

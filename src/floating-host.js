@@ -4,6 +4,7 @@ import { HYPNOSIS_RULES_API } from './hypnosis-rules.js';
 const BRIDGE_KEY = '__HYPNOOS3_CORE_BRIDGE__';
 const SINGLETON_KEY = '__HYPNOOS3_EXTENSION_FLOATING_SINGLETON__';
 const HOST_ID = 'hypnoos3-extension-floating-phone-host';
+const FRONTEND_REVISION = 'hypnoos3-1.0.0-pet-motion-resize';
 
 function phoneFrame() {
   return document.querySelector(`#${HOST_ID}`)?.shadowRoot?.querySelector('iframe.phone') || null;
@@ -78,7 +79,9 @@ export class FloatingHost {
     this.disposers.push(() => removeEventListener('message', onMessage));
 
     const script = document.createElement('script');
-    script.src = new URL('../public/floating-bootstrap.js', import.meta.url).href;
+    const scriptUrl = new URL('../public/floating-bootstrap.js', import.meta.url);
+    scriptUrl.searchParams.set('revision', FRONTEND_REVISION);
+    script.src = scriptUrl.href;
     script.dataset.frontendUrl = new URL('../ui/index.html', import.meta.url).href;
     script.dataset.assetBase = new URL('../public/assets/', import.meta.url).href;
     script.dataset.vendorBase = new URL('../public/vendor/', import.meta.url).href;
@@ -87,7 +90,7 @@ export class FloatingHost {
     script.dataset.hostId = HOST_ID;
     script.dataset.registryEvent = 'HYPNOOS3_EXTENSION_FLOATING_REGISTRY_READY';
     script.dataset.storageKey = 'hypnoos3.extension.floatingPhone.ui.v1';
-    script.dataset.revision = 'hypnoos3-1.0.0-input-flow';
+    script.dataset.revision = FRONTEND_REVISION;
     script.dataset.mode = 'host';
     script.async = false;
     document.head.append(script);

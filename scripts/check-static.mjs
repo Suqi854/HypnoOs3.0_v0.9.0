@@ -113,6 +113,12 @@ expect(floatingHost.includes('var petDisplayMode = "floating"') && floatingHost.
 expect(floatingHost.includes('label.textContent = "催眠手机"') && floatingHost.includes('if (stored && shellOpen) toggleShell(false)'), '收纳模式没有显示催眠手机或关闭已打开的手机');
 expect(floatingHost.includes('toggleShell(!shellOpen)'), '魔法棒催眠手机入口不能再次点击关闭');
 expect(floatingHost.includes('if (nextName !== "idle" && !petReadyAssets.has(petStateAsset(nextName))) nextName = "idle"'), '桌宠动作素材未就绪时没有回退到 idle，仍可能出现空白帧');
+expect(floatingHost.includes('pet-sprite pet-sprite-underlay') && floatingHost.includes('pet-sprite pet-sprite-main'), '四个导入桌宠缺少补洞渲染层');
+expect(floatingHost.includes("data-pet-state='unique_a'") && floatingHost.includes("data-pet-state='unique_b'") && floatingHost.includes("data-pet-state='held_scared'") && floatingHost.includes("data-pet-state='landing'"), '桌宠单击、长按、拖拽或落地缺少独立动画');
+expect(floatingHost.includes('petMotionFrame = requestFrame(advancePetFrame)'), '桌宠帧动画没有使用浏览器动画帧调度');
+expect(floatingHost.includes('host.requestAnimationFrame.bind(host)'), '动画帧调度仍被限制在局部作用域或丢失宿主绑定');
+expect(floatingHost.includes('transform:translateZ(0) scale(var(--phone-scale))') && !floatingHost.includes('isolation:isolate;transform:scale(var(--phone-scale))'), '手机缩放没有统一作用于整个容器');
+expect(floatingHost.includes('(horizontal * 430 + vertical * 812) / (430 * 430 + 812 * 812)'), '手机缩放仍会在横轴与纵轴之间跳变');
 for (const id of ['miku', 'rem', 'mai', 'umaru', 'alisa', 'hyakka']) {
   try { await stat(new URL(`public/assets/pet/v5/${id}/${id}-idle-v5.png`, root)); } catch { failures.push(`缺少桌宠素材：${id}`); }
 }
@@ -122,6 +128,7 @@ expect(!extensionSource.includes('hypnoos3-launcher'), '不得重新引入自制
 const floatingHostSource = await readFile(new URL('src/floating-host.js', root), 'utf8');
 expect(floatingHostSource.includes('__HYPNOOS3_EXTENSION_FLOATING_SINGLETON__'), '插件没有独立于4.3脚本的单例命名空间');
 expect(floatingHostSource.includes('hypnoos3-extension-floating-phone-host'), '插件没有独立于4.3脚本的宿主节点');
+expect(floatingHostSource.includes("scriptUrl.searchParams.set('revision', FRONTEND_REVISION)"), '悬浮宿主脚本缺少版本缓存标识');
 expect(floatingHostSource.includes('directSend(text)'), '插件宿主缺少直接发送桥');
 const hostAdapterSource = await readFile(new URL('src/host-adapter.js', root), 'utf8');
 expect(hostAdapterSource.includes('getCharacterWorldbookNames()'), '宿主适配器缺少当前角色世界书解析');
