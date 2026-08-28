@@ -164,6 +164,20 @@ def remove_alpha_specks(image: Image.Image) -> Image.Image:
     return source
 
 
+def remove_green_spill(image: Image.Image) -> Image.Image:
+    source = image.convert("RGBA")
+    pixels = source.load()
+    for y in range(source.height):
+        for x in range(source.width):
+            red, green, blue, alpha = pixels[x, y]
+            edge = max(red, blue)
+            if green > 80 and green > edge + 18:
+                pixels[x, y] = (0, 0, 0, 0)
+            elif green > 80 and green > edge + 6:
+                pixels[x, y] = (red, edge, blue, alpha)
+    return remove_alpha_specks(source)
+
+
 def compose_strip(frames: list[Image.Image]) -> Image.Image:
     strip = Image.new("RGBA", (FRAME_SIZE * len(frames), FRAME_SIZE), (0, 0, 0, 0))
     for index, frame in enumerate(frames):
@@ -178,6 +192,7 @@ def main() -> None:
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--threshold", type=int, default=18)
     parser.add_argument("--layout", choices=("4x2", "8x1"), default="4x2")
+    parser.add_argument("--group", choices=GROUPS)
     args = parser.parse_args()
 
     frames: list[Image.Image] = []
@@ -189,26 +204,30 @@ def main() -> None:
             cell = remove_alpha_specks(source.crop((left, 0, right, source.height)))
             frames.append(normalize_frame(cell))
     else:
-        source = Image.open(args.source).convert("RGB")
-        if source.width % GRID_COLUMNS or source.height % GRID_ROWS:
-            raise ValueError("source dimensions must divide evenly into a 4x2 grid")
-        cell_width = source.width // GRID_COLUMNS
-        cell_height = source.height // GRID_ROWS
+        source = Image.open(args.source).convert("RGBA")
+        has_transparency = source.getchannel("A").getextrema()[0] < 255
         for row in range(GRID_ROWS):
             for column in range(GRID_COLUMNS):
+                left = round(column * source.width / GRID_COLUMNS)
+                right = round((column + 1) * source.width / GRID_COLUMNS)
+                top = round(row * source.height / GRID_ROWS)
+                bottom = round((row + 1) * source.height / GRID_ROWS)
                 cell = source.crop((
-                    column * cell_width,
-                    row * cell_height,
-                    (column + 1) * cell_width,
-                    (row + 1) * cell_height,
+                    left,
+                    top,
+                    right,
+                    bottom,
                 ))
-                frames.append(normalize_frame(remove_connected_background(cell, args.threshold)))
+                cleaned = remove_alpha_specks(cell) if has_transparency else remove_green_spill(remove_connected_background(cell, args.threshold))
+                frames.append(normalize_frame(cleaned))
 
     target = args.output_dir / args.pet_id
     target.mkdir(parents=True, exist_ok=True)
-    for group in GROUPS:
+    groups = (args.group,) if args.group else GROUPS
+    for group in groups:
         compose_strip(frames).save(target / f"{args.pet_id}-{group}-v5.png", optimize=True)
-    compose_strip(frames + frames[:4]).save(target / f"{args.pet_id}-landing-v5.png", optimize=True)
+    if not args.group:
+        compose_strip(frames + frames[:4]).save(target / f"{args.pet_id}-landing-v5.png", optimize=True)
 
 
 if __name__ == "__main__":

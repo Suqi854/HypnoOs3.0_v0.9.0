@@ -130,6 +130,7 @@ const pendingSource = uiText.slice(pendingStart, pendingEnd);
 expect(pendingSource.indexOf('parts.push(buildOperationBlock(entries))') < pendingSource.indexOf('parts.push(playerInput)'), '本轮输入仍把玩家文字放在前端操作之前');
 expect(uiText.includes('const next = base ? block + "\\n" + base : block;'), '输入框回退仍把前端操作放在玩家文字之后');
 expect(floatingHost.includes('petMotionFrame = requestFrame(advancePetFrame)'), '桌宠帧动画没有使用浏览器动画帧调度');
+expect(floatingHost.includes('PET_ASSET_REVISION = "character-actions-20260828"') && floatingHost.includes('?revision=" + PET_ASSET_REVISION'), '桌宠专属动作素材缺少缓存版本');
 expect(floatingHost.includes('host.requestAnimationFrame.bind(host)'), '动画帧调度仍被限制在局部作用域或丢失宿主绑定');
 expect(floatingHost.includes('transform:translateZ(0) scale(var(--phone-scale))') && !floatingHost.includes('isolation:isolate;transform:scale(var(--phone-scale))'), '手机缩放没有统一作用于整个容器');
 expect(floatingHost.includes('(horizontal * 430 + vertical * 812) / (430 * 430 + 812 * 812)'), '手机缩放仍会在横轴与纵轴之间跳变');

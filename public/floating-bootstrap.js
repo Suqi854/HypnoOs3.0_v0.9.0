@@ -1381,8 +1381,10 @@
       petRoamY = 0;
     }
 
+    var PET_ASSET_REVISION = "character-actions-20260828";
+
     function petAssetUrl(name) {
-      return String(config.assetBase || "").replace(/\/?$/, "/") + "pet/" + name;
+      return String(config.assetBase || "").replace(/\/?$/, "/") + "pet/" + name + "?revision=" + PET_ASSET_REVISION;
     }
 
     var PET_BASE_FACING = 1;

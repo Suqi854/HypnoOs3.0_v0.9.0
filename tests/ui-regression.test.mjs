@@ -118,6 +118,17 @@ test('information app selects six pets and toggles floating or wand storage mode
     assert.ok(floatingHost.includes(`${id}: "${name}"`), `桌宠列表缺少${name}`);
     await stat(new URL(`../public/assets/pet/v5/${id}/${id}-idle-v5.png`, import.meta.url));
   }
+  for (const id of ['miku', 'rem', 'mai', 'umaru']) {
+    const idle = await readFile(new URL(`../public/assets/pet/v5/${id}/${id}-idle-v5.png`, import.meta.url));
+    const actions = [];
+    for (const group of ['unique-a', 'unique-b', 'drag']) {
+      const action = await readFile(new URL(`../public/assets/pet/v5/${id}/${id}-${group}-v5.png`, import.meta.url));
+      assert.equal(action.equals(idle), false, `${id} 的 ${group} 仍然复制待机素材`);
+      actions.push(action);
+    }
+    assert.equal(actions[0].equals(actions[1]), false, `${id} 的单击与长按素材仍然相同`);
+    assert.equal(actions[1].equals(actions[2]), false, `${id} 的长按与拖拽素材仍然相同`);
+  }
   assert.ok(floatingHost.includes('var petDisplayMode = "floating"'));
   assert.ok(floatingHost.includes('hypnoos-pet-wand-container'));
   assert.ok(floatingHost.includes('menu.lastElementChild !== wandPetEntry'));
@@ -234,7 +245,7 @@ test('hypnosis commands wait in phone input before host write or direct send', (
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__(block, { append: false })'));
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_DIRECT_SEND__(block)'));
   assert.ok(floatingHost.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__'));
-  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-input-order-unique-pets'"));
+  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-character-action-sprites'"));
   assert.ok(floatingCore.includes("scriptUrl.searchParams.set('revision', FRONTEND_REVISION)"));
   assert.ok(floatingCore.includes('script.dataset.revision = FRONTEND_REVISION'));
   assert.ok(floatingHost.includes('writeInput: function (text, options) { return callApi("setInput", [text, options]); }'));
