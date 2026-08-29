@@ -2518,8 +2518,6 @@
       frame.addEventListener("load", function () {
         bindPhoneTextEditingState();
         consumePendingProfileRole();
-        host.setTimeout(function () { phoneApi("__ST_ENSURE_ARCHIVE_BINDING_PROMPT__", [], false); }, 0);
-        host.setTimeout(function () { phoneApi("__ST_ENSURE_ARCHIVE_BINDING_PROMPT__", [], false); }, 500);
         host.setTimeout(function () { notifyStages(); }, 0);
         host.setTimeout(function () { notifyStages(); }, 350);
       });
@@ -2768,7 +2766,6 @@
         else updateChrome();
         applySavedPosition();
         mountPhone(false);
-        host.setTimeout(function () { phoneApi("__ST_ENSURE_ARCHIVE_BINDING_PROMPT__", [], false); }, 0);
         playPetShellAction("unique_a", true);
       } else {
         hideEncounterDetail();

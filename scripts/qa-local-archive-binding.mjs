@@ -21,36 +21,18 @@ try {
   assert.ok(frame, '本地酒馆没有加载 HypnoOS 手机 iframe');
   await frame.waitForFunction(() => typeof globalThis.getArchiveWorldbookOptions === 'function' && typeof globalThis.configureArchiveWorldbook === 'function', null, { timeout: 30_000 });
   const options = await frame.evaluate(() => globalThis.getArchiveWorldbookOptions());
-  if (!options?.binding?.worldbookName) {
-    try {
-      await frame.locator('.st-archive-bind-overlay').waitFor({ state: 'visible', timeout: 10_000 });
-    } catch (error) {
-      const debug = await frame.evaluate(() => ({
-        bodyChildren: document.body.children.length,
-        appChildren: document.querySelector('#app')?.children?.length || 0,
-        phoneRoot: Boolean(document.querySelector('#app')),
-        latest: globalThis.__ST_HYPNOOS_IS_LATEST_MESSAGE_FRONTEND__?.(),
-        retry: globalThis.__ST_ARCHIVE_BIND_PROMPT_RETRY__,
-        overlays: document.querySelectorAll('.st-archive-bind-overlay').length,
-        ready: globalThis.__ST_HYPNOOS_PATCH_READY__,
-        href: location.href,
-        htmlRetry: document.documentElement.innerHTML.includes('const retryLater = () =>'),
-        apiOptions: typeof globalThis.getArchiveWorldbookOptions,
-        apiConfigure: typeof globalThis.configureArchiveWorldbook,
-      }));
-      throw new Error(`${error.message}; debug=${JSON.stringify(debug)}`);
-    }
-    assert.equal(await frame.locator('[data-archive-first="dedicated"]').count(), 1);
-    assert.equal(await frame.locator('[data-archive-first="character"]').count(), 1);
-  }
+  assert.equal(await frame.locator('.st-archive-bind-overlay').count(), 0, '手机打开时不应自动弹出档案存储界面');
+  assert.equal(await frame.evaluate(() => typeof globalThis.__ST_ENSURE_ARCHIVE_BINDING_PROMPT__), 'undefined');
 
   await frame.evaluate(() => {
-    document.querySelector('.st-archive-bind-overlay')?.remove();
     globalThis.__ST_OPEN_SETTINGS_APP__?.();
   });
   const settings = frame.locator('.st-settings-app').last();
   await settings.waitFor({ state: 'visible' });
   await settings.locator('.st-settings-archive-binding-panel').waitFor({ state: 'visible' });
+  assert.equal(await settings.locator('[data-settings-action="archive-create"]').count(), 1);
+  assert.equal(await settings.locator('[data-settings-action="archive-character"]').count(), 1);
+  assert.equal(await settings.locator('[data-settings-action="archive-migrate"]').count(), 1);
   const order = await settings.evaluate((node) => ({
     binding: node.innerHTML.indexOf('<h3>档案世界书绑定</h3>'),
     archive: node.innerHTML.indexOf('<h3>档案</h3>'),

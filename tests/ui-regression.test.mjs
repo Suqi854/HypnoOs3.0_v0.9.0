@@ -401,10 +401,12 @@ test('profile photo area opens photo folder; folder slots open the avatar librar
   assert.ok(!profileAction.includes('openProfilePhotoAvatarPicker(page)'));
 });
 
-test('archive worldbook binding is one-time, reply-driven and available before profile import settings', () => {
-  assert.ok(html.includes('overlay.className = "st-archive-bind-overlay"'));
-  assert.ok(html.includes('新建本对话专用世界书'));
-  assert.ok(html.includes('写入角色卡绑定世界书'));
+test('archive worldbook binding stays optional in settings and remains reply-driven', () => {
+  assert.ok(!html.includes('st-archive-bind-overlay'));
+  assert.ok(!html.includes('__ST_ENSURE_ARCHIVE_BINDING_PROMPT__'));
+  assert.ok(html.includes('data-settings-action="archive-create"'));
+  assert.ok(html.includes('data-settings-action="archive-character"'));
+  assert.ok(html.includes('data-settings-action="archive-migrate"'));
   assert.ok(html.indexOf('<h3>档案世界书绑定</h3>') < html.indexOf('<h3>档案</h3>'));
   assert.ok(html.includes('syncArchiveFromLatestReply({ knownRoles: archiveKnownRoleNames() })'));
   assert.ok(html.includes('await refreshArchiveRoleSnapshotCache()'));
