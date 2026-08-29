@@ -58,7 +58,10 @@ export class FloatingHost {
     const receivedEvent = context?.eventTypes?.MESSAGE_RECEIVED;
     const chatChangedEvent = context?.eventTypes?.CHAT_CHANGED;
     if (receivedEvent && context?.eventSource) {
-      const onDialogueRoundEnded = (...args) => emitBridgeEvent('HYPNOOS3_DIALOGUE_ROUND_ENDED', { args });
+      const onDialogueRoundEnded = (...args) => {
+        emitBridgeEvent('HYPNOOS3_DIALOGUE_ROUND_ENDED', { args });
+        this.dataService.syncArchiveFromLatestReply().catch((error) => console.warn('[HypnoOS3] 每轮人物档案同步失败', error));
+      };
       context.eventSource.on(receivedEvent, onDialogueRoundEnded);
       this.disposers.push(() => context.eventSource.removeListener(receivedEvent, onDialogueRoundEnded));
     }
@@ -134,6 +137,9 @@ export class FloatingHost {
       getWorldbookNames() { return dataService.getWorldbookNames(); },
       getCharWorldbookNames() { return dataService.getCharacterWorldbookNames(); },
       getWorldbook(name) { return dataService.getWorldbook(name); },
+      getArchiveWorldbookOptions() { return dataService.getArchiveWorldbookOptions(); },
+      configureArchiveWorldbook(options) { return dataService.configureArchiveWorldbook(options || {}); },
+      syncArchiveFromLatestReply(options) { return dataService.syncArchiveFromLatestReply(options || {}); },
       generateRaw(options) { return host.generateRaw(options || {}); },
       getHypnosisRules(version) { return HYPNOSIS_RULES_API.get(version); },
       listHypnosisRuleVersions() { return HYPNOSIS_RULES_API.listVersions(); },

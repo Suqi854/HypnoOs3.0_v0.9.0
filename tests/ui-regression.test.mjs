@@ -323,7 +323,7 @@ test('profile removal clears only phone-side profile data and hides the whole do
   assert.ok(remove.includes('profileClearLocalPhotoSlots(name)'));
   assert.ok(!remove.includes('appendAppOperation'));
   const roles = functionBody('getStatsRoles');
-  assert.ok(roles.includes('const visibleRoles = { ...importedRoles, ...adaptiveWorldbookRoleCache, ...mvuRoles }'));
+  assert.ok(roles.includes('const visibleRoles = { ...importedRoles, ...adaptiveWorldbookRoleCache, ...archiveRoleSnapshotCache, ...mvuRoles }'));
   assert.ok(roles.includes('delete visibleRoles[name]'));
   assert.ok(html.includes('确认移除'));
   assert.ok(!html.includes('确认请求 AI 删除'));
@@ -399,6 +399,16 @@ test('profile photo area opens photo folder; folder slots open the avatar librar
   assert.ok(profileAction.includes('if (action === "upload-photo")'));
   assert.ok(profileAction.includes('openProfilePhotoDialog(page)'));
   assert.ok(!profileAction.includes('openProfilePhotoAvatarPicker(page)'));
+});
+
+test('archive worldbook binding is one-time, reply-driven and available before profile import settings', () => {
+  assert.ok(html.includes('overlay.className = "st-archive-bind-overlay"'));
+  assert.ok(html.includes('新建本对话专用世界书'));
+  assert.ok(html.includes('写入角色卡绑定世界书'));
+  assert.ok(html.indexOf('<h3>档案世界书绑定</h3>') < html.indexOf('<h3>档案</h3>'));
+  assert.ok(html.includes('syncArchiveFromLatestReply({ knownRoles: archiveKnownRoleNames() })'));
+  assert.ok(html.includes('await refreshArchiveRoleSnapshotCache()'));
+  assert.ok(!html.includes('以世界书与当前剧情为准'));
 });
 
 test('hypnosis start uses a touch-safe activation path before mobile blur rerenders', () => {

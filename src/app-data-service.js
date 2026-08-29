@@ -2,6 +2,7 @@ import { appById } from './apps.js';
 import { toLegacyVariables } from './contracts.js';
 import { getRegionPack } from './regions.js';
 import { clone, isRecord } from './utils.js';
+import { ArchiveWorldbookService } from './archive-worldbook-service.js';
 
 function readPath(value, path) {
   return String(path).split('.').reduce((current, key) => current?.[key], value);
@@ -21,6 +22,7 @@ export class AppDataService {
   constructor(host, store) {
     this.host = host;
     this.store = store;
+    this.archiveWorldbooks = new ArchiveWorldbookService(host, store);
   }
 
   readState() { return this.store.state; }
@@ -75,4 +77,7 @@ export class AppDataService {
   getWorldbookNames() { return this.host.getWorldbookNames(); }
   getCharacterWorldbookNames() { return this.host.getCharacterWorldbookNames(); }
   getWorldbook(name) { return this.host.loadWorldbook(name); }
+  getArchiveWorldbookOptions() { return this.archiveWorldbooks.options(); }
+  configureArchiveWorldbook(options) { return this.archiveWorldbooks.configure(options); }
+  syncArchiveFromLatestReply(options) { return this.archiveWorldbooks.syncLatestReply(options); }
 }

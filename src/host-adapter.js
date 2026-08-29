@@ -232,6 +232,18 @@ export class HostAdapter {
     await context.updateWorldInfoList?.();
   }
 
+  getChatWorldbookName() {
+    return String(this.context?.chatMetadata?.world_info || '').trim();
+  }
+
+  async bindChatWorldbook(name) {
+    const context = this.context;
+    if (!context?.chatMetadata) throw new Error('当前聊天元数据不可用');
+    context.chatMetadata.world_info = String(name || '').trim();
+    await Promise.resolve(context.saveMetadataDebounced?.());
+    return true;
+  }
+
   setPromptText(text) {
     this.#promptText = String(text || '');
   }

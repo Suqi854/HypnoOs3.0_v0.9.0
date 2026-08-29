@@ -2224,8 +2224,8 @@
         "globalThis.__ST_HYPNOOS_UPDATE_LOCATION_RULE_RADAR__=function(p){return r.updateLocationRuleRadar(p)};" +
         "globalThis.SillyTavern={getContext:function(){return r.getContext()},getCurrentChatId:function(){return r.getCurrentChatId()}};" +
         "var sourceMvu=r.getMvu();if(sourceMvu&&typeof sourceMvu.getMvuData==='function'&&typeof sourceMvu.replaceMvuData==='function'){globalThis.Mvu={get events(){return sourceMvu.events||{}},getMvuData:function(o){return r.readMvu('getMvuData',[option(o)])},replaceMvuData:function(m,o){return r.guardedMvu('replaceMvuData',[m,writeOption(o)])}};if(typeof sourceMvu.setMvuVariable==='function')globalThis.Mvu.setMvuVariable=function(){return r.guardedMvu('setMvuVariable',Array.prototype.slice.call(arguments))}}" +
-        "['eventOn','triggerSlash','getWorldbookNames','getCharWorldbookNames','getWorldbook','generateRaw'].forEach(function(n){if(r.hasApi(n))globalThis[n]=function(){return r.callApi(n,Array.prototype.slice.call(arguments))}});" +
-        "['createWorldbook','createWorldbookEntries','createWorldInfoEntry','replaceWorldbook','updateWorldbookWith','rebindCharWorldbooks','deleteWorldbook'].forEach(function(n){if(r.hasApi(n))globalThis[n]=function(){return r.guardedApi(n,Array.prototype.slice.call(arguments))}});" +
+        "['eventOn','triggerSlash','getWorldbookNames','getCharWorldbookNames','getWorldbook','generateRaw','getArchiveWorldbookOptions','syncArchiveFromLatestReply'].forEach(function(n){if(r.hasApi(n))globalThis[n]=function(){return r.callApi(n,Array.prototype.slice.call(arguments))}});" +
+        "['createWorldbook','createWorldbookEntries','createWorldInfoEntry','replaceWorldbook','updateWorldbookWith','rebindCharWorldbooks','deleteWorldbook','configureArchiveWorldbook'].forEach(function(n){if(r.hasApi(n))globalThis[n]=function(){return r.guardedApi(n,Array.prototype.slice.call(arguments))}});" +
         "})();</scr" + "ipt>";
     }
 
@@ -2518,6 +2518,8 @@
       frame.addEventListener("load", function () {
         bindPhoneTextEditingState();
         consumePendingProfileRole();
+        host.setTimeout(function () { phoneApi("__ST_ENSURE_ARCHIVE_BINDING_PROMPT__", [], false); }, 0);
+        host.setTimeout(function () { phoneApi("__ST_ENSURE_ARCHIVE_BINDING_PROMPT__", [], false); }, 500);
         host.setTimeout(function () { notifyStages(); }, 0);
         host.setTimeout(function () { notifyStages(); }, 350);
       });
@@ -2766,6 +2768,7 @@
         else updateChrome();
         applySavedPosition();
         mountPhone(false);
+        host.setTimeout(function () { phoneApi("__ST_ENSURE_ARCHIVE_BINDING_PROMPT__", [], false); }, 0);
         playPetShellAction("unique_a", true);
       } else {
         hideEncounterDetail();

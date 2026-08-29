@@ -4797,6 +4797,7 @@ var __webpack_exports__ = __webpack_require__("./src/催眠APP前端/index.tsx")
 .st-settings-region-fields{display:grid;gap:8px;margin-top:8px}.st-settings-region-fields label{display:grid;gap:5px;color:#cbd5e1;font-size:10px;font-weight:800}
 .st-settings-file{width:100%;min-width:0;border:1px dashed rgba(148,163,184,.24);border-radius:9px;background:rgba(255,255,255,.045);color:rgba(226,232,240,.76);padding:8px;font-size:10px}
 .st-settings-status{border:1px solid rgba(45,212,191,.16);border-radius:9px;background:rgba(20,184,166,.08);color:#99f6e4;padding:8px 9px;font-size:11px;line-height:1.45}
+.st-archive-bind-overlay{position:absolute;z-index:130;inset:0;display:grid;place-items:center;padding:20px;background:rgba(2,6,23,.82);backdrop-filter:blur(5px)}.st-archive-bind-card{width:min(350px,100%);border:1px solid rgba(94,234,212,.45);border-radius:10px;background:#111827;padding:14px;box-shadow:0 22px 60px rgba(0,0,0,.6);display:grid;gap:10px}.st-archive-bind-card h3,.st-archive-bind-card p{margin:0}.st-archive-bind-card h3{color:#f8fafc;font-size:16px}.st-archive-bind-card p{color:#cbd5e1;font-size:11px;line-height:1.55}.st-archive-bind-card .st-settings-button{width:100%}
 .st-settings-report{display:grid;gap:7px;max-height:180px;overflow:auto;scrollbar-width:thin}
 .st-settings-report section{border:1px solid rgba(148,163,184,.12);border-radius:8px;background:rgba(255,255,255,.04);padding:8px;display:grid;gap:5px}
 .st-settings-report strong{color:#f8fafc;font-size:12px;line-height:1.25}
@@ -12773,6 +12774,49 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
 
   let adaptiveWorldbookRoleCache = {};
   let adaptiveWorldbookRoleCacheScope = "";
+  let archiveRoleSnapshotCache = {};
+
+  function archiveRoleData(record, existing = {}) {
+    const name = String(record?.name || "").trim();
+    const base = isPlainObject(existing) ? encounterClone(existing) : {};
+    base["衣着"] = isPlainObject(base["衣着"]) ? base["衣着"] : {};
+    base["信息"] = isPlainObject(base["信息"]) ? base["信息"] : {};
+    base["状态"] = isPlainObject(base["状态"]) ? base["状态"] : {};
+    base["事件"] = isPlainObject(base["事件"]) ? base["事件"] : { "_事件记录": [], "至关重要记忆": [] };
+    base["效果"] = isPlainObject(base["效果"]) ? base["效果"] : {};
+    if (record?.clothing) base["衣着"]["当前衣着"] = String(record.clothing);
+    if (record?.currentState) base["状态"]["剧情状态"] = String(record.currentState);
+    if (record?.location) base["状态"]["当前位置"] = String(record.location);
+    if (record?.relationship) base["状态"]["人物关系"] = String(record.relationship);
+    if (record?.hypnosis) {
+      base["效果"]["剧情催眠状态"] = { "效果": String(record.hypnosis), "来源": "每轮AI回复" };
+    }
+    const facts = Array.isArray(record?.importantFacts) ? record.importantFacts.map(String).filter(Boolean) : [];
+    if (facts.length) base["事件"]["至关重要记忆"] = facts;
+    base["信息"]["姓名"] = name;
+    if (record?.gender) base["信息"]["性别"] = normalizedRoleGender(record.gender, base["信息"]["性别"] || "女");
+    base["信息"]["档案更新时间"] = "最近AI回复";
+    base.__hypnoosArchiveSnapshot = true;
+    return base;
+  }
+
+  async function refreshArchiveRoleSnapshotCache() {
+    if (typeof getArchiveWorldbookOptions !== "function") return archiveRoleSnapshotCache;
+    try {
+      const options = await getArchiveWorldbookOptions();
+      const next = {};
+      for (const record of Array.isArray(options?.records) ? options.records : []) {
+        const name = String(record?.name || "").trim();
+        if (!name || isProfileWorldbookTechnicalName(name)) continue;
+        const existing = adaptiveWorldbookRoleCache[name] || readImportedProfileWorldbookRoles()[name] || {};
+        next[name] = archiveRoleData(record, existing);
+      }
+      archiveRoleSnapshotCache = next;
+    } catch (error) {
+      console.warn("[HypnoOS] 读取绑定世界书档案快照失败", error);
+    }
+    return archiveRoleSnapshotCache;
+  }
 
   function adaptiveWorldbookRoleName(entry) {
     const title = String(encounterEntryTitle(entry) || "").replace(/\[[^\]]*\]/g, " ").replace(/(?:角色|人物)?(?:人设|档案|设定|变量)/g, " ").trim();
@@ -12803,7 +12847,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       return String(match?.[1] || fallback).trim();
     };
     return {
-      "衣着": { "头发": field("头发|发型|hair", "以世界书与当前剧情为准"), "面部": field("面部|容貌|face", "以世界书与当前剧情为准"), "上衣": field("上衣|服装|attire", "以世界书与当前剧情为准"), "下衣": field("下衣", "以世界书与当前剧情为准") },
+      "衣着": { "头发": field("头发|发型|hair"), "面部": field("面部|容貌|face"), "上衣": field("上衣|服装|attire"), "下衣": field("下衣") },
       "信息": { "姓名": name, "性别": gender, "_年龄": field("年龄|age"), "社团或职业": field("职业|身份|社团|occupation", "世界书角色"), "身高": field("身高|height"), "体重": field("体重|weight"), "三围": field("三围|measurement"), "绰号": "", "绰号已认可": false, "世界书摘要": summary },
       "状态": { "好感度": 0, "警戒度": 0, "服从度": 0, "性欲": 0, "快感值": 0, "是否派遣中": false },
       "事件": { "_事件记录": [], "至关重要记忆": [] },
@@ -12854,10 +12898,10 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     }
     return {
       "衣着": {
-        "头发": field("hair", "头发", "以世界书与当前剧情为准"),
-        "面部": field("face", "面部", "以世界书与当前剧情为准"),
-        "上衣": field("top", "上衣", "以世界书与当前剧情为准"),
-        "下衣": field("bottom", "下衣", "以世界书与当前剧情为准")
+        "头发": field("hair", "头发"),
+        "面部": field("face", "面部"),
+        "上衣": field("top", "上衣"),
+        "下衣": field("bottom", "下衣")
       },
       "信息": {
         "姓名": name,
@@ -12944,7 +12988,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     const roles = variables?.["角色"];
     const mvuRoles = roles && typeof roles === "object" && !Array.isArray(roles) ? roles : {};
     const importedRoles = readImportedProfileWorldbookRoles();
-    const visibleRoles = { ...importedRoles, ...adaptiveWorldbookRoleCache, ...mvuRoles };
+    const visibleRoles = { ...importedRoles, ...adaptiveWorldbookRoleCache, ...archiveRoleSnapshotCache, ...mvuRoles };
     for (const name of readDismissedProfileRoleNames()) delete visibleRoles[name];
     return visibleRoles;
   }
@@ -20673,6 +20717,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     ensurePhoneDarkThemeStyle();
     const root = findPhoneRoot(tile);
     await refreshAdaptiveWorldbookRoleCache(true);
+    await refreshArchiveRoleSnapshotCache();
     const roles = getStatsRoles();
     const requestedRoleName = String(initialRoleName || "").trim();
     const requestedRole = requestedRoleName && isPlainObject(roles[requestedRoleName]) ? roles[requestedRoleName] : null;
@@ -40284,6 +40329,90 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     try { return normalizeWorldbookSelection(JSON.parse(page?.dataset?.[key] || "[]")); } catch { return normalizeWorldbookSelection(fallback); }
   }
 
+  function archiveKnownRoleNames() {
+    return Object.keys(getStatsRoles()).filter((name) => name && !isProfileWorldbookTechnicalName(name)).slice(0, 100);
+  }
+
+  async function archiveConfigure(page, options) {
+    if (typeof configureArchiveWorldbook !== "function") throw new Error("当前宿主没有加载档案世界书写入接口。");
+    page.dataset.settingsStatus = "正在写入并校验档案世界书…";
+    if (page.classList.contains("st-settings-app")) renderSettingsPage(page);
+    const binding = await configureArchiveWorldbook(options);
+    await syncArchiveFromLatestReply?.({ knownRoles: archiveKnownRoleNames() });
+    const refreshed = await getArchiveWorldbookOptions();
+    page.__stArchiveWorldbooks = refreshed;
+    await refreshArchiveRoleSnapshotCache();
+    return binding;
+  }
+
+  function closeArchiveBindingPrompt(overlay) {
+    overlay?.remove?.();
+  }
+
+  async function ensureArchiveBindingPrompt() {
+    const retryLater = () => {
+      const retry = Math.max(0, Number(window.__ST_ARCHIVE_BIND_PROMPT_RETRY__ || 0));
+      if (retry >= 30) return;
+      window.__ST_ARCHIVE_BIND_PROMPT_RETRY__ = retry + 1;
+      window.setTimeout(() => void ensureArchiveBindingPrompt(), 300);
+    };
+    if (!isLatestPhoneVariableView()) {
+      retryLater();
+      return;
+    }
+    if (typeof getArchiveWorldbookOptions !== "function" || typeof configureArchiveWorldbook !== "function") {
+      retryLater();
+      return;
+    }
+    if (document.querySelector(".st-archive-bind-overlay")) return;
+    let options;
+    try { options = await getArchiveWorldbookOptions(); }
+    catch {
+      retryLater();
+      return;
+    }
+    if (options?.binding?.worldbookName) {
+      await refreshArchiveRoleSnapshotCache();
+      return;
+    }
+    const root = findPhoneRoot(null);
+    if (!root) {
+      retryLater();
+      return;
+    }
+    window.__ST_ARCHIVE_BIND_PROMPT_RETRY__ = 0;
+    if (document.querySelector(".st-archive-bind-overlay")) return;
+    root.style.position = root.style.position || "relative";
+    const primary = String(options?.character?.primary || "").trim();
+    const characterWritable = Boolean(primary && !primary.startsWith("__hypnoos_embedded__:"));
+    const overlay = document.createElement("section");
+    overlay.className = "st-archive-bind-overlay";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-label", "选择档案存储世界书");
+    overlay.innerHTML = '<div class="st-archive-bind-card"><h3>档案存储</h3><p>当前角色卡与本对话只需选择一次。催眠手机会在每轮 AI 回复后更新人物状态，并把档案与催眠剧情上下文写入所选世界书。</p><button type="button" class="st-settings-button primary" data-archive-first="dedicated">新建本对话专用世界书</button><button type="button" class="st-settings-button" data-archive-first="character"' + (characterWritable ? "" : " disabled") + '>写入角色卡绑定世界书</button>' + (characterWritable ? '<p>角色卡世界书：' + escapeHtml(primary) + '</p>' : '<p>当前角色卡没有可写入的外部绑定世界书，可先使用专用世界书。</p>') + '<div class="st-settings-status" data-archive-first-status hidden></div></div>';
+    root.appendChild(overlay);
+    overlay.querySelectorAll("[data-archive-first]").forEach((button) => button.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const status = overlay.querySelector("[data-archive-first-status]");
+      overlay.querySelectorAll("button").forEach((item) => { item.disabled = true; });
+      status.hidden = false;
+      status.textContent = "正在创建并绑定…";
+      try {
+        await archiveConfigure(overlay, { mode: button.dataset.archiveFirst });
+        closeArchiveBindingPrompt(overlay);
+      } catch (error) {
+        status.textContent = "绑定失败：" + String(error?.message || error || "未知错误");
+        overlay.querySelector('[data-archive-first="dedicated"]').disabled = false;
+        const character = overlay.querySelector('[data-archive-first="character"]');
+        if (character) character.disabled = !characterWritable;
+      }
+    }));
+  }
+
+  window.__ST_ENSURE_ARCHIVE_BINDING_PROMPT__ = ensureArchiveBindingPrompt;
+
   function settingsWriteDatasetSelection(page, key, names) {
     const selected = normalizeWorldbookSelection(names);
     page.dataset[key] = JSON.stringify(selected);
@@ -40333,6 +40462,11 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     const profileSelected = settingsDatasetSelection(page, "settingsProfileWorldbooks", readProfileWorldbookSelections());
     const profileImportBusy = page.dataset.settingsProfileImportBusy === "true";
     const profileImportStatus = String(page.dataset.settingsProfileImportStatus || "");
+    const archiveOptions = page.__stArchiveWorldbooks || {};
+    const archiveBinding = archiveOptions.binding || null;
+    const archiveNames = Array.isArray(archiveOptions.names) ? archiveOptions.names : [];
+    const archivePrimary = String(archiveOptions.character?.primary || "").trim();
+    const archiveCharacterWritable = Boolean(archivePrimary && !archivePrimary.startsWith("__hypnoos_embedded__:"));
     const adaptiveOptions = settingsWorldbookCheckboxOptions(adaptiveWorldbooks, adaptiveSelected, "data-settings-worldbook");
     const profileOptions = settingsWorldbookCheckboxOptions(adaptiveWorldbooks, profileSelected, "data-settings-profile-worldbooks");
     const requestedTab = String(page.dataset.settingsTab || "general");
@@ -40384,6 +40518,13 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
           '<div class="st-settings-actions is-single">' +
             '<button type="button" class="st-settings-button primary" data-settings-action="overwrite-line-worldbooks">覆盖当前阶段世界书</button>' +
           '</div>' +
+        '</section>' +
+        '<section class="st-settings-panel st-settings-archive-binding-panel">' +
+          '<h3>档案世界书绑定</h3>' +
+          '<p>当前对话一对一绑定。每轮 AI 回复都会更新人物状态；有变量时用变量校正，没有变量时仍按回复更新。更换后会先复制并校验 HypnoOS 档案，再只删除旧世界书中的 HypnoOS 档案条目。</p>' +
+          '<div class="st-settings-status">当前绑定：' + escapeHtml(archiveBinding?.worldbookName || "尚未绑定") + (archiveBinding?.lastSyncedAt ? '<br>最近同步：' + escapeHtml(new Date(archiveBinding.lastSyncedAt).toLocaleString()) : "") + '</div>' +
+          '<label class="st-settings-worldbook-field"><span>更换到已有世界书</span><select class="st-settings-region-select" data-settings-archive-target><option value="">请选择世界书</option>' + archiveNames.map((name) => '<option value="' + escapeAttr(name) + '"' + (name === archiveBinding?.worldbookName ? " selected" : "") + '>' + escapeHtml(name) + '</option>').join("") + '</select></label>' +
+          '<div class="st-settings-actions is-three"><button type="button" class="st-settings-button primary" data-settings-action="archive-create">新建专用世界书</button><button type="button" class="st-settings-button" data-settings-action="archive-character"' + (archiveCharacterWritable ? "" : " disabled") + '>绑定角色卡世界书</button><button type="button" class="st-settings-button" data-settings-action="archive-migrate"' + (archiveNames.length ? "" : " disabled") + '>迁移到所选世界书</button></div>' +
         '</section>' +
         '<section class="st-settings-panel st-settings-profile-worldbooks-panel">' +
           '<h3>档案</h3>' +
@@ -40484,6 +40625,26 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       settingsStopEvent(event);
       const region = writeAdaptiveRegion(page.querySelector('[data-settings-region]')?.value);
       page.dataset.settingsStatus = "通用适配模板已切换为" + (region === "japan" ? "日本版" : "中国版") + "。";
+      renderSettingsPage(page);
+    });
+    page.querySelector('[data-settings-action="archive-create"]')?.addEventListener("click", async (event) => {
+      settingsStopEvent(event);
+      try { await archiveConfigure(page, { mode: "dedicated" }); page.dataset.settingsStatus = "已新建并绑定本对话专用档案世界书。"; }
+      catch (error) { page.dataset.settingsStatus = "绑定失败：" + String(error?.message || error); }
+      renderSettingsPage(page);
+    });
+    page.querySelector('[data-settings-action="archive-character"]')?.addEventListener("click", async (event) => {
+      settingsStopEvent(event);
+      try { await archiveConfigure(page, { mode: "character" }); page.dataset.settingsStatus = "已迁移并绑定角色卡世界书。"; }
+      catch (error) { page.dataset.settingsStatus = "绑定失败：" + String(error?.message || error); }
+      renderSettingsPage(page);
+    });
+    page.querySelector('[data-settings-action="archive-migrate"]')?.addEventListener("click", async (event) => {
+      settingsStopEvent(event);
+      const worldbookName = String(page.querySelector("[data-settings-archive-target]")?.value || "").trim();
+      if (!worldbookName) { page.dataset.settingsStatus = "请先选择目标世界书。"; renderSettingsPage(page); return; }
+      try { await archiveConfigure(page, { mode: "selected", worldbookName }); page.dataset.settingsStatus = "档案已迁移并绑定到：" + worldbookName + "。"; }
+      catch (error) { page.dataset.settingsStatus = "迁移失败：" + String(error?.message || error); }
       renderSettingsPage(page);
     });
     page.querySelector('[data-settings-action="generate-adaptive"]')?.addEventListener("click", async (event) => {
@@ -40745,6 +40906,17 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     page.setAttribute("aria-label", "设置");
     root.appendChild(page);
     renderSettingsPage(page);
+    if (typeof getArchiveWorldbookOptions === "function") {
+      void Promise.resolve(getArchiveWorldbookOptions()).then((options) => {
+        if (!page.isConnected) return;
+        page.__stArchiveWorldbooks = options || {};
+        renderSettingsPage(page);
+      }).catch((error) => {
+        if (!page.isConnected) return;
+        page.dataset.settingsStatus = "档案世界书读取失败：" + String(error?.message || error || "未知错误");
+        renderSettingsPage(page);
+      });
+    }
   }
 
   const ST_HELP_APP_ITEMS = [
@@ -43581,6 +43753,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       await migrateCurrentRolePageStructure().catch((error) => console.warn("[HypnoOS] 启动角色十页迁移失败", error));
     }
     refreshUntilFirstPatch();
+    void ensureArchiveBindingPrompt();
     let runtimeDisposed = false;
     let refreshFrame = 0;
     let runtimeObserver = null;
@@ -43639,12 +43812,21 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       if (typeof eventOn === "function") {
         const roundStop = eventOn(CHAOS_FORUM_ROUND_EVENT, () => {
           void refreshChaosForumFromModel({ manual: false });
+          if (typeof syncArchiveFromLatestReply === "function") {
+            void Promise.resolve(syncArchiveFromLatestReply({ knownRoles: archiveKnownRoleNames() }))
+              .then(() => refreshArchiveRoleSnapshotCache())
+              .then(() => updateOpenPersonProfilePage())
+              .catch((error) => console.warn("[HypnoOS] 每轮档案世界书同步失败", error));
+          }
         });
         const chatStop = eventOn(CHAOS_FORUM_CHAT_EVENT, () => {
           delete window.__ST_MCHAN_FORUM_STATE_SCOPE__;
           delete window.__ST_MCHAN_FORUM_STATE__;
           const page = document.querySelector(".st-mchan-internal-app");
           if (page) renderPage(page, loadState());
+          archiveRoleSnapshotCache = {};
+          window.__ST_ARCHIVE_BIND_PROMPT_RETRY__ = 0;
+          window.setTimeout(() => void ensureArchiveBindingPrompt(), 0);
         });
         if (roundStop?.stop) eventStops.push(roundStop);
         if (chatStop?.stop) eventStops.push(chatStop);
