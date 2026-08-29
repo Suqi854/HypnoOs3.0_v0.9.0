@@ -137,6 +137,11 @@ test('information app selects six pets and toggles floating or wand storage mode
   assert.ok(floatingHost.includes('fa-mobile-screen-button extensionsMenuExtensionButton'));
   assert.ok(floatingHost.includes('if (stored && shellOpen) toggleShell(false)'));
   assert.ok(floatingHost.includes('toggleShell(!shellOpen)'));
+  assert.ok(floatingHost.includes('petDisplayMode === "stored" && shellOpen'), '收纳模式缺少点击手机外部自动关闭');
+  assert.ok(floatingHost.includes('path.indexOf(panel) >= 0'), '手机内部点击没有从自动收纳中排除');
+  assert.ok(floatingHost.includes('node.getAttribute("data-phone-resize") !== null'), '左右缩放角没有从自动收纳中排除');
+  assert.ok(floatingHost.includes('node.getAttribute("data-phone-drag") !== null'), '边框拖动条没有从自动收纳中排除');
+  assert.ok(floatingHost.includes('path.indexOf(wandPetEntry) >= 0'), '魔法棒入口没有从自动收纳中排除');
   assert.ok(floatingHost.includes('if (nextName !== "idle" && !petReadyAssets.has(petStateAsset(nextName))) nextName = "idle"'));
   assert.ok(!floatingHost.includes('nextName !== "held_scared" && !petReadyAssets.has'));
   assert.ok(!floatingHost.includes('label.textContent = "桌宠 · " + name'));

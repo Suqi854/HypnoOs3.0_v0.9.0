@@ -2903,6 +2903,17 @@
     }
 
     hostClickHandler = function (event) {
+      if (petDisplayMode === "stored" && shellOpen) {
+        var path = typeof event.composedPath === "function" ? event.composedPath() : [];
+        var insidePhone = path.indexOf(panel) >= 0 || path.some(function (node) {
+          return Boolean(node && node.getAttribute && (
+            node.getAttribute("data-phone-resize") !== null ||
+            node.getAttribute("data-phone-drag") !== null
+          ));
+        });
+        var fromWandEntry = path.indexOf(wandPetEntry) >= 0;
+        if (!insidePhone && !fromWandEntry) toggleShell(false);
+      }
       var id = mesIdFromElement(event.target);
       if (selectionMode === "follow" && id && floorItems().map(function (item) { return item.id; }).indexOf(id) >= 0) {
         selectFloor(id, "follow");
