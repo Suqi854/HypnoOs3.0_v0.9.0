@@ -20,9 +20,10 @@
 - 项目版本：`1.0.0`（见 `package.json`）
 - 发布仓库名称仍为：`HypnoOs3.0_v0.9.0`
 - 远端：`https://github.com/Suqi854/HypnoOs3.0_v0.9.0.git`
-- 最新功能提交：`e7093143193bcf25ab7881d1d4f4a6005e107e73`
+- 最新功能提交：`3d79447 fix: restore interactive worldbook binding controls`
 - 本文件提交并推送后，必须用 `git ls-remote origin refs/heads/main` 重新记录远端 SHA。
 - 当前关键提交：
+  - `3d79447 fix: restore interactive worldbook binding controls`
   - `e709314 feat: add plug-and-play hypnosis worldbook rules`
   - `37b062d fix: keep archive binding in settings only`
   - `2ddc6f4 feat: bind persistent archives to worldbooks`
@@ -84,19 +85,23 @@
 - 已完整审计 `催眠APP初版.json` 与 `催眠app二改 v4.3（louisHM 完全免费）.json` 的催眠规则，按现有 `HypnosisRules/v1` 格式合并为无重复规则集；保留 36 条催眠指令并登记两份来源 SHA-256 与审计条目 ID。
 - 玩家在设置中绑定档案存储世界书后，进入该聊天会自动写入唯一的 `[HypnoOS内置]催眠规则` 条目；离开该聊天只删除该临时规则，人物档案、剧情上下文和玩家原条目继续保留；返回聊天后自动恢复规则。
 - 绑定世界书承载催眠规则时，扩展提示不会重复注入同一规则；酒馆加载旧聊天首条问候不会误触发档案模型同步。
+- 设置页三个档案世界书按钮已接入 SillyTavern 原生弹窗：新建显示原生名称输入框，绑定角色卡世界书显示确认弹窗，迁移显示原生弹窗内的已有世界书选择器。
+- 档案世界书操作不再依赖当前可写消息楼层；绑定后不再立即调用模型同步，并在当前面板就地显示忙碌、成功或失败状态。
+- 所有可用按钮都有悬停/键盘焦点高亮、按下缩放和点击后反馈动画，并为减少动态效果偏好提供降级反馈。
+- 世界书绑定状态变化会立即刷新扩展提示，避免规则已经写入世界书但旧扩展提示仍短暂重复注入。
 
 ### 最近一次真实宿主结果
 
-- `npm test`：68/68 通过。
+- `npm test`：71/71 通过。
 - `npm run check`：通过。
 - `npm run build`：通过，生成 `HypnoOS3.0-v1.0.0.zip`，308 个文件。
-- UI 基线：`6faf6676007dccffbf58cae0326880af4a05860dece8736fc97c695e698356d5`。
-- 本地真实酒馆档案绑定、即插即用催眠规则与收纳 QA：通过；确认 36 条指令完整，原生 World Info 提示只注入一次；切换到另一聊天后规则删除但两条档案保留，返回原聊天后规则恢复；无额外模型请求；缩放和拖动不触发关闭，外部空白点击关闭。
+- UI 基线：`071127b13be92398009d1d888d77c10799dc11ca99f097710ee00263776cae2b`。
+- 本地真实酒馆档案绑定、即插即用催眠规则与收纳 QA：通过；由 Playwright 实际点击新建、角色卡绑定（可用时）和迁移按钮，确认原生输入/确认/选择弹窗、按钮反馈及就地成功状态；迁移真实完成。确认 36 条指令完整，原生 World Info 提示只注入一次；切换到另一聊天后规则删除但两条档案保留，返回原聊天后规则恢复；无额外模型请求；缩放和拖动不触发关闭，外部空白点击关闭。
 - 两个本地扩展安装目录均已同步精确构建产物。
 
 ## 当前待确认
 
-- 用户尚未完成取消档案存储自动弹窗后的手动视觉验收。
+- 自动化已验证原生弹窗和按钮反馈；用户仍可进行最终人工视觉手感验收。
 - 未绑定世界书时不会持久写入档案；玩家需要在设置页主动选择绑定方式。这是当前明确产品行为，不应重新加自动弹窗。
 - 用户尚未反馈四个角色专属动作的最终视觉验收结果。
 - 若下一条反馈仍是桌宠动作问题，先确认浏览器实际加载的素材 URL 带有：
@@ -149,5 +154,6 @@ node scripts/qa-local-archive-binding.mjs
 - `HypnoOS-v1.0.0-before-remove-auto-archive-prompt-20260830-005909-2ddc6f4.zip`
 - `HypnoOS-v1.0.0-after-remove-auto-archive-prompt-20260830-010510-37b062d.zip`
 - `HypnoOS-v1.0.0-after-plug-and-play-hypnosis-rules-20260830-134637-e709314.zip`
+- `HypnoOS-v1.0.0-after-worldbook-dialog-feedback-20260830-142554-3d79447.zip`
 
 以上回档均位于：`E:\sillytavern\卡\催眠app重置\版本`
