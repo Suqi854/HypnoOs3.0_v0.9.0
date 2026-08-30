@@ -29,6 +29,53 @@ test('loading a chat greeting does not trigger archive model synchronization', (
   assert.equal(shouldSyncArchiveReply('swipe'), true);
 });
 
+test('prompt projection refreshes immediately when worldbook ownership changes', () => {
+  const prompts = [];
+  globalThis.SillyTavern = { getContext: () => ({
+    chat: [],
+    setExtensionPrompt: (...args) => prompts.push(args),
+  }) };
+  try {
+    const host = new HostAdapter();
+    host.setPromptText('更新后的运行提示');
+    assert.equal(prompts.length, 1);
+    assert.equal(prompts[0][1], '更新后的运行提示');
+  } finally {
+    delete globalThis.SillyTavern;
+  }
+});
+
+test('archive worldbook actions use the native SillyTavern popup contract', async () => {
+  const calls = [];
+  const context = {
+    characterId: 0,
+    chatId: '测试聊天',
+    characters: [{ name: '测试角色' }],
+    Popup: {
+      show: {
+        input: async (...args) => { calls.push(['input', ...args]); return '玩家输入的新世界书'; },
+        confirm: async (...args) => { calls.push(['confirm', ...args]); return 1; },
+      },
+    },
+    POPUP_TYPE: { CONFIRM: 2 },
+    POPUP_RESULT: { AFFIRMATIVE: 1 },
+  };
+  globalThis.SillyTavern = { getContext: () => context };
+  try {
+    const host = new HostAdapter();
+    const created = await host.requestArchiveWorldbookAction({ action: 'create', names: [] });
+    assert.deepEqual(created, { cancelled: false, worldbookName: '玩家输入的新世界书' });
+    assert.equal(calls[0][0], 'input');
+    assert.equal(calls[0][1], '创建新的世界书');
+    const bound = await host.requestArchiveWorldbookAction({ action: 'character', characterWorldbook: '角色世界书' });
+    assert.deepEqual(bound, { cancelled: false, worldbookName: '角色世界书' });
+    assert.equal(calls[1][0], 'confirm');
+    assert.equal(calls[1][1], '绑定角色卡世界书');
+  } finally {
+    delete globalThis.SillyTavern;
+  }
+});
+
 test('converts an embedded character book read-only when no linked book exists', async () => {
   const embedded = { name: '卡内世界书', entries: [{ name: '地点', content: '车站' }] };
   globalThis.SillyTavern = { getContext: () => ({

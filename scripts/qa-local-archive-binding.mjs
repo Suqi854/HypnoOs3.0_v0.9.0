@@ -55,12 +55,41 @@ try {
   }));
   assert.ok(order.binding >= 0 && order.binding < order.archive, '档案世界书绑定模块没有位于档案设置之前');
 
-  const targetName = String(options?.binding?.worldbookName || options?.names?.find((name) => String(name).startsWith('HypnoOS档案 - ')) || '');
-  const configured = await frame.evaluate(async (name) => {
-    if (name) await globalThis.configureArchiveWorldbook({ mode: 'selected', worldbookName: name });
-    else await globalThis.configureArchiveWorldbook({ mode: 'dedicated' });
-    return globalThis.getArchiveWorldbookOptions();
-  }, targetName);
+  const targetName = String(options?.binding?.worldbookName || options?.names?.find((name) => String(name).startsWith('HypnoOS档案 - ')) || options?.names?.[0] || '');
+  const createButton = settings.locator('[data-settings-action="archive-create"]');
+  await createButton.click();
+  assert.equal(await createButton.evaluate((node) => node.classList.contains('st-button-feedback')), true, '按钮点击后没有可见微动效反馈');
+  const createPopup = page.locator('dialog.popup[open]').last();
+  await createPopup.waitFor({ state: 'visible' });
+  assert.match(await createPopup.textContent(), /创建新的世界书/);
+  assert.equal(await createPopup.locator('.popup-input').count(), 1, '新建世界书没有显示酒馆原生输入框');
+  assert.ok(String(await createPopup.locator('.popup-input').inputValue()).startsWith('HypnoOS档案 - '), '新建世界书没有提供专用名称');
+  await createPopup.locator('.popup-button-cancel').click();
+
+  const characterButton = settings.locator('[data-settings-action="archive-character"]');
+  if (await characterButton.isEnabled()) {
+    await characterButton.click();
+    const characterPopup = page.locator('dialog.popup[open]').last();
+    await characterPopup.waitFor({ state: 'visible' });
+    assert.match(await characterPopup.textContent(), /绑定角色卡世界书/);
+    await characterPopup.locator('.popup-button-cancel').click();
+  }
+
+  if (!targetName) throw new Error('真实酒馆没有已有世界书，无法验证迁移弹窗和写入');
+  const migrateButton = settings.locator('[data-settings-action="archive-migrate"]');
+  await migrateButton.click();
+  const migratePopup = page.locator('dialog.popup[open]').last();
+  await migratePopup.waitFor({ state: 'visible' });
+  assert.match(await migratePopup.textContent(), /数据注入目标/);
+  const migrateSelect = migratePopup.locator('[data-hypnoos-archive-target]');
+  assert.ok(await migrateSelect.locator('option').count(), '迁移弹窗没有列出已有世界书');
+  await migrateSelect.selectOption(targetName);
+  await migratePopup.locator('.popup-button-ok').click();
+  await frame.waitForFunction(() => document.querySelector('[data-settings-archive-status]')?.textContent?.includes('内置催眠规则已加载'), null, { timeout: 30_000 });
+  assert.match(await settings.locator('[data-settings-archive-status]').textContent(), /内置催眠规则已加载/);
+  assert.equal(await settings.locator('[data-settings-action="archive-migrate"]').isEnabled(), true, '迁移完成后按钮仍处于卡死状态');
+
+  const configured = await frame.evaluate(() => globalThis.getArchiveWorldbookOptions());
   const binding = configured?.binding;
   assert.ok(binding?.worldbookName, '真实酒馆没有建立可写世界书绑定');
   await frame.evaluate((name) => globalThis.configureArchiveWorldbook({ mode: 'selected', worldbookName: name }), binding.worldbookName);

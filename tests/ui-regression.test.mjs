@@ -250,7 +250,7 @@ test('hypnosis commands wait in phone input before host write or direct send', (
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__(block, { append: false })'));
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_DIRECT_SEND__(block)'));
   assert.ok(floatingHost.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__'));
-  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-character-action-sprites'"));
+  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-worldbook-dialogs'"));
   assert.ok(floatingCore.includes("scriptUrl.searchParams.set('revision', FRONTEND_REVISION)"));
   assert.ok(floatingCore.includes('script.dataset.revision = FRONTEND_REVISION'));
   assert.ok(floatingHost.includes('writeInput: function (text, options) { return callApi("setInput", [text, options]); }'));
@@ -407,9 +407,19 @@ test('archive worldbook binding stays optional in settings and remains reply-dri
   assert.ok(html.includes('data-settings-action="archive-create"'));
   assert.ok(html.includes('data-settings-action="archive-character"'));
   assert.ok(html.includes('data-settings-action="archive-migrate"'));
+  assert.ok(html.includes('requestArchiveWorldbookAction({'));
+  assert.ok(html.includes('data-settings-archive-status'));
+  assert.ok(html.includes('内置催眠规则已加载'));
+  assert.ok(!html.includes('data-settings-archive-target'));
   assert.ok(html.indexOf('<h3>档案世界书绑定</h3>') < html.indexOf('<h3>档案</h3>'));
   assert.ok(html.includes('syncArchiveFromLatestReply({ knownRoles: archiveKnownRoleNames() })'));
+  assert.ok(!functionBody('archiveConfigure').includes('syncArchiveFromLatestReply'));
   assert.ok(html.includes('await refreshArchiveRoleSnapshotCache()'));
+  assert.ok(html.includes('function installGlobalButtonFeedback()'));
+  assert.ok(html.includes('button:not(:disabled).st-button-feedback'));
+  assert.ok(html.includes('@media(prefers-reduced-motion:reduce)'));
+  assert.ok(floatingHost.includes("'requestArchiveWorldbookAction','configureArchiveWorldbook'"));
+  assert.ok(!floatingHost.includes("'deleteWorldbook','configureArchiveWorldbook'"));
   assert.ok(!html.includes('以世界书与当前剧情为准'));
 });
 

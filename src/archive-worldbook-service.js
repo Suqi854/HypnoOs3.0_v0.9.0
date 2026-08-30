@@ -194,7 +194,7 @@ export class ArchiveWorldbookService {
     return { names: [...new Set(names.map(String).filter(Boolean))], character, binding, records };
   }
 
-  async configure({ mode, worldbookName = '' } = {}) {
+  async configure({ mode, worldbookName = '', createOnly = false } = {}) {
     const chatKey = this.host.contextKey();
     const previous = this.getBinding();
     const names = (await Promise.resolve(this.host.getWorldbookNames()) || []).map(String);
@@ -211,6 +211,7 @@ export class ArchiveWorldbookService {
       for (let index = 2; names.includes(targetName); index += 1) targetName = `${base} ${index}`;
     }
     if (!targetName) throw new Error('没有选择目标世界书。');
+    if (createOnly && names.includes(targetName)) throw new Error(`世界书“${targetName}”已存在，请输入新名称。`);
     let targetBook = names.includes(targetName) ? await this.host.loadWorldbook(targetName) : { entries: {}, extensions: {} };
     let records = [];
     let contextText = '';

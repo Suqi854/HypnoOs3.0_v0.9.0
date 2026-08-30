@@ -110,3 +110,15 @@ test('built-in hypnosis rules preserve array-shaped worldbook format', async () 
   assert.equal(hypnosisRuleEntries(deactivated).length, 0);
   assert.equal(deactivated.entries.some((entry) => entry.comment === '玩家数组条目'), true);
 });
+
+test('new worldbook flow refuses to overwrite an existing book', async () => {
+  const host = new FakeHost();
+  const store = new FakeStore();
+  const service = new ArchiveWorldbookService(host, store);
+  await assert.rejects(
+    service.configure({ mode: 'dedicated', worldbookName: '角色世界书', createOnly: true }),
+    /已存在/,
+  );
+  assert.equal(ownedEntries(host.books.get('角色世界书')).length, 0);
+  assert.equal(hypnosisRuleEntries(host.books.get('角色世界书')).length, 0);
+});

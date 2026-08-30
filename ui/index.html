@@ -4774,6 +4774,12 @@ var __webpack_exports__ = __webpack_require__("./src/催眠APP前端/index.tsx")
 .st-settings-button.danger{border-color:rgba(248,113,113,.34);background:rgba(127,29,29,.28);color:#fecaca}
 .st-settings-cheat-panel.is-active .st-settings-button.danger{border-color:#fb7185;background:linear-gradient(135deg,#b91c1c,#e11d48);color:#fff;box-shadow:0 8px 20px rgba(225,29,72,.28)}
 .st-settings-button:disabled{opacity:.46;cursor:not-allowed;filter:saturate(.6)}
+button:not(:disabled){transition:filter .14s ease,box-shadow .14s ease,outline-color .14s ease,translate .1s ease,scale .1s ease;-webkit-tap-highlight-color:transparent}
+button:not(:disabled):hover,button:not(:disabled):focus-visible{filter:brightness(1.1) saturate(1.08);outline:2px solid rgba(94,234,212,.58);outline-offset:2px}
+button:not(:disabled):active,button:not(:disabled).st-button-pressed{filter:brightness(1.2) saturate(1.12);translate:0 1px;scale:.97}
+button:not(:disabled).st-button-feedback{animation:stButtonFeedback .42s ease-out}
+@keyframes stButtonFeedback{0%{filter:brightness(1.28);box-shadow:0 0 0 0 rgba(94,234,212,.8)}55%{box-shadow:0 0 0 5px rgba(94,234,212,.18)}100%{filter:none;box-shadow:0 0 0 9px transparent}}
+@media(prefers-reduced-motion:reduce){button:not(:disabled){transition:outline-color .01ms linear,filter .01ms linear!important}button:not(:disabled):active,button:not(:disabled).st-button-pressed{translate:none;scale:1}button:not(:disabled).st-button-feedback{animation:stButtonFeedbackReduced .18s linear}@keyframes stButtonFeedbackReduced{0%,60%{outline:3px solid rgba(94,234,212,.82);filter:brightness(1.18)}100%{outline-color:transparent;filter:none}}}
 .st-settings-code{width:100%;min-height:96px;border:1px solid rgba(148,163,184,.18);border-radius:9px;background:rgba(2,6,23,.54);color:#dbeafe;outline:none;padding:9px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:10px;line-height:1.45;resize:vertical}
 .st-settings-region-select{width:100%;height:34px;min-height:34px;border:1px solid rgba(148,163,184,.22);border-radius:9px;background:#111827;color:#f8fafc;padding:0 9px;font-size:10px;font-weight:800;outline:none}
 .st-settings-worldbook-picker{width:100%;min-width:0;border:1px solid rgba(148,163,184,.22);border-radius:9px;background:#111827;color:#f8fafc;overflow:hidden}
@@ -39523,6 +39529,30 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
 	    try { event?.stopPropagation?.(); } catch {}
 	  }
 
+  function installGlobalButtonFeedback() {
+    const findButton = (event) => event?.target?.closest?.("button:not(:disabled)") || null;
+    const press = (event) => findButton(event)?.classList.add("st-button-pressed");
+    const release = (event) => findButton(event)?.classList.remove("st-button-pressed");
+    const acknowledge = (event) => {
+      const button = findButton(event);
+      if (!button) return;
+      button.classList.remove("st-button-pressed", "st-button-feedback");
+      void button.offsetWidth;
+      button.classList.add("st-button-feedback");
+      window.setTimeout(() => button.classList.remove("st-button-feedback"), 460);
+    };
+    document.addEventListener("pointerdown", press, true);
+    document.addEventListener("pointerup", release, true);
+    document.addEventListener("pointercancel", release, true);
+    document.addEventListener("click", acknowledge, true);
+    return () => {
+      document.removeEventListener("pointerdown", press, true);
+      document.removeEventListener("pointerup", release, true);
+      document.removeEventListener("pointercancel", release, true);
+      document.removeEventListener("click", acknowledge, true);
+    };
+  }
+
   const SETTINGS_CHEAT_MODE_STORAGE_PREFIX = "hypnoos.settings.cheatMode.v1:";
   const SETTINGS_CHEAT_MODE_STORAGE_KEY = SETTINGS_CHEAT_MODE_STORAGE_PREFIX + "phone";
   // 修改这里即可更换作弊模式密钥；不要把密钥写入世界书、导出包或日志。
@@ -40334,14 +40364,47 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
 
   async function archiveConfigure(page, options) {
     if (typeof configureArchiveWorldbook !== "function") throw new Error("当前宿主没有加载档案世界书写入接口。");
-    page.dataset.settingsStatus = "正在写入并校验档案世界书…";
-    if (page.classList.contains("st-settings-app")) renderSettingsPage(page);
     const binding = await configureArchiveWorldbook(options);
-    await syncArchiveFromLatestReply?.({ knownRoles: archiveKnownRoleNames() });
     const refreshed = await getArchiveWorldbookOptions();
     page.__stArchiveWorldbooks = refreshed;
     await refreshArchiveRoleSnapshotCache();
     return binding;
+  }
+
+  async function runArchiveSettingsAction(page, action) {
+    if (typeof requestArchiveWorldbookAction !== "function") throw new Error("当前宿主没有加载世界书原生弹窗接口。");
+    const archiveOptions = page.__stArchiveWorldbooks || {};
+    const choice = await requestArchiveWorldbookAction({
+      action,
+      names: Array.isArray(archiveOptions.names) ? archiveOptions.names : [],
+      characterWorldbook: String(archiveOptions.character?.primary || ""),
+      currentWorldbook: String(archiveOptions.binding?.worldbookName || "")
+    });
+    if (!choice || choice.cancelled) {
+      page.dataset.settingsArchiveStatus = "已取消本次世界书操作。";
+      renderSettingsPage(page);
+      return null;
+    }
+    const worldbookName = String(choice.worldbookName || "").trim();
+    page.dataset.settingsArchiveBusy = "true";
+    page.dataset.settingsArchiveStatus = action === "create" ? "正在新建并绑定世界书…" : action === "character" ? "正在绑定角色卡世界书…" : "正在迁移并绑定世界书…";
+    renderSettingsPage(page);
+    try {
+      const binding = await archiveConfigure(page, action === "create"
+        ? { mode: "dedicated", worldbookName, createOnly: true }
+        : action === "character" ? { mode: "character" } : { mode: "selected", worldbookName });
+      page.dataset.settingsArchiveStatus = action === "create"
+        ? "已新建并绑定：" + binding.worldbookName + "。内置催眠规则已加载。"
+        : action === "character" ? "已绑定角色卡世界书：" + binding.worldbookName + "。内置催眠规则已加载。"
+        : "档案已迁移并绑定到：" + binding.worldbookName + "。内置催眠规则已加载。";
+      return binding;
+    } catch (error) {
+      page.dataset.settingsArchiveStatus = (action === "migrate" ? "迁移失败：" : "绑定失败：") + String(error?.message || error);
+      throw error;
+    } finally {
+      page.dataset.settingsArchiveBusy = "false";
+      renderSettingsPage(page);
+    }
   }
 
   function settingsWriteDatasetSelection(page, key, names) {
@@ -40398,6 +40461,8 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     const archiveNames = Array.isArray(archiveOptions.names) ? archiveOptions.names : [];
     const archivePrimary = String(archiveOptions.character?.primary || "").trim();
     const archiveCharacterWritable = Boolean(archivePrimary && !archivePrimary.startsWith("__hypnoos_embedded__:"));
+    const archiveBusy = page.dataset.settingsArchiveBusy === "true";
+    const archiveStatus = String(page.dataset.settingsArchiveStatus || "");
     const adaptiveOptions = settingsWorldbookCheckboxOptions(adaptiveWorldbooks, adaptiveSelected, "data-settings-worldbook");
     const profileOptions = settingsWorldbookCheckboxOptions(adaptiveWorldbooks, profileSelected, "data-settings-profile-worldbooks");
     const requestedTab = String(page.dataset.settingsTab || "general");
@@ -40454,8 +40519,8 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
           '<h3>档案世界书绑定</h3>' +
           '<p>当前对话一对一绑定。每轮 AI 回复都会更新人物状态；有变量时用变量校正，没有变量时仍按回复更新。更换后会先复制并校验 HypnoOS 档案，再只删除旧世界书中的 HypnoOS 档案条目。</p>' +
           '<div class="st-settings-status">当前绑定：' + escapeHtml(archiveBinding?.worldbookName || "尚未绑定") + (archiveBinding?.lastSyncedAt ? '<br>最近同步：' + escapeHtml(new Date(archiveBinding.lastSyncedAt).toLocaleString()) : "") + '</div>' +
-          '<label class="st-settings-worldbook-field"><span>更换到已有世界书</span><select class="st-settings-region-select" data-settings-archive-target><option value="">请选择世界书</option>' + archiveNames.map((name) => '<option value="' + escapeAttr(name) + '"' + (name === archiveBinding?.worldbookName ? " selected" : "") + '>' + escapeHtml(name) + '</option>').join("") + '</select></label>' +
-          '<div class="st-settings-actions is-three"><button type="button" class="st-settings-button primary" data-settings-action="archive-create">新建专用世界书</button><button type="button" class="st-settings-button" data-settings-action="archive-character"' + (archiveCharacterWritable ? "" : " disabled") + '>绑定角色卡世界书</button><button type="button" class="st-settings-button" data-settings-action="archive-migrate"' + (archiveNames.length ? "" : " disabled") + '>迁移到所选世界书</button></div>' +
+          '<div class="st-settings-actions is-three"><button type="button" class="st-settings-button primary" data-settings-action="archive-create"' + (archiveBusy ? " disabled" : "") + '>新建专用世界书</button><button type="button" class="st-settings-button" data-settings-action="archive-character"' + (archiveCharacterWritable && !archiveBusy ? "" : " disabled") + '>绑定角色卡世界书</button><button type="button" class="st-settings-button" data-settings-action="archive-migrate"' + (archiveNames.length && !archiveBusy ? "" : " disabled") + '>迁移到已有世界书</button></div>' +
+          (archiveStatus ? '<div class="st-settings-status" data-settings-archive-status role="status" aria-live="polite">' + escapeHtml(archiveStatus) + '</div>' : '') +
         '</section>' +
         '<section class="st-settings-panel st-settings-profile-worldbooks-panel">' +
           '<h3>档案</h3>' +
@@ -40560,23 +40625,15 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     });
     page.querySelector('[data-settings-action="archive-create"]')?.addEventListener("click", async (event) => {
       settingsStopEvent(event);
-      try { await archiveConfigure(page, { mode: "dedicated" }); page.dataset.settingsStatus = "已新建并绑定本对话专用档案世界书。"; }
-      catch (error) { page.dataset.settingsStatus = "绑定失败：" + String(error?.message || error); }
-      renderSettingsPage(page);
+      try { await runArchiveSettingsAction(page, "create"); } catch {}
     });
     page.querySelector('[data-settings-action="archive-character"]')?.addEventListener("click", async (event) => {
       settingsStopEvent(event);
-      try { await archiveConfigure(page, { mode: "character" }); page.dataset.settingsStatus = "已迁移并绑定角色卡世界书。"; }
-      catch (error) { page.dataset.settingsStatus = "绑定失败：" + String(error?.message || error); }
-      renderSettingsPage(page);
+      try { await runArchiveSettingsAction(page, "character"); } catch {}
     });
     page.querySelector('[data-settings-action="archive-migrate"]')?.addEventListener("click", async (event) => {
       settingsStopEvent(event);
-      const worldbookName = String(page.querySelector("[data-settings-archive-target]")?.value || "").trim();
-      if (!worldbookName) { page.dataset.settingsStatus = "请先选择目标世界书。"; renderSettingsPage(page); return; }
-      try { await archiveConfigure(page, { mode: "selected", worldbookName }); page.dataset.settingsStatus = "档案已迁移并绑定到：" + worldbookName + "。"; }
-      catch (error) { page.dataset.settingsStatus = "迁移失败：" + String(error?.message || error); }
-      renderSettingsPage(page);
+      try { await runArchiveSettingsAction(page, "migrate"); } catch {}
     });
     page.querySelector('[data-settings-action="generate-adaptive"]')?.addEventListener("click", async (event) => {
       settingsStopEvent(event);
@@ -43688,6 +43745,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     let refreshFrame = 0;
     let runtimeObserver = null;
     const eventStops = [];
+    const removeButtonFeedback = installGlobalButtonFeedback();
 	    const schedulePhoneVariableRefresh = () => {
 	      if (runtimeDisposed) return;
 	      if (!syncLatestPhoneVariableViewVisibility()) return;
@@ -43713,6 +43771,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       window.removeEventListener("focus", schedulePhoneVariableRefresh);
       window.removeEventListener("pagehide", disposeRuntime);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      removeButtonFeedback();
       if (window.__ST_HYPNOOS_REFRESH_FRONTEND__ === schedulePhoneVariableRefresh) delete window.__ST_HYPNOOS_REFRESH_FRONTEND__;
       if (window.__ST_HYPNOOS_RUNTIME_DISPOSE__ === disposeRuntime) delete window.__ST_HYPNOOS_RUNTIME_DISPOSE__;
     };

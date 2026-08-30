@@ -4,7 +4,7 @@ import { HYPNOSIS_RULES_API } from './hypnosis-rules.js';
 const BRIDGE_KEY = '__HYPNOOS3_CORE_BRIDGE__';
 const SINGLETON_KEY = '__HYPNOOS3_EXTENSION_FLOATING_SINGLETON__';
 const HOST_ID = 'hypnoos3-extension-floating-phone-host';
-const FRONTEND_REVISION = 'hypnoos3-1.0.0-character-action-sprites';
+const FRONTEND_REVISION = 'hypnoos3-1.0.0-worldbook-dialogs';
 
 function phoneFrame() {
   return document.querySelector(`#${HOST_ID}`)?.shadowRoot?.querySelector('iframe.phone') || null;
@@ -143,6 +143,7 @@ export class FloatingHost {
       getCharWorldbookNames() { return dataService.getCharacterWorldbookNames(); },
       getWorldbook(name) { return dataService.getWorldbook(name); },
       getArchiveWorldbookOptions() { return dataService.getArchiveWorldbookOptions(); },
+      requestArchiveWorldbookAction(options) { return host.requestArchiveWorldbookAction(options || {}); },
       configureArchiveWorldbook(options) { return dataService.configureArchiveWorldbook(options || {}); },
       syncArchiveFromLatestReply(options) { return dataService.syncArchiveFromLatestReply(options || {}); },
       generateRaw(options) { return host.generateRaw(options || {}); },
