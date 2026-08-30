@@ -37,6 +37,10 @@ function ownedEntries(book) {
   return Object.values(book.entries || {}).filter((entry) => entry?.extensions?.hypnoosArchive?.owner === 'hypnoos3-archive');
 }
 
+function hypnosisRuleEntries(book) {
+  return Object.values(book.entries || {}).filter((entry) => entry?.extensions?.hypnoosRules?.owner === 'hypnoos3-hypnosis-rules');
+}
+
 test('dedicated archive worldbook persists reply state without MVU and migrates only owned entries', async () => {
   const host = new FakeHost();
   const store = new FakeStore();
@@ -45,6 +49,31 @@ test('dedicated archive worldbook persists reply state without MVU and migrates 
   const binding = await service.configure({ mode: 'dedicated' });
   assert.equal(host.chatWorldbook, binding.worldbookName);
   assert.equal(ownedEntries(host.books.get(binding.worldbookName)).length, 2);
+  assert.equal(binding.rulesetVersion, '4.3.0-hypnoos.5');
+  const builtInRules = hypnosisRuleEntries(host.books.get(binding.worldbookName));
+  assert.equal(builtInRules.length, 1);
+  assert.equal(builtInRules[0].comment, '[HypnoOS内置]催眠规则');
+  assert.equal(builtInRules[0].constant, true);
+  assert.equal(builtInRules[0].position, 0);
+  assert.equal(builtInRules[0].order, 17);
+  assert.equal(builtInRules[0].ignoreBudget, true);
+  assert.equal(builtInRules[0].excludeRecursion, true);
+  assert.equal(builtInRules[0].preventRecursion, true);
+  assert.equal(builtInRules[0].useProbability, false);
+  assert.deepEqual(builtInRules[0].key, ['HypnoOS', '催眠手机', '催眠规则']);
+  assert.match(builtInRules[0].content, /<HypnoOS催眠规则.+source-count="2">/);
+  assert.match(builtInRules[0].content, /只对人类生效/);
+
+  await service.configure({ mode: 'selected', worldbookName: binding.worldbookName });
+  assert.equal(hypnosisRuleEntries(host.books.get(binding.worldbookName)).length, 1);
+
+  const deactivated = await service.deactivateRules();
+  assert.equal(deactivated.ok, true);
+  assert.equal(hypnosisRuleEntries(host.books.get(binding.worldbookName)).length, 0);
+  assert.equal(ownedEntries(host.books.get(binding.worldbookName)).length, 2);
+  const activated = await service.activateRules();
+  assert.equal(activated.ok, true);
+  assert.equal(hypnosisRuleEntries(host.books.get(binding.worldbookName)).length, 1);
 
   const synced = await service.syncLatestReply({ knownRoles: ['林遥'] });
   assert.equal(synced.ok, true);
@@ -57,6 +86,27 @@ test('dedicated archive worldbook persists reply state without MVU and migrates 
   await service.configure({ mode: 'selected', worldbookName: '迁移目标' });
   assert.equal(host.chatWorldbook, '迁移目标');
   assert.equal(ownedEntries(host.books.get(oldName)).length, 0);
+  assert.equal(hypnosisRuleEntries(host.books.get(oldName)).length, 0);
   assert.equal(ownedEntries(host.books.get('迁移目标')).length, 2);
+  assert.equal(hypnosisRuleEntries(host.books.get('迁移目标')).length, 1);
   assert.equal(Object.values(host.books.get('迁移目标').entries).some((entry) => entry.comment === '玩家原条目' && entry.content === '必须保留'), true);
+});
+
+test('built-in hypnosis rules preserve array-shaped worldbook format', async () => {
+  const host = new FakeHost();
+  host.books.set('数组世界书', { entries: [{ uid: 4, comment: '玩家数组条目', content: '保持数组', extensions: {} }], extensions: { custom: true } });
+  const store = new FakeStore();
+  const service = new ArchiveWorldbookService(host, store);
+
+  await service.configure({ mode: 'selected', worldbookName: '数组世界书' });
+  const saved = host.books.get('数组世界书');
+  assert.equal(Array.isArray(saved.entries), true);
+  assert.equal(saved.extensions.custom, true);
+  assert.equal(saved.entries.some((entry) => entry.comment === '玩家数组条目' && entry.content === '保持数组'), true);
+  assert.equal(hypnosisRuleEntries(saved).length, 1);
+  await service.deactivateRules();
+  const deactivated = host.books.get('数组世界书');
+  assert.equal(Array.isArray(deactivated.entries), true);
+  assert.equal(hypnosisRuleEntries(deactivated).length, 0);
+  assert.equal(deactivated.entries.some((entry) => entry.comment === '玩家数组条目'), true);
 });

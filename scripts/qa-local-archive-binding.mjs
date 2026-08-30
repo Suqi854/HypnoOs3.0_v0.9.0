@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import { getHypnosisRules } from '../src/hypnosis-rules.js';
 
 const modules = process.env.CODEX_NODE_MODULES;
 if (!modules) throw new Error('请设置 CODEX_NODE_MODULES 为包含 playwright 的 node_modules 路径');
@@ -14,13 +15,28 @@ page.on('pageerror', (error) => errors.push(String(error?.stack || error)));
 
 try {
   await page.goto(process.env.HYPNOOS_ST_URL || 'http://127.0.0.1:8000/', { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => Array.from(document.querySelectorAll('#rm_print_characters_block .character_select[data-chid]')).some((node) => Number.isInteger(Number(node.getAttribute('data-chid')))), null, { timeout: 30_000 });
+  const initialRuntime = await page.evaluate(() => {
+    const st = globalThis.SillyTavern?.getContext?.();
+    return { characterId: st?.characterId, chatId: st?.chatId };
+  });
+  if (!Number.isInteger(Number(initialRuntime.characterId)) || !initialRuntime.chatId) {
+    await page.evaluate(() => {
+      const card = Array.from(document.querySelectorAll('#rm_print_characters_block .character_select[data-chid]')).find((node) => Number.isInteger(Number(node.getAttribute('data-chid'))));
+      card?.click();
+    });
+    await page.waitForFunction(() => {
+      const st = globalThis.SillyTavern?.getContext?.();
+      return Number.isInteger(Number(st?.characterId)) && Boolean(st?.chatId);
+    }, null, { timeout: 30_000 });
+  }
   await page.waitForFunction(() => document.querySelector('#hypnoos3-extension-floating-phone-host')?.shadowRoot?.querySelector('.panel'), null, { timeout: 30_000 });
   await page.evaluate(() => globalThis.__HYPNOOS3_EXTENSION_FLOATING_SINGLETON__?.openPhone?.());
   await page.waitForTimeout(800);
   const frame = page.frames().find((candidate) => candidate !== page.mainFrame());
   assert.ok(frame, '本地酒馆没有加载 HypnoOS 手机 iframe');
   await frame.waitForFunction(() => typeof globalThis.getArchiveWorldbookOptions === 'function' && typeof globalThis.configureArchiveWorldbook === 'function', null, { timeout: 30_000 });
-  const options = await frame.evaluate(() => globalThis.getArchiveWorldbookOptions());
+  let options = await frame.evaluate(() => globalThis.getArchiveWorldbookOptions());
   assert.equal(await frame.locator('.st-archive-bind-overlay').count(), 0, '手机打开时不应自动弹出档案存储界面');
   assert.equal(await frame.evaluate(() => typeof globalThis.__ST_ENSURE_ARCHIVE_BINDING_PROMPT__), 'undefined');
 
@@ -39,6 +55,96 @@ try {
   }));
   assert.ok(order.binding >= 0 && order.binding < order.archive, '档案世界书绑定模块没有位于档案设置之前');
 
+  const targetName = String(options?.binding?.worldbookName || options?.names?.find((name) => String(name).startsWith('HypnoOS档案 - ')) || '');
+  const configured = await frame.evaluate(async (name) => {
+    if (name) await globalThis.configureArchiveWorldbook({ mode: 'selected', worldbookName: name });
+    else await globalThis.configureArchiveWorldbook({ mode: 'dedicated' });
+    return globalThis.getArchiveWorldbookOptions();
+  }, targetName);
+  const binding = configured?.binding;
+  assert.ok(binding?.worldbookName, '真实酒馆没有建立可写世界书绑定');
+  await frame.evaluate((name) => globalThis.configureArchiveWorldbook({ mode: 'selected', worldbookName: name }), binding.worldbookName);
+  options = await frame.evaluate(() => globalThis.getArchiveWorldbookOptions());
+  assert.equal(options?.binding?.rulesetVersion, getHypnosisRules().version);
+  await page.evaluate(() => globalThis.SillyTavern?.getContext?.()?.saveMetadata?.());
+
+  const runtimeRules = await page.evaluate(async (worldbookName) => {
+    const st = globalThis.SillyTavern?.getContext?.();
+    const book = await st?.loadWorldInfo?.(worldbookName);
+    const entries = Array.isArray(book?.entries) ? book.entries : Object.values(book?.entries || {});
+    const rules = entries.filter((entry) => entry?.extensions?.hypnoosRules?.owner === 'hypnoos3-hypnosis-rules');
+    const scanChat = Array.isArray(st?.chat) ? st.chat.map((message) => String(message?.mes || message?.message || '')).reverse() : [];
+    const worldInfoPrompt = await st?.getWorldInfoPrompt?.(scanChat, 32_768, true);
+    return {
+      entryCount: rules.length,
+      entry: rules[0] || null,
+      runtimePrompt: String(st?.extensionPrompts?.['hypnoos3-runtime-state']?.value || ''),
+      worldInfoPrompt: String(worldInfoPrompt?.worldInfoString || ''),
+    };
+  }, binding.worldbookName);
+  assert.equal(runtimeRules.entryCount, 1, '真实世界书中的内置催眠规则不是唯一条目');
+  assert.equal(runtimeRules.entry.comment, '[HypnoOS内置]催眠规则');
+  assert.equal(runtimeRules.entry.constant, true);
+  assert.equal(runtimeRules.entry.position, 0);
+  assert.equal(runtimeRules.entry.order, 17);
+  assert.equal(runtimeRules.entry.ignoreBudget, true);
+  assert.equal(runtimeRules.entry.preventRecursion, true);
+  assert.equal(runtimeRules.entry.useProbability, false);
+  assert.match(runtimeRules.entry.content, /<HypnoOS催眠规则.+source-count="2">/);
+  assert.match(runtimeRules.entry.content, /只对人类生效/);
+  assert.match(runtimeRules.entry.content, /主角可疑度反映环境/);
+  for (const command of getHypnosisRules().commands) assert.ok(runtimeRules.entry.content.includes(`${command.id}｜${command.tier}｜${command.title}`), `真实世界书缺少催眠指令：${command.id}`);
+  assert.doesNotMatch(runtimeRules.runtimePrompt, /<HypnoOS催眠规则/, '绑定世界书后扩展提示仍重复注入催眠规则');
+  assert.equal((runtimeRules.worldInfoPrompt.match(/<HypnoOS催眠规则/g) || []).length, 1, '真实酒馆 World Info 扫描没有且仅有一份催眠规则');
+  assert.match(runtimeRules.worldInfoPrompt, /vip5_permanent_personality｜VIP5｜永久人格植入/);
+
+  const chatSwitch = await page.evaluate(async () => {
+    const st = globalThis.SillyTavern?.getContext?.();
+    const character = st?.characters?.[st?.characterId];
+    const response = await fetch('/api/characters/chats', {
+      method: 'POST',
+      headers: st.getRequestHeaders(),
+      body: JSON.stringify({ avatar_url: character?.avatar }),
+    });
+    const data = response.ok ? await response.json() : {};
+    return {
+      originalChatId: String(st?.chatId || ''),
+      candidates: Object.values(data || {}).map((item) => String(item?.file_name || '')).filter((name) => name && name !== st?.chatId),
+    };
+  });
+  assert.ok(chatSwitch.originalChatId && chatSwitch.candidates.length, '真实酒馆当前角色没有第二个聊天，无法验证规则退出删除/进入加载');
+  let exitVerified = false;
+  let switchedChatId = '';
+  try {
+    for (const candidate of chatSwitch.candidates.slice(0, 8)) {
+      await page.evaluate((chatId) => globalThis.SillyTavern.getContext().openCharacterChat(chatId), candidate);
+      await page.waitForFunction((chatId) => globalThis.SillyTavern?.getContext?.()?.chatId === chatId, candidate, { timeout: 30_000 });
+      try {
+        await page.waitForFunction(async (worldbookName) => {
+          const st = globalThis.SillyTavern?.getContext?.();
+          const book = await st?.loadWorldInfo?.(worldbookName);
+          const entries = Array.isArray(book?.entries) ? book.entries : Object.values(book?.entries || {});
+          const rules = entries.filter((entry) => entry?.extensions?.hypnoosRules?.owner === 'hypnoos3-hypnosis-rules');
+          const archives = entries.filter((entry) => entry?.extensions?.hypnoosArchive?.owner === 'hypnoos3-archive');
+          return rules.length === 0 && archives.length === 2;
+        }, binding.worldbookName, { timeout: 5_000 });
+        exitVerified = true;
+        switchedChatId = candidate;
+        break;
+      } catch {}
+    }
+  } finally {
+    await page.evaluate((chatId) => globalThis.SillyTavern.getContext().openCharacterChat(chatId), chatSwitch.originalChatId);
+    await page.waitForFunction((chatId) => globalThis.SillyTavern?.getContext?.()?.chatId === chatId, chatSwitch.originalChatId, { timeout: 30_000 });
+  }
+  assert.equal(exitVerified, true, '离开绑定聊天后，内置催眠规则未自动删除或档案条目被误删');
+  await page.waitForFunction(async (worldbookName) => {
+    const st = globalThis.SillyTavern?.getContext?.();
+    const book = await st?.loadWorldInfo?.(worldbookName);
+    const entries = Array.isArray(book?.entries) ? book.entries : Object.values(book?.entries || {});
+    return entries.filter((entry) => entry?.extensions?.hypnoosRules?.owner === 'hypnoos3-hypnosis-rules').length === 1;
+  }, binding.worldbookName, { timeout: 30_000 });
+
   const closeResults = await page.evaluate(() => {
     const registry = globalThis.__HYPNOOS3_EXTENSION_FLOATING_SINGLETON__;
     const host = document.querySelector('#hypnoos3-extension-floating-phone-host');
@@ -55,7 +161,7 @@ try {
   });
   assert.deepEqual(closeResults, { afterResize: true, afterDrag: true, afterOutside: false });
   assert.equal(errors.length, 0, errors.join('\n'));
-  console.log('PASS local SillyTavern archive binding and stored-mode outside close', { bound: Boolean(options?.binding?.worldbookName), closeResults });
+  console.log('PASS local SillyTavern plug-and-play hypnosis worldbook rule and stored-mode outside close', { worldbookName: binding.worldbookName, switchedChatId, rulesetVersion: options.binding.rulesetVersion, commands: getHypnosisRules().commands.length, closeResults });
 } finally {
   await browser.close();
 }

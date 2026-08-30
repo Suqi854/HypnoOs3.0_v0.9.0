@@ -14,15 +14,22 @@ import {
   registerHypnosisRules,
 } from '../src/hypnosis-rules.js';
 
-test('v4.3 hypnosis ruleset is complete, versioned and immutable to callers', () => {
+test('initial and v4.3 hypnosis rules form one complete versioned ruleset', () => {
   const rules = getHypnosisRules();
   assert.equal(rules.schema, 'HypnosisRules/v1');
   assert.equal(rules.version, DEFAULT_HYPNOSIS_RULESET_VERSION);
-  assert.equal(rules.source.sha256, '9A24EA8BDD96AC5031323B7BF1006D53EB91B56510ADA7C70A186B59D938C74A');
+  assert.deepEqual(rules.source.files.map(({ name, sha256 }) => ({ name, sha256 })), [
+    { name: '催眠APP初版', sha256: 'AA53A0E42455FC0E0FB1E163B948945F89832D7F15A6CE20249B533857CEFBCD' },
+    { name: '催眠app二改 v4.3（louisHM 完全免费）', sha256: '9A24EA8BDD96AC5031323B7BF1006D53EB91B56510ADA7C70A186B59D938C74A' },
+  ]);
+  assert.deepEqual(rules.source.files[0].reviewedEntryIds, [8, 14, 15, 20, 25, 27, 28, 30, 32]);
+  assert.deepEqual(rules.source.files[1].reviewedEntryIds, [3, 8, 14, 15, 20, 27, 30, 40, 41, 48, 49, 55, 56, 57, 58, 117, 209, 210, 218, 220, 221, 223]);
   assert.equal(rules.commands.length, 36);
   assert.equal(new Set(rules.commands.map((item) => item.id)).size, 36);
   assert.ok(rules.coreRules.length >= 20);
   assert.ok(rules.parameterRules.length >= 6);
+  const normalized = [...rules.coreRules, ...rules.parameterRules, ...rules.commands.map((item) => item.rule)].map((item) => item.replace(/\s+/g, ''));
+  assert.equal(new Set(normalized).size, normalized.length);
   rules.commands.length = 0;
   assert.equal(getHypnosisRules().commands.length, 36);
 });
@@ -75,7 +82,7 @@ test('MC recharge bills only the quantity that can fit below the energy cap', ()
 
 test('full hypnosis prompt includes every enforcement section and command', () => {
   const prompt = buildHypnosisRulePrompt();
-  for (const marker of ['<核心规则>', '<参数与强度>', '<催眠指令白名单>', '<结果分类>', '<输出硬检查>', '最新真实用户消息', '成功必须原子结算', 'JSON Patch只允许', '取消当前催眠不能删除永久效果']) assert.ok(prompt.includes(marker), `missing prompt rule: ${marker}`);
+  for (const marker of ['<核心规则>', '<参数与强度>', '<催眠指令白名单>', '<结果分类>', '<输出硬检查>', '最新真实用户消息', '成功必须原子结算', 'JSON Patch只允许', '取消当前催眠不能删除永久效果', '只对人类生效', '人类无法察觉的声波', '不得默认让目标失忆', '在线下不会直接遇到另一个催眠APP使用者', '主角可疑度反映环境', '地点常识规则与角色催眠效果严格分离']) assert.ok(prompt.includes(marker), `missing prompt rule: ${marker}`);
   for (const item of getHypnosisRules().commands) assert.ok(prompt.includes(`${item.id}｜${item.tier}｜${item.title}`), `missing command: ${item.id}`);
   assert.match(prompt, /permanent-hypnosis-trigger.+永久催眠效果/);
   assert.ok(prompt.includes('/角色/<目标>/效果/催眠扳机/<催眠扳机>'));

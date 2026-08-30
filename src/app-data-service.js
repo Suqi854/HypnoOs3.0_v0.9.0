@@ -80,4 +80,6 @@ export class AppDataService {
   getArchiveWorldbookOptions() { return this.archiveWorldbooks.options(); }
   configureArchiveWorldbook(options) { return this.archiveWorldbooks.configure(options); }
   syncArchiveFromLatestReply(options) { return this.archiveWorldbooks.syncLatestReply(options); }
+  activateArchiveWorldbookRules() { return this.archiveWorldbooks.activateRules(); }
+  deactivateArchiveWorldbookRules() { return this.archiveWorldbooks.deactivateRules(); }
 }

@@ -1,7 +1,10 @@
 import { clone, isRecord, stableStringify } from './utils.js';
+import { buildHypnosisRulePrompt, DEFAULT_HYPNOSIS_RULESET_VERSION } from './hypnosis-rules.js';
 
 const OWNER = 'hypnoos3-archive';
+const RULES_OWNER = 'hypnoos3-hypnosis-rules';
 const BINDING_KEY = 'archiveWorldbookBinding';
+const RULES_COMMENT = '[HypnoOS内置]催眠规则';
 const ARCHIVE_COMMENT = '[HypnoOS档案]人物状态';
 const CONTEXT_COMMENT = '[HypnoOS档案]剧情与催眠上下文';
 
@@ -22,6 +25,10 @@ function entryMap(book) {
 function managed(entry, chatKey) {
   const meta = entry?.extensions?.hypnoosArchive;
   return meta?.owner === OWNER && String(meta.chatKey || '') === String(chatKey || '');
+}
+
+function managedRules(entry) {
+  return entry?.extensions?.hypnoosRules?.owner === RULES_OWNER;
 }
 
 function nextUid(entries) {
@@ -51,9 +58,43 @@ function makeEntry(uid, comment, content, chatKey, constant = false) {
   };
 }
 
+function makeRulesEntry(uid) {
+  const entry = makeEntry(uid, RULES_COMMENT, buildHypnosisRulePrompt(), '', true);
+  entry.key = ['HypnoOS', '催眠手机', '催眠规则'];
+  entry.order = 17;
+  entry.ignoreBudget = true;
+  entry.excludeRecursion = true;
+  entry.preventRecursion = true;
+  entry.useProbability = false;
+  delete entry.extensions.hypnoosArchive;
+  entry.extensions.hypnoosRules = {
+    owner: RULES_OWNER,
+    schemaVersion: 1,
+    rulesetVersion: DEFAULT_HYPNOSIS_RULESET_VERSION,
+  };
+  return entry;
+}
+
+function replaceRulesEntry(book) {
+  const mapped = entryMap(book);
+  const current = entriesOf(mapped.source).filter((entry) => !managedRules(entry));
+  const next = [...current, makeRulesEntry(nextUid(current))];
+  if (mapped.array) mapped.source.entries = next;
+  else mapped.source.entries = Object.fromEntries(next.map((entry, index) => [String(entry.uid ?? index), entry]));
+  return mapped.source;
+}
+
+function removeRulesEntry(book) {
+  const mapped = entryMap(book);
+  const next = entriesOf(mapped.source).filter((entry) => !managedRules(entry));
+  if (mapped.array) mapped.source.entries = next;
+  else mapped.source.entries = Object.fromEntries(next.map((entry, index) => [String(entry.uid ?? index), entry]));
+  return mapped.source;
+}
+
 function replaceManagedEntries(book, chatKey, records, contextText) {
   const mapped = entryMap(book);
-  const current = entriesOf(mapped.source).filter((entry) => !managed(entry, chatKey));
+  const current = entriesOf(mapped.source).filter((entry) => !managed(entry, chatKey) && !managedRules(entry));
   let uid = nextUid(current);
   const archiveContent = [
     '<HypnoOS人物档案存储>',
@@ -69,6 +110,7 @@ function replaceManagedEntries(book, chatKey, records, contextText) {
   ].join('\n');
   const next = [
     ...current,
+    makeRulesEntry(uid++),
     makeEntry(uid++, ARCHIVE_COMMENT, archiveContent, chatKey, false),
     makeEntry(uid++, CONTEXT_COMMENT, contextContent, chatKey, true),
   ];
@@ -130,6 +172,7 @@ export class ArchiveWorldbookService {
     this.host = host;
     this.store = store;
     this.syncing = null;
+    this.activeRulesBinding = null;
   }
 
   getBinding() {
@@ -186,6 +229,8 @@ export class ArchiveWorldbookService {
     await this.host.saveWorldbook(targetName, targetBook);
     const verify = await this.host.loadWorldbook(targetName);
     if (entriesOf(verify).filter((entry) => managed(entry, chatKey)).length !== 2) throw new Error('目标世界书写后校验失败，未更改绑定。');
+    const ruleEntries = entriesOf(verify).filter(managedRules);
+    if (ruleEntries.length !== 1 || ruleEntries[0].comment !== RULES_COMMENT || ruleEntries[0].content !== buildHypnosisRulePrompt()) throw new Error('目标世界书催眠规则写后校验失败，未更改绑定。');
     const previousChatWorldbook = this.host.getChatWorldbookName?.() || '';
     if (mode === 'character') {
       if (previous?.mode !== 'character' && previousChatWorldbook === previous?.worldbookName) await this.host.bindChatWorldbook?.('');
@@ -193,14 +238,41 @@ export class ArchiveWorldbookService {
       await this.host.bindChatWorldbook?.(targetName);
     }
     await this.store.update((state) => {
-      state.custom[BINDING_KEY] = { schemaVersion: 1, chatKey, mode: mode === 'character' ? 'character' : 'dedicated', worldbookName: targetName, prompted: true, previousChatWorldbook: previous?.previousChatWorldbook || previousChatWorldbook, lastSyncedMessageId: previous?.lastSyncedMessageId || '' };
+      state.custom[BINDING_KEY] = { schemaVersion: 1, chatKey, mode: mode === 'character' ? 'character' : 'dedicated', worldbookName: targetName, prompted: true, rulesetVersion: DEFAULT_HYPNOSIS_RULESET_VERSION, previousChatWorldbook: previous?.previousChatWorldbook || previousChatWorldbook, lastSyncedMessageId: previous?.lastSyncedMessageId || '' };
       return state;
     }, 'archive-worldbook-bind');
+    this.activeRulesBinding = { worldbookName: targetName };
     if (previous?.worldbookName && previous.worldbookName !== targetName) {
       const oldBook = await this.host.loadWorldbook(previous.worldbookName);
-      await this.host.saveWorldbook(previous.worldbookName, removeManagedEntries(oldBook, previous.chatKey || chatKey));
+      await this.host.saveWorldbook(previous.worldbookName, removeRulesEntry(removeManagedEntries(oldBook, previous.chatKey || chatKey)));
     }
     return this.getBinding();
+  }
+
+  async activateRules() {
+    const binding = this.getBinding();
+    if (!binding?.worldbookName) {
+      this.activeRulesBinding = null;
+      return { ok: false, reason: 'not-bound' };
+    }
+    const book = await this.host.loadWorldbook(binding.worldbookName);
+    await this.host.saveWorldbook(binding.worldbookName, replaceRulesEntry(book));
+    const verify = await this.host.loadWorldbook(binding.worldbookName);
+    const rules = entriesOf(verify).filter(managedRules);
+    if (rules.length !== 1 || rules[0].content !== buildHypnosisRulePrompt()) throw new Error('进入聊天时加载内置催眠规则失败。');
+    this.activeRulesBinding = { worldbookName: binding.worldbookName };
+    return { ok: true, worldbookName: binding.worldbookName };
+  }
+
+  async deactivateRules() {
+    const binding = this.activeRulesBinding || this.getBinding();
+    this.activeRulesBinding = null;
+    if (!binding?.worldbookName) return { ok: false, reason: 'not-bound' };
+    const book = await this.host.loadWorldbook(binding.worldbookName);
+    await this.host.saveWorldbook(binding.worldbookName, removeRulesEntry(book));
+    const verify = await this.host.loadWorldbook(binding.worldbookName);
+    if (entriesOf(verify).some(managedRules)) throw new Error('退出聊天时删除内置催眠规则失败。');
+    return { ok: true, worldbookName: binding.worldbookName };
   }
 
   async syncLatestReply({ knownRoles = [] } = {}) {
@@ -226,7 +298,7 @@ export class ArchiveWorldbookService {
         try { sourceBooks.push(await this.host.loadWorldbook(name)); } catch {}
       }
     } catch {}
-    const sourceExcerpt = sourceBooks.flatMap((source) => entriesOf(source)).filter((entry) => !managed(entry, binding.chatKey)).slice(0, 40)
+    const sourceExcerpt = sourceBooks.flatMap((source) => entriesOf(source)).filter((entry) => !managed(entry, binding.chatKey) && !managedRules(entry)).slice(0, 40)
       .map((entry) => `${String(entry.comment || '').slice(0, 120)}\n${String(entry.content || '').slice(0, 800)}`).join('\n\n').slice(0, 16000);
     const stateRoles = Object.values(this.store.state.roles || {}).map((role) => ({ name: role.name, variables: role.variables }));
     const prompt = [
@@ -258,6 +330,7 @@ export class ArchiveWorldbookService {
         state.custom[BINDING_KEY].lastSyncedMessageId = messageId;
         state.custom[BINDING_KEY].lastSyncedAt = new Date().toISOString();
         state.custom[BINDING_KEY].lastRoleCount = records.length;
+        state.custom[BINDING_KEY].rulesetVersion = DEFAULT_HYPNOSIS_RULESET_VERSION;
       }
       return state;
     }, 'archive-worldbook-sync');

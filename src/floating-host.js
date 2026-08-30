@@ -10,6 +10,10 @@ function phoneFrame() {
   return document.querySelector(`#${HOST_ID}`)?.shadowRoot?.querySelector('iframe.phone') || null;
 }
 
+export function shouldSyncArchiveReply(type) {
+  return String(type || '') !== 'first_message';
+}
+
 export function createStateBridge(host, dataService) {
   return {
     getVariables: () => dataService.readLegacyVariables(),
@@ -59,6 +63,7 @@ export class FloatingHost {
     const chatChangedEvent = context?.eventTypes?.CHAT_CHANGED;
     if (receivedEvent && context?.eventSource) {
       const onDialogueRoundEnded = (...args) => {
+        if (!shouldSyncArchiveReply(args[1])) return;
         emitBridgeEvent('HYPNOOS3_DIALOGUE_ROUND_ENDED', { args });
         this.dataService.syncArchiveFromLatestReply().catch((error) => console.warn('[HypnoOS3] 每轮人物档案同步失败', error));
       };

@@ -45,6 +45,11 @@ class Runtime {
     );
 
     this.floatingHost = await new FloatingHost(this.host, this.store).start();
+    try {
+      await this.floatingHost.dataService.activateArchiveWorldbookRules();
+    } catch (error) {
+      console.warn('[HypnoOS3] 进入聊天时加载即插即用催眠规则失败', error);
+    }
     globalThis.__HYPNOOS3_HYPNOSIS_RULES__ = HYPNOSIS_RULES_API;
     this.disposers.push(() => {
       if (globalThis.__HYPNOOS3_HYPNOSIS_RULES__ === HYPNOSIS_RULES_API) delete globalThis.__HYPNOOS3_HYPNOSIS_RULES__;
@@ -53,7 +58,17 @@ class Runtime {
     const context = this.host.context;
     const chatChanged = context?.eventTypes?.CHAT_CHANGED;
     if (chatChanged && context?.eventSource) {
-      const reload = async () => { await this.store.initialize(); };
+      const transition = async () => {
+        try { await this.floatingHost.dataService.deactivateArchiveWorldbookRules(); }
+        catch (error) { console.warn('[HypnoOS3] 退出聊天时删除即插即用催眠规则失败', error); }
+        await this.store.initialize();
+        try { await this.floatingHost.dataService.activateArchiveWorldbookRules(); }
+        catch (error) { console.warn('[HypnoOS3] 进入聊天时加载即插即用催眠规则失败', error); }
+      };
+      const reload = () => {
+        this.chatTransition = (this.chatTransition || Promise.resolve()).then(transition)
+          .catch((error) => console.warn('[HypnoOS3] 聊天切换状态重载失败', error));
+      };
       context.eventSource.on(chatChanged, reload);
       this.disposers.push(() => context.eventSource.removeListener(chatChanged, reload));
     }

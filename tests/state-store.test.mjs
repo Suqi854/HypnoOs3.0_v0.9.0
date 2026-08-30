@@ -39,12 +39,13 @@ class StubHost {
     this.saved = saved;
     this.snapshots = snapshots;
     this.readCount = 0;
+    this.promptText = '';
   }
 
   loadChatState() { return structuredClone(this.saved); }
   async readOptionalRuntimeState() { this.readCount += 1; return structuredClone(this.snapshots); }
   async saveChatState(value) { this.saved = structuredClone(value); return true; }
-  setPromptText() {}
+  setPromptText(value) { this.promptText = String(value || ''); }
   async writeOptionalRuntimeState() {}
 }
 
@@ -79,6 +80,24 @@ test('startup migrates legacy runtime data once when HypnoState is absent', asyn
   assert.equal(Object.values(state.roles)[0].name, '旧角色');
   assert.equal(state.custom.legacyVariables.系统.外部字段, '保留');
   assert.equal(host.saved.schema, 'HypnoState/v1');
+});
+
+test('bound worldbook owns the hypnosis prompt exactly once', async () => {
+  const unboundHost = new StubHost({ saved: createDefaultState(getRegionPack('cn')) });
+  const unboundStore = new StateStore(unboundHost, new MemorySettings());
+  await unboundStore.initialize();
+  assert.match(unboundHost.promptText, /<HypnoOS催眠规则/);
+
+  const boundState = createDefaultState(getRegionPack('cn'));
+  boundState.custom.archiveWorldbookBinding = {
+    worldbookName: 'HypnoOS档案 - 测试',
+    rulesetVersion: '4.3.0-hypnoos.5',
+  };
+  const boundHost = new StubHost({ saved: boundState });
+  const boundStore = new StateStore(boundHost, new MemorySettings());
+  await boundStore.initialize();
+  assert.doesNotMatch(boundHost.promptText, /<HypnoOS催眠规则/);
+  assert.match(boundHost.promptText, /HypnoOS3 当前状态/);
 });
 
 test('saved compatibility fields leave the runtime namespace and empty fixed dispatch slots are removed', async () => {

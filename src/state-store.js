@@ -1,5 +1,5 @@
 import { createDefaultState, fromLegacyVariables, makeOperation, normalizeState, toLegacyVariables } from './contracts.js';
-import { buildHypnosisRulePrompt } from './hypnosis-rules.js';
+import { buildHypnosisRulePrompt, DEFAULT_HYPNOSIS_RULESET_VERSION } from './hypnosis-rules.js';
 import { findLegacyVariables, mergeLegacyVariables, migrateStateCompatibility } from './legacy-adapter.js';
 import { getRegionPack } from './regions.js';
 import { clone, stableStringify } from './utils.js';
@@ -149,8 +149,9 @@ export class StateStore extends EventTarget {
   buildPromptProjection() {
     const state = this.#state;
     const roles = Object.values(state.roles).map((role) => ({ id: role.id, name: role.name, variables: role.variables }));
+    const rulesStoredInBoundWorldbook = state.custom?.archiveWorldbookBinding?.rulesetVersion === DEFAULT_HYPNOSIS_RULESET_VERSION;
     return [
-      buildHypnosisRulePrompt(),
+      rulesStoredInBoundWorldbook ? '' : buildHypnosisRulePrompt(),
       '[HypnoOS3 当前状态；仅在剧情相关时使用]',
       JSON.stringify({ time: state.time, location: state.location.current, resources: state.resources, roles, tasks: state.tasks, activeEffects: state.hypnosis.activeEffects }),
     ].filter(Boolean).join('\n');

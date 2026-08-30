@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { shouldSyncArchiveReply } from '../src/floating-host.js';
 import { HostAdapter } from '../src/host-adapter.js';
 
 test('reads current character worldbook binding and latest message variables without writing', async () => {
@@ -20,6 +21,12 @@ test('reads current character worldbook binding and latest message variables wit
   assert.equal((await host.loadWorldbook('主世界书')).name, '主世界书');
   assert.equal(host.readMvu({ type: 'message', message_id: 'latest' }).stat_data.系统.MC能量, 42);
   delete globalThis.SillyTavern;
+});
+
+test('loading a chat greeting does not trigger archive model synchronization', () => {
+  assert.equal(shouldSyncArchiveReply('first_message'), false);
+  assert.equal(shouldSyncArchiveReply('normal'), true);
+  assert.equal(shouldSyncArchiveReply('swipe'), true);
 });
 
 test('converts an embedded character book read-only when no linked book exists', async () => {
