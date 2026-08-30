@@ -20,9 +20,10 @@
 - 项目版本：`1.0.0`（见 `package.json`）
 - 发布仓库名称仍为：`HypnoOs3.0_v0.9.0`
 - 远端：`https://github.com/Suqi854/HypnoOs3.0_v0.9.0.git`
-- 最新功能提交：`37b062d5bb38b8f621d9ab12a2150f3a66e7bb23`
+- 最新功能提交：`e7093143193bcf25ab7881d1d4f4a6005e107e73`
 - 本文件提交并推送后，必须用 `git ls-remote origin refs/heads/main` 重新记录远端 SHA。
 - 当前关键提交：
+  - `e709314 feat: add plug-and-play hypnosis worldbook rules`
   - `37b062d fix: keep archive binding in settings only`
   - `2ddc6f4 feat: bind persistent archives to worldbooks`
   - `c7af677 fix: store phone on outside click`
@@ -80,14 +81,17 @@
 - 每轮 AI 回复会用回复内容更新档案；MVU 仅作为结构化校正，没有 MVU 时仍可按回复更新。
 - 档案和催眠剧情上下文写入绑定世界书；迁移只删除旧世界书中由 HypnoOS 管理的档案条目。
 - 不再在新卡或新对话时自动弹出档案存储界面；绑定功能只保留在设置页。
+- 已完整审计 `催眠APP初版.json` 与 `催眠app二改 v4.3（louisHM 完全免费）.json` 的催眠规则，按现有 `HypnosisRules/v1` 格式合并为无重复规则集；保留 36 条催眠指令并登记两份来源 SHA-256 与审计条目 ID。
+- 玩家在设置中绑定档案存储世界书后，进入该聊天会自动写入唯一的 `[HypnoOS内置]催眠规则` 条目；离开该聊天只删除该临时规则，人物档案、剧情上下文和玩家原条目继续保留；返回聊天后自动恢复规则。
+- 绑定世界书承载催眠规则时，扩展提示不会重复注入同一规则；酒馆加载旧聊天首条问候不会误触发档案模型同步。
 
 ### 最近一次真实宿主结果
 
-- `npm test`：65/65 通过。
+- `npm test`：68/68 通过。
 - `npm run check`：通过。
 - `npm run build`：通过，生成 `HypnoOS3.0-v1.0.0.zip`，308 个文件。
 - UI 基线：`6faf6676007dccffbf58cae0326880af4a05860dece8736fc97c695e698356d5`。
-- 本地真实酒馆档案绑定与收纳 QA：通过；确认无自动档案弹窗、设置页三种绑定操作存在、缩放和拖动不触发关闭、外部空白点击关闭。
+- 本地真实酒馆档案绑定、即插即用催眠规则与收纳 QA：通过；确认 36 条指令完整，原生 World Info 提示只注入一次；切换到另一聊天后规则删除但两条档案保留，返回原聊天后规则恢复；无额外模型请求；缩放和拖动不触发关闭，外部空白点击关闭。
 - 两个本地扩展安装目录均已同步精确构建产物。
 
 ## 当前待确认
@@ -144,5 +148,6 @@ node scripts/qa-local-archive-binding.mjs
 - `HypnoOS-v1.0.0-after-worldbook-binding-20260830-004054-2ddc6f4.zip`
 - `HypnoOS-v1.0.0-before-remove-auto-archive-prompt-20260830-005909-2ddc6f4.zip`
 - `HypnoOS-v1.0.0-after-remove-auto-archive-prompt-20260830-010510-37b062d.zip`
+- `HypnoOS-v1.0.0-after-plug-and-play-hypnosis-rules-20260830-134637-e709314.zip`
 
 以上回档均位于：`E:\sillytavern\卡\催眠app重置\版本`
