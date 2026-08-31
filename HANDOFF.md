@@ -20,8 +20,8 @@
 - 项目版本：`1.0.0`（见 `package.json`）
 - 发布仓库名称仍为：`HypnoOs3.0_v0.9.0`
 - 远端：`https://github.com/Suqi854/HypnoOs3.0_v0.9.0.git`
-- 最新功能提交：`5af061c feat: integrate database-backed phone state`（仅本地，尚未推送）
-- 当前远端 `origin/main`：`29e27572decd85eae4ca60e0fc655728a8444021`；后续只有用户明确要求时才可推送，并须用 `git ls-remote origin refs/heads/main` 复核。
+- 最新功能提交：`5af061c feat: integrate database-backed phone state`（已推送）
+- 远端 `origin/main` 已包含功能提交 `5af061c` 与验证文档提交 `51a7c77`；后续仍只有用户明确要求时才可推送，并须用 `git ls-remote origin refs/heads/main` 复核实时 SHA。
 - 当前关键提交：
   - `5af061c feat: integrate database-backed phone state`
   - `7d389a8 feat: persist model presets and unify phone settings`
