@@ -73,6 +73,24 @@ class Runtime {
       context.eventSource.on(chatChanged, reload);
       this.disposers.push(() => context.eventSource.removeListener(chatChanged, reload));
     }
+    const chatDeleted = context?.eventTypes?.CHAT_DELETED;
+    const groupChatDeleted = context?.eventTypes?.GROUP_CHAT_DELETED;
+    if (chatDeleted && context?.eventSource) {
+      const removeCharacterChatState = (chatId) => {
+        void this.storage.deleteChatStateByChatId(chatId, { scopeKey: this.host.characterScopeKey() })
+          .catch((error) => console.warn('[HypnoOS3] 删除聊天关联存档失败', error));
+      };
+      context.eventSource.on(chatDeleted, removeCharacterChatState);
+      this.disposers.push(() => context.eventSource.removeListener(chatDeleted, removeCharacterChatState));
+    }
+    if (groupChatDeleted && context?.eventSource) {
+      const removeGroupChatState = (chatId) => {
+        void this.storage.deleteChatStateByChatId(chatId, { scopeKey: this.host.groupScopeKey() })
+          .catch((error) => console.warn('[HypnoOS3] 删除群聊关联存档失败', error));
+      };
+      context.eventSource.on(groupChatDeleted, removeGroupChatState);
+      this.disposers.push(() => context.eventSource.removeListener(groupChatDeleted, removeGroupChatState));
+    }
     return this;
   }
 

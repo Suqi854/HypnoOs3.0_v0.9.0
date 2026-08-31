@@ -257,6 +257,38 @@ test('chat switching reloads each chat state and preserves its roles and app dat
   }
 });
 
+test('switching away unloads chat state without deleting its independent mirror', async () => {
+  const storage = new MemorySettings();
+  let active = 'character:0:chat-a';
+  const metadata = new Map([
+    ['character:0:chat-a', savedState({ money: 100, roleName: '人物A', location: '地点A' })],
+    ['character:0:chat-b', savedState({ money: 200, roleName: '人物B', location: '地点B' })],
+  ]);
+  const host = {
+    contextKey: () => active,
+    loadChatState: () => structuredClone(metadata.get(active) || null),
+    saveChatState: async (value, expected) => {
+      if (active !== expected) return false;
+      metadata.set(active, structuredClone(value));
+      return true;
+    },
+    setPromptText() {},
+    async writeOptionalRuntimeState() {},
+  };
+  const store = new StateStore(host, storage);
+  await store.initialize();
+  await store.update((state) => { state.resources.money = 111; return state; }, 'chat-a-change');
+  active = 'character:0:chat-b';
+  await store.initialize();
+  await store.update((state) => { state.resources.money = 222; return state; }, 'chat-b-change');
+
+  metadata.delete('character:0:chat-a');
+  active = 'character:0:chat-a';
+  const restored = await store.initialize();
+  assert.equal(restored.resources.money, 111);
+  assert.equal((await storage.getChatState('character:0:chat-b')).resources.money, 222);
+});
+
 test('chat state mirror restores settings and worldbook binding when host metadata is missing', async () => {
   const storage = new MemorySettings();
   const mirrored = savedState({ money: 3210, roleName: '镜像人物', location: '镜像地点' });

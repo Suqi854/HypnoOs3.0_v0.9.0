@@ -141,6 +141,7 @@ for (const id of ['miku', 'rem', 'mai', 'umaru', 'alisa', 'hyakka']) {
 expect(uiText.includes('normalizeConnectorProviderError') && uiText.includes('硅基流动账户余额不足'), '模型插头没有识别硅基流动余额不足错误');
 const extensionSource = await readFile(new URL('src/extension.js', root), 'utf8');
 expect(!extensionSource.includes('hypnoos3-launcher'), '不得重新引入自制 H 启动器');
+expect(extensionSource.includes('CHAT_DELETED') && extensionSource.includes('GROUP_CHAT_DELETED') && extensionSource.includes('deleteChatStateByChatId'), '聊天删除没有联动清理独立 HypnoOS 存档');
 const floatingHostSource = await readFile(new URL('src/floating-host.js', root), 'utf8');
 expect(floatingHostSource.includes('__HYPNOOS3_EXTENSION_FLOATING_SINGLETON__'), '插件没有独立于4.3脚本的单例命名空间');
 expect(floatingHostSource.includes('hypnoos3-extension-floating-phone-host'), '插件没有独立于4.3脚本的宿主节点');

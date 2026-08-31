@@ -140,6 +140,16 @@ export class HostAdapter {
     return `${context.groupId ? 'group' : 'character'}:${context.groupId ?? context.characterId ?? 'none'}:${context.chatId ?? 'no-chat'}`;
   }
 
+  characterScopeKey() {
+    const id = this.context?.characterId;
+    return id !== undefined && id !== null && String(id).trim() !== '' && String(id) !== '-1' ? `character:${id}` : '';
+  }
+
+  groupScopeKey() {
+    const id = this.context?.groupId;
+    return id !== undefined && id !== null && String(id).trim() !== '' && String(id) !== '-1' ? `group:${id}` : '';
+  }
+
   characterKey() {
     const context = this.context;
     return context?.groupId ? `group:${context.groupId}` : `character:${context?.characterId ?? 'none'}`;

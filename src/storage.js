@@ -6,6 +6,20 @@ const DB_VERSION = 1;
 const STORES = ['global', 'characters', 'assets', 'adapters'];
 const CHAT_STATE_PREFIX = 'chat-state:';
 
+function normalizedChatId(value) {
+  return String(value || '').trim().replace(/(?:\.jsonl)+$/iu, '');
+}
+
+function chatStateContextKey(storageKey) {
+  const key = String(storageKey || '');
+  return key.startsWith(CHAT_STATE_PREFIX) ? key.slice(CHAT_STATE_PREFIX.length) : '';
+}
+
+function contextChatId(contextKey) {
+  const match = String(contextKey || '').match(/^(?:character|group):[^:]+:(.*)$/u);
+  return match ? match[1] : '';
+}
+
 function openDatabase() {
   if (!globalThis.indexedDB) return Promise.resolve(null);
   return new Promise((resolve, reject) => {
@@ -101,6 +115,26 @@ export class HypnoStorage {
     if (!key) return false;
     await this.set('adapters', `${CHAT_STATE_PREFIX}${key}`, state);
     return true;
+  }
+
+  async deleteChatState(contextKey) {
+    const key = String(contextKey || '').trim();
+    if (!key) return false;
+    return this.delete('adapters', `${CHAT_STATE_PREFIX}${key}`);
+  }
+
+  async deleteChatStateByChatId(chatId, { scopeKey = '' } = {}) {
+    const targetId = normalizedChatId(chatId);
+    if (!targetId) return [];
+    const records = await this.list('adapters');
+    const matches = records
+      .map(({ key }) => chatStateContextKey(key))
+      .filter((contextKey) => contextKey && normalizedChatId(contextChatId(contextKey)) === targetId);
+    const owner = String(scopeKey || '').trim();
+    const scoped = owner ? matches.filter((contextKey) => contextKey.startsWith(`${owner}:`)) : [];
+    const targets = owner ? scoped : (matches.length === 1 ? matches : []);
+    for (const contextKey of targets) await this.deleteChatState(contextKey);
+    return targets;
   }
 
   setDirectApiSecret(value, persist = false) {
