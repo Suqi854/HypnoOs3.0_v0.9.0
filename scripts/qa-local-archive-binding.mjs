@@ -102,6 +102,7 @@ try {
     const book = await st?.loadWorldInfo?.(worldbookName);
     const entries = Array.isArray(book?.entries) ? book.entries : Object.values(book?.entries || {});
     const rules = entries.filter((entry) => entry?.extensions?.hypnoosRules?.owner === 'hypnoos3-hypnosis-rules');
+    const archives = entries.filter((entry) => entry?.extensions?.hypnoosArchive?.owner === 'hypnoos3-archive');
     const managedRuleBooks = [];
     for (const name of await Promise.resolve(st?.getWorldInfoNames?.()) || []) {
       const candidate = await st?.loadWorldInfo?.(name);
@@ -113,12 +114,17 @@ try {
     return {
       entryCount: rules.length,
       entry: rules[0] || null,
+      archives: archives.map((entry) => ({ comment: entry.comment, archiveWrappers: (String(entry.content || '').match(/<HypnoOS人物档案存储>/g) || []).length, contextWrappers: (String(entry.content || '').match(/<HypnoOS剧情融合规则>/g) || []).length })),
       managedRuleBooks,
       runtimePrompt: String(st?.extensionPrompts?.['hypnoos3-runtime-state']?.value || ''),
       worldInfoPrompt: String(worldInfoPrompt?.worldInfoString || ''),
     };
   }, binding.worldbookName);
   assert.equal(runtimeRules.entryCount, 1, '真实世界书中的内置催眠规则不是唯一条目');
+  assert.equal(runtimeRules.archives.filter((entry) => entry.comment === '[HypnoOS档案]人物状态').length, 1, '真实世界书人物状态条目不是唯一条目');
+  assert.equal(runtimeRules.archives.filter((entry) => entry.comment === '[HypnoOS档案]剧情与催眠上下文').length, 1, '真实世界书剧情上下文条目不是唯一条目');
+  assert.equal(runtimeRules.archives.reduce((total, entry) => total + entry.archiveWrappers, 0), 1, '人物状态正文存在重复包裹');
+  assert.equal(runtimeRules.archives.reduce((total, entry) => total + entry.contextWrappers, 0), 1, '剧情上下文正文存在重复包裹');
   assert.equal(runtimeRules.entry.comment, '[HypnoOS内置]催眠规则');
   assert.equal(runtimeRules.entry.constant, true);
   assert.equal(runtimeRules.entry.position, 0);
@@ -129,10 +135,10 @@ try {
   assert.match(runtimeRules.entry.content, /<HypnoOS催眠规则.+source-count="2">/);
   assert.match(runtimeRules.entry.content, /只对人类生效/);
   assert.match(runtimeRules.entry.content, /主角可疑度反映环境/);
-  for (const command of getHypnosisRules().commands) assert.ok(runtimeRules.entry.content.includes(`${command.id}｜${command.tier}｜${command.title}`), `真实世界书缺少催眠指令：${command.id}`);
+  assert.doesNotMatch(runtimeRules.entry.content, /<催眠指令白名单>|<结果分类>|<输出硬检查>|封闭白名单/);
   assert.doesNotMatch(runtimeRules.runtimePrompt, /<HypnoOS催眠规则/, '绑定世界书后扩展提示仍重复注入催眠规则');
   assert.equal((runtimeRules.worldInfoPrompt.match(/<HypnoOS催眠规则/g) || []).length, 1, `真实酒馆 World Info 扫描没有且仅有一份催眠规则；含规则世界书：${runtimeRules.managedRuleBooks.join('、')}`);
-  assert.match(runtimeRules.worldInfoPrompt, /vip5_permanent_personality｜VIP5｜永久人格植入/);
+  assert.doesNotMatch(runtimeRules.worldInfoPrompt, /<催眠指令白名单>|<结果分类>|<输出硬检查>/);
 
   const chatSwitch = await page.evaluate(async () => {
     const st = globalThis.SillyTavern?.getContext?.();

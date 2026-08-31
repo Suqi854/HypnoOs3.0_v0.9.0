@@ -74,6 +74,16 @@ function messageText(message) {
   return typeof value === 'string' ? value : String(value || '');
 }
 
+function runtimeDatabase() {
+  for (const view of sameOriginWindows()) {
+    try {
+      const api = view.AutoCardUpdaterAPI;
+      if (api && typeof api.exportTableAsJson === 'function') return api;
+    } catch {}
+  }
+  return null;
+}
+
 export function extractLatestUserOperationBlock(chat) {
   const list = Array.isArray(chat) ? chat : [];
   const latest = [...list].reverse().find(visibleUserMessage);
@@ -109,6 +119,7 @@ export class HostAdapter {
       promptInjection: Boolean(context?.setExtensionPrompt && context?.eventSource && context?.eventTypes),
       tavernHelper: typeof globalThis.getVariables === 'function' && typeof globalThis.updateVariablesWith === 'function',
       mvu: Boolean(globalThis.Mvu?.getMvuData && globalThis.Mvu?.replaceMvuData),
+      database: Boolean(runtimeDatabase()),
     };
   }
 
@@ -387,6 +398,79 @@ export class HostAdapter {
       subscribed.add(eventName);
       this.#disposers.push(() => context.eventSource.removeListener(eventName, notify));
     }
+  }
+
+  hasDatabaseRuntime() {
+    return Boolean(runtimeDatabase());
+  }
+
+  async readDatabaseSnapshot() {
+    const api = runtimeDatabase();
+    if (!api) return null;
+    const value = await Promise.resolve(api.exportTableAsJson());
+    return usableObject(value) ? clone(value) : null;
+  }
+
+  installDatabaseRuntimeLifecycle(listener) {
+    if (typeof listener !== 'function') return;
+    let activeApi = null;
+    let retryTimer = null;
+    let retryCount = 0;
+    const notify = () => Promise.resolve().then(listener).catch((error) => console.warn(`[${EXTENSION_ID}] 数据库状态导入失败`, error));
+    const unbind = () => {
+      if (!activeApi) return;
+      try { activeApi.unregisterTableUpdateCallback?.(notify); } catch {}
+      activeApi = null;
+    };
+    const bind = (shouldNotify = true) => {
+      retryCount += 1;
+      const api = runtimeDatabase();
+      if (!api) return false;
+      if (api !== activeApi) {
+        unbind();
+        activeApi = api;
+        try { activeApi.registerTableUpdateCallback?.(notify); } catch {}
+        if (shouldNotify) notify();
+      }
+      if (retryTimer) {
+        clearInterval(retryTimer);
+        retryTimer = null;
+      }
+      return true;
+    };
+    if (!bind()) {
+      retryTimer = setInterval(() => {
+        if (!bind() && retryCount >= 120 && retryTimer) {
+          clearInterval(retryTimer);
+          retryTimer = null;
+        }
+      }, 250);
+      retryTimer.unref?.();
+    }
+    const context = this.context;
+    const chatChanged = context?.eventTypes?.CHAT_CHANGED;
+    if (chatChanged && context?.eventSource) {
+      const rebind = () => {
+        unbind();
+        retryCount = 0;
+        if (!bind(false) && !retryTimer) {
+          retryTimer = setInterval(() => {
+            if (!bind() && retryCount >= 120 && retryTimer) {
+              clearInterval(retryTimer);
+              retryTimer = null;
+            }
+          }, 250);
+          retryTimer.unref?.();
+        }
+      };
+      context.eventSource.on(chatChanged, rebind);
+      this.#disposers.push(() => context.eventSource.removeListener(chatChanged, rebind));
+    }
+    this.#disposers.push(() => {
+      if (retryTimer) clearInterval(retryTimer);
+      retryTimer = null;
+      unbind();
+    });
   }
 
   async writeOptionalRuntimeState(legacyVariables, settings) {

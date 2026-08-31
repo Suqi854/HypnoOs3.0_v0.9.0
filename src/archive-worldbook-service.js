@@ -7,6 +7,7 @@ const BINDING_KEY = 'archiveWorldbookBinding';
 const RULES_COMMENT = '[HypnoOS内置]催眠规则';
 const ARCHIVE_COMMENT = '[HypnoOS档案]人物状态';
 const CONTEXT_COMMENT = '[HypnoOS档案]剧情与催眠上下文';
+const CONTEXT_RULE_BODY = '催眠手机下达的操作必须结合当前人物关系、地点、已发生剧情与既有催眠效果自然执行。不得突然跳出故事解释系统，不得把未执行的指令写成已生效事实。';
 
 function entriesOf(book) {
   if (Array.isArray(book?.entries)) return book.entries;
@@ -25,6 +26,19 @@ function entryMap(book) {
 function managed(entry, chatKey) {
   const meta = entry?.extensions?.hypnoosArchive;
   return meta?.owner === OWNER && String(meta.chatKey || '') === String(chatKey || '');
+}
+
+function archiveKind(entry) {
+  const comment = String(entry?.comment || '');
+  const content = String(entry?.content || '');
+  const owned = entry?.extensions?.hypnoosArchive?.owner === OWNER;
+  if (comment === ARCHIVE_COMMENT && (owned || content.includes('<HypnoOS人物档案存储>'))) return 'archive';
+  if (comment === CONTEXT_COMMENT && (owned || content.includes('<HypnoOS剧情融合规则>'))) return 'context';
+  return '';
+}
+
+function managedArchive(entry) {
+  return Boolean(archiveKind(entry));
 }
 
 function managedRules(entry) {
@@ -58,6 +72,18 @@ function makeEntry(uid, comment, content, chatKey, constant = false) {
   };
 }
 
+function refreshManagedEntry(entry, comment, content, chatKey, constant) {
+  const fresh = makeEntry(Number(entry?.uid ?? entry?.id ?? 0) || 0, comment, content, chatKey, constant);
+  return {
+    ...clone(entry || {}),
+    ...fresh,
+    extensions: {
+      ...clone(entry?.extensions || {}),
+      ...fresh.extensions,
+    },
+  };
+}
+
 function makeRulesEntry(uid) {
   const entry = makeEntry(uid, RULES_COMMENT, buildHypnosisRulePrompt(), '', true);
   entry.key = ['HypnoOS', '催眠手机', '催眠规则'];
@@ -77,8 +103,58 @@ function makeRulesEntry(uid) {
 
 function replaceRulesEntry(book) {
   const mapped = entryMap(book);
-  const current = entriesOf(mapped.source).filter((entry) => !managedRules(entry));
-  const next = [...current, makeRulesEntry(nextUid(current))];
+  const all = entriesOf(mapped.source);
+  const existing = all.find(managedRules);
+  const current = all.filter((entry) => !managedRules(entry));
+  const next = [...current, makeRulesEntry(existing?.uid ?? existing?.id ?? nextUid(all))];
+  if (mapped.array) mapped.source.entries = next;
+  else mapped.source.entries = Object.fromEntries(next.map((entry, index) => [String(entry.uid ?? index), entry]));
+  return mapped.source;
+}
+
+function managedSnapshot(book, chatKey = '') {
+  const entries = entriesOf(book);
+  const prefer = (kind) => entries.find((entry) => archiveKind(entry) === kind && managed(entry, chatKey))
+    || entries.find((entry) => archiveKind(entry) === kind)
+    || null;
+  const archive = prefer('archive');
+  const context = prefer('context');
+  return {
+    archive,
+    context,
+    records: extractArchiveRecords(archive?.content),
+    contextText: extractContextText(context?.content),
+  };
+}
+
+function extractContextText(content) {
+  const source = String(content || '');
+  const parts = source.split('<HypnoOS剧情融合规则>');
+  const selected = String(parts.at(-1) || source).split('</HypnoOS剧情融合规则>')[0].trim();
+  return (selected.startsWith(CONTEXT_RULE_BODY) ? selected.slice(CONTEXT_RULE_BODY.length).trim() : selected).slice(0, 6000);
+}
+
+function extractArchiveRecords(content) {
+  const source = String(content || '');
+  const parts = source.split('<HypnoOS人物档案存储>');
+  const selected = String(parts.at(-1) || source).split('</HypnoOS人物档案存储>')[0];
+  return boundedRoleRecords(parseJson(selected));
+}
+
+function ensureManagedEntries(book, chatKey, records, contextText) {
+  const mapped = entryMap(book);
+  const snapshot = managedSnapshot(mapped.source, chatKey);
+  const all = entriesOf(mapped.source);
+  const existingRules = all.find(managedRules);
+  const current = all.filter((entry) => !managedArchive(entry) && !managedRules(entry));
+  let uid = nextUid(all);
+  const archive = snapshot.archive
+    ? refreshManagedEntry(snapshot.archive, ARCHIVE_COMMENT, String(snapshot.archive.content || '').split('<HypnoOS人物档案存储>').length > 2 ? buildArchiveContent(snapshot.records) : snapshot.archive.content, chatKey, false)
+    : makeEntry(uid++, ARCHIVE_COMMENT, buildArchiveContent(records), chatKey, false);
+  const context = snapshot.context
+    ? refreshManagedEntry(snapshot.context, CONTEXT_COMMENT, buildContextContent(snapshot.contextText), chatKey, true)
+    : makeEntry(uid++, CONTEXT_COMMENT, buildContextContent(contextText), chatKey, true);
+  const next = [...current, makeRulesEntry(existingRules?.uid ?? existingRules?.id ?? uid++), archive, context];
   if (mapped.array) mapped.source.entries = next;
   else mapped.source.entries = Object.fromEntries(next.map((entry, index) => [String(entry.uid ?? index), entry]));
   return mapped.source;
@@ -92,28 +168,57 @@ function removeRulesEntry(book) {
   return mapped.source;
 }
 
-function replaceManagedEntries(book, chatKey, records, contextText) {
-  const mapped = entryMap(book);
-  const current = entriesOf(mapped.source).filter((entry) => !managed(entry, chatKey) && !managedRules(entry));
-  let uid = nextUid(current);
-  const archiveContent = [
+function buildArchiveContent(records) {
+  return [
     '<HypnoOS人物档案存储>',
     '以下是当前对话的持续档案快照。只把剧情中已经明确发生的事实视为有效，不得把未知项自行补全。',
     stableStringify({ updatedAt: new Date().toISOString(), roles: records }),
     '</HypnoOS人物档案存储>',
   ].join('\n');
-  const contextContent = [
+}
+
+function buildContextContent(contextText) {
+  return [
     '<HypnoOS剧情融合规则>',
-    '催眠手机下达的操作必须结合当前人物关系、地点、已发生剧情与既有催眠效果自然执行。不得突然跳出故事解释系统，不得把未执行的指令写成已生效事实。',
-    String(contextText || '').slice(0, 6000),
+    CONTEXT_RULE_BODY,
+    extractContextText(contextText),
     '</HypnoOS剧情融合规则>',
-  ].join('\n');
+  ].filter(Boolean).join('\n');
+}
+
+function replaceManagedEntries(book, chatKey, records, contextText) {
+  const mapped = entryMap(book);
+  const snapshot = managedSnapshot(mapped.source, chatKey);
+  const all = entriesOf(mapped.source);
+  const existingRules = all.find(managedRules);
+  const current = all.filter((entry) => !managedArchive(entry) && !managedRules(entry));
+  let uid = nextUid(all);
+  const archiveContent = buildArchiveContent(records);
+  const contextContent = buildContextContent(contextText);
   const next = [
     ...current,
-    makeRulesEntry(uid++),
-    makeEntry(uid++, ARCHIVE_COMMENT, archiveContent, chatKey, false),
-    makeEntry(uid++, CONTEXT_COMMENT, contextContent, chatKey, true),
+    makeRulesEntry(existingRules?.uid ?? existingRules?.id ?? uid++),
+    snapshot.archive ? refreshManagedEntry(snapshot.archive, ARCHIVE_COMMENT, archiveContent, chatKey, false) : makeEntry(uid++, ARCHIVE_COMMENT, archiveContent, chatKey, false),
+    snapshot.context ? refreshManagedEntry(snapshot.context, CONTEXT_COMMENT, contextContent, chatKey, true) : makeEntry(uid++, CONTEXT_COMMENT, contextContent, chatKey, true),
   ];
+  if (mapped.array) mapped.source.entries = next;
+  else mapped.source.entries = Object.fromEntries(next.map((entry, index) => [String(entry.uid ?? index), entry]));
+  return mapped.source;
+}
+
+function normalizeActiveEntries(book, chatKey) {
+  const mapped = entryMap(book);
+  const all = entriesOf(mapped.source);
+  const snapshot = managedSnapshot(mapped.source, chatKey);
+  const existingRules = all.find(managedRules);
+  const current = all.filter((entry) => !managedArchive(entry) && !managedRules(entry));
+  let uid = nextUid(all);
+  const next = [
+    ...current,
+    makeRulesEntry(existingRules?.uid ?? existingRules?.id ?? uid++),
+  ];
+  if (snapshot.archive) next.push(refreshManagedEntry(snapshot.archive, ARCHIVE_COMMENT, snapshot.archive.content, chatKey, false));
+  if (snapshot.context) next.push(refreshManagedEntry(snapshot.context, CONTEXT_COMMENT, buildContextContent(snapshot.contextText), chatKey, true));
   if (mapped.array) mapped.source.entries = next;
   else mapped.source.entries = Object.fromEntries(next.map((entry, index) => [String(entry.uid ?? index), entry]));
   return mapped.source;
@@ -121,7 +226,7 @@ function replaceManagedEntries(book, chatKey, records, contextText) {
 
 function removeManagedEntries(book, chatKey) {
   const mapped = entryMap(book);
-  const next = entriesOf(mapped.source).filter((entry) => !managed(entry, chatKey));
+  const next = entriesOf(mapped.source).filter((entry) => !managedArchive(entry));
   if (mapped.array) mapped.source.entries = next;
   else mapped.source.entries = Object.fromEntries(next.map((entry, index) => [String(entry.uid ?? index), entry]));
   return mapped.source;
@@ -199,8 +304,7 @@ export class ArchiveWorldbookService {
     if (binding?.worldbookName) {
       try {
         const book = await this.host.loadWorldbook(binding.worldbookName);
-        const archive = entriesOf(book).find((entry) => managed(entry, binding.chatKey) && entry.comment === ARCHIVE_COMMENT);
-        records = boundedRoleRecords(parseJson(String(archive?.content || '').match(/\{[\s\S]*\}/)?.[0] || ''));
+        records = managedSnapshot(book, binding.chatKey).records;
       } catch {}
     }
     return { names: [...new Set(names.map(String).filter(Boolean))], character, binding, records };
@@ -225,24 +329,23 @@ export class ArchiveWorldbookService {
     if (!targetName) throw new Error('没有选择目标世界书。');
     if (createOnly && names.includes(targetName)) throw new Error(`世界书“${targetName}”已存在，请输入新名称。`);
     let targetBook = names.includes(targetName) ? await this.host.loadWorldbook(targetName) : { entries: {}, extensions: {} };
-    let records = [];
-    let contextText = '';
+    const targetSnapshot = managedSnapshot(targetBook, chatKey);
+    let records = targetSnapshot.records;
+    let contextText = targetSnapshot.contextText;
     if (previous?.worldbookName) {
       try {
         const oldBook = await this.host.loadWorldbook(previous.worldbookName);
-        const owned = entriesOf(oldBook).filter((entry) => managed(entry, previous.chatKey || chatKey));
-        const archive = owned.find((entry) => entry.comment === ARCHIVE_COMMENT);
-        const contextEntry = owned.find((entry) => entry.comment === CONTEXT_COMMENT);
-        const parsed = parseJson(String(archive?.content || '').match(/\{[\s\S]*\}/)?.[0] || '');
-        records = boundedRoleRecords(parsed);
-        contextText = String(contextEntry?.content || '');
+        const oldSnapshot = managedSnapshot(oldBook, previous.chatKey || chatKey);
+        if (!targetSnapshot.archive) records = oldSnapshot.records;
+        if (!targetSnapshot.context) contextText = oldSnapshot.contextText;
       } catch {}
     }
-    targetBook = replaceManagedEntries(targetBook, chatKey, records, contextText);
+    targetBook = ensureManagedEntries(targetBook, chatKey, records, contextText);
     await this.host.saveWorldbook(targetName, targetBook);
     await this.removeRulesFromOtherWorldbooks(targetName);
     const verify = await this.host.loadWorldbook(targetName);
-    if (entriesOf(verify).filter((entry) => managed(entry, chatKey)).length !== 2) throw new Error('目标世界书写后校验失败，未更改绑定。');
+    const verifyArchives = entriesOf(verify).filter(managedArchive);
+    if (verifyArchives.filter((entry) => archiveKind(entry) === 'archive').length !== 1 || verifyArchives.filter((entry) => archiveKind(entry) === 'context').length !== 1) throw new Error('目标世界书写后校验失败，未更改绑定。');
     const ruleEntries = entriesOf(verify).filter(managedRules);
     if (ruleEntries.length !== 1 || ruleEntries[0].comment !== RULES_COMMENT || ruleEntries[0].content !== buildHypnosisRulePrompt()) throw new Error('目标世界书催眠规则写后校验失败，未更改绑定。');
     const previousChatWorldbook = this.host.getChatWorldbookName?.() || '';
@@ -271,7 +374,8 @@ export class ArchiveWorldbookService {
     }
     await this.removeRulesFromOtherWorldbooks(binding.worldbookName);
     const book = await this.host.loadWorldbook(binding.worldbookName);
-    await this.host.saveWorldbook(binding.worldbookName, replaceRulesEntry(book));
+    const normalized = normalizeActiveEntries(book, binding.chatKey);
+    if (stableStringify(normalized) !== stableStringify(book)) await this.host.saveWorldbook(binding.worldbookName, normalized);
     const verify = await this.host.loadWorldbook(binding.worldbookName);
     const rules = entriesOf(verify).filter(managedRules);
     if (rules.length !== 1 || rules[0].content !== buildHypnosisRulePrompt()) throw new Error('进入聊天时加载内置催眠规则失败。');
@@ -304,8 +408,7 @@ export class ArchiveWorldbookService {
     const messageId = String(message.message_id ?? '');
     if (messageId && messageId === String(binding.lastSyncedMessageId || '')) return { ok: true, skipped: true };
     const book = await this.host.loadWorldbook(binding.worldbookName);
-    const existingArchive = entriesOf(book).find((entry) => managed(entry, binding.chatKey) && entry.comment === ARCHIVE_COMMENT);
-    const existingRecords = boundedRoleRecords(parseJson(String(existingArchive?.content || '').match(/\{[\s\S]*\}/)?.[0] || ''));
+    const existingRecords = managedSnapshot(book, binding.chatKey).records;
     const sourceBooks = [book];
     try {
       const characterBooks = await this.host.getCharacterWorldbookNames();
@@ -313,7 +416,7 @@ export class ArchiveWorldbookService {
         try { sourceBooks.push(await this.host.loadWorldbook(name)); } catch {}
       }
     } catch {}
-    const sourceExcerpt = sourceBooks.flatMap((source) => entriesOf(source)).filter((entry) => !managed(entry, binding.chatKey) && !managedRules(entry)).slice(0, 40)
+    const sourceExcerpt = sourceBooks.flatMap((source) => entriesOf(source)).filter((entry) => !managedArchive(entry) && !managedRules(entry)).slice(0, 40)
       .map((entry) => `${String(entry.comment || '').slice(0, 120)}\n${String(entry.content || '').slice(0, 800)}`).join('\n\n').slice(0, 16000);
     const stateRoles = Object.values(this.store.state.roles || {}).map((role) => ({ name: role.name, variables: role.variables }));
     const prompt = [

@@ -61,6 +61,7 @@ try {
   await frame.evaluate(() => globalThis.__ST_OPEN_SETTINGS_APP__?.());
   const settings = frame.locator('.st-settings-app').last();
   await settings.waitFor({ state: 'visible' });
+  await settings.locator('[data-settings-tab="models"]').click();
   await settings.locator('[data-connector-profile="text"]').waitFor({ state: 'visible' });
   await settings.locator('[data-connector-preset-new]').click();
   assert.equal(await settings.evaluate((node) => node.dataset.connectorPresetDraft), 'new', '新增预设按钮没有进入草稿状态');
@@ -105,6 +106,7 @@ try {
   await page.waitForFunction((chatId) => globalThis.SillyTavern?.getContext?.()?.chatId === chatId, originalChatId, { timeout: 30_000 });
   await frame.evaluate(() => globalThis.__ST_OPEN_SETTINGS_APP__?.());
   const returnedSettings = frame.locator('.st-settings-app').last();
+  await returnedSettings.locator('[data-settings-tab="models"]').click();
   await returnedSettings.locator('[data-connector-profile="text"]').waitFor({ state: 'visible' });
   await returnedSettings.locator('[data-connector-preset-delete="' + saved.preset.id + '"]').click();
   await returnedSettings.getByRole('button', { name: '确认删除' }).click();

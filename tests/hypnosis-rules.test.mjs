@@ -80,13 +80,12 @@ test('MC recharge bills only the quantity that can fit below the energy cap', ()
   });
 });
 
-test('full hypnosis prompt includes every enforcement section and command', () => {
+test('slim hypnosis prompt keeps core enforcement without removed command catalog sections', () => {
   const prompt = buildHypnosisRulePrompt();
-  for (const marker of ['<核心规则>', '<参数与强度>', '<催眠指令白名单>', '<结果分类>', '<输出硬检查>', '最新真实用户消息', '成功必须原子结算', 'JSON Patch只允许', '取消当前催眠不能删除永久效果', '只对人类生效', '人类无法察觉的声波', '不得默认让目标失忆', '在线下不会直接遇到另一个催眠APP使用者', '主角可疑度反映环境', '地点常识规则与角色催眠效果严格分离']) assert.ok(prompt.includes(marker), `missing prompt rule: ${marker}`);
-  for (const item of getHypnosisRules().commands) assert.ok(prompt.includes(`${item.id}｜${item.tier}｜${item.title}`), `missing command: ${item.id}`);
-  assert.match(prompt, /permanent-hypnosis-trigger.+永久催眠效果/);
+  for (const marker of ['<核心规则>', '<参数与强度>', '最新真实用户消息', '成功必须原子结算', 'JSON Patch只允许', '取消当前催眠不能删除永久效果', '只对人类生效', '人类无法察觉的声波', '不得默认让目标失忆', '在线下不会直接遇到另一个催眠APP使用者', '主角可疑度反映环境', '地点常识规则与角色催眠效果严格分离']) assert.ok(prompt.includes(marker), `missing prompt rule: ${marker}`);
+  for (const removed of ['<催眠指令白名单>', '<结果分类>', '<输出硬检查>', '封闭白名单']) assert.equal(prompt.includes(removed), false, `prompt still includes removed section: ${removed}`);
   assert.ok(prompt.includes('/角色/<目标>/效果/催眠扳机/<催眠扳机>'));
-  assert.ok(prompt.length > 7_000);
+  assert.ok(prompt.length > 4_000);
 });
 
 test('later rule revisions use the public registry without mutating the default', () => {

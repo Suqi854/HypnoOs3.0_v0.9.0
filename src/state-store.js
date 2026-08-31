@@ -3,6 +3,32 @@ import { buildHypnosisRulePrompt, DEFAULT_HYPNOSIS_RULESET_VERSION } from './hyp
 import { findLegacyVariables, mergeLegacyVariables, migrateStateCompatibility } from './legacy-adapter.js';
 import { getRegionPack } from './regions.js';
 import { clone, stableStringify } from './utils.js';
+import { projectDatabaseSnapshot } from './database-adapter.js';
+
+export function mergeDatabaseSnapshotIntoState(current, rawSnapshot, regionPack) {
+  const projection = projectDatabaseSnapshot(rawSnapshot);
+  if (!projection.snapshot.available) return current;
+  const base = clone(current);
+  const sheetNames = new Set(projection.metadata.sheets.map((sheet) => sheet.name));
+  if (sheetNames.has('重要人物表')) {
+    base.roles = Object.fromEntries(Object.entries(base.roles || {}).filter(([, role]) => role?.variables?.extensions?.数据来源 !== '数据库'));
+  }
+  if (sheetNames.has('任务与事件表')) {
+    base.tasks = (base.tasks || []).filter((task) => task?.数据来源 !== '数据库');
+  }
+  const legacy = toLegacyVariables(base);
+  if (sheetNames.has('重要人物表')) {
+    legacy.角色 = Object.fromEntries(Object.entries(legacy.角色 || {}).filter(([, role]) => role?.自定义?.数据来源 !== '数据库'));
+  }
+  if (sheetNames.has('任务与事件表')) {
+    legacy.任务 = Object.fromEntries(Object.entries(legacy.任务 || {}).filter(([, task]) => task?.数据来源 !== '数据库'));
+  }
+  if (sheetNames.has('背包物品表')) legacy.系统.持有物品 = projection.legacy.系统.持有物品 || {};
+  const merged = mergeLegacyVariables(legacy, projection.legacy);
+  const next = fromLegacyVariables(merged, base, regionPack);
+  next.custom.databaseSource = projection.metadata;
+  return next;
+}
 
 export class StateStore extends EventTarget {
   #host;
@@ -28,6 +54,10 @@ export class StateStore extends EventTarget {
       const snapshots = await this.#host.readOptionalRuntimeState();
       const legacy = snapshots.map((snapshot) => findLegacyVariables(snapshot?.value ?? snapshot)).find(Boolean);
       if (legacy) initial = fromLegacyVariables(legacy, initial, region);
+    }
+    if (typeof this.#host.readDatabaseSnapshot === 'function') {
+      const database = await this.#host.readDatabaseSnapshot();
+      if (database) initial = mergeDatabaseSnapshotIntoState(initial, database, region);
     }
     this.#state = normalizeState(migrateStateCompatibility(initial), region);
     await this.#persist(false);
@@ -93,6 +123,17 @@ export class StateStore extends EventTarget {
     const pack = getRegionPack(this.#state.region);
     const next = fromLegacyVariables(merged, this.#state, pack);
     if (stableStringify(toLegacyVariables(next)) === stableStringify(toLegacyVariables(this.#state))) return this.state;
+    return this.replace(next, reason);
+  }
+
+  async syncDatabaseRuntimeState(reason = 'database-adapter') {
+    if (typeof this.#host.readDatabaseSnapshot !== 'function') return this.state;
+    const database = await this.#host.readDatabaseSnapshot();
+    if (!database) return this.state;
+    const pack = getRegionPack(this.#state.region);
+    const next = mergeDatabaseSnapshotIntoState(this.#state, database, pack);
+    next.revision = this.#state.revision;
+    if (stableStringify(next) === stableStringify(this.#state)) return this.state;
     return this.replace(next, reason);
   }
 

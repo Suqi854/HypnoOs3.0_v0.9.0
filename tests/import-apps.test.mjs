@@ -7,7 +7,7 @@ import { getRegionPack } from '../src/regions.js';
 import { importRoleFile, validateAvatar } from '../src/role-import.js';
 
 test('app registry uses versioned declarations and unique IDs', () => {
-  assert.equal(PHONE_APPS.length, 23);
+  assert.equal(PHONE_APPS.length, 24);
   assert.equal(new Set(PHONE_APPS.map((app) => app.id)).size, PHONE_APPS.length);
   assert.ok(PHONE_APPS.every((app) => app.schema === 'PhoneAppModule/v1' && Array.isArray(app.readPaths) && app.fallback));
 });
@@ -37,6 +37,24 @@ test('map calendar monitor work and task apps read through AppDataService', asyn
   assert.equal(service.readAppData('achievements').tasks[0].title, '服务任务');
   assert.deepEqual(await service.getCharacterWorldbookNames(), { primary: '主世界书', additional: [] });
   assert.equal((await service.getWorldbook('主世界书')).name, '主世界书');
+});
+
+test('database runtime becomes the per-round source instead of worldbook generation', async () => {
+  let databaseSyncs = 0;
+  const host = {
+    hasDatabaseRuntime: () => true,
+    readDatabaseSnapshot: async () => ({ mate: {}, sheet_1: { name: '重要人物表', content: [['', '姓名'], [1, '林遥']] } }),
+  };
+  const store = {
+    get state() { return createDefaultState(getRegionPack('cn')); },
+    async syncDatabaseRuntimeState() { databaseSyncs += 1; },
+  };
+  const service = new AppDataService(host, store);
+  service.archiveWorldbooks.syncLatestReply = async () => { throw new Error('数据库存在时不应调用世界书档案生成'); };
+  const result = await service.syncArchiveFromLatestReply();
+  assert.equal(result.reason, 'database-source');
+  assert.equal(result.sheetCount, 1);
+  assert.equal(databaseSyncs, 1);
 });
 
 test('JSON card imports as inert role data', async () => {

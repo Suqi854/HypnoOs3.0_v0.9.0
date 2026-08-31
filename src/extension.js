@@ -16,6 +16,7 @@ class Runtime {
     await this.store.initialize();
     this.host.installPromptLifecycle();
     this.host.installOptionalRuntimeLifecycle(() => this.store.syncOptionalRuntimeState());
+    this.host.installDatabaseRuntimeLifecycle(() => this.store.syncDatabaseRuntimeState());
 
     this.control = document.createElement('div');
     this.control.id = 'hypnoos3-control-host';

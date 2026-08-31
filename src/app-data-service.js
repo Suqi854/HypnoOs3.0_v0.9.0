@@ -3,6 +3,7 @@ import { toLegacyVariables } from './contracts.js';
 import { getRegionPack } from './regions.js';
 import { clone, isRecord } from './utils.js';
 import { ArchiveWorldbookService } from './archive-worldbook-service.js';
+import { normalizeDatabaseSnapshot } from './database-adapter.js';
 
 function readPath(value, path) {
   return String(path).split('.').reduce((current, key) => current?.[key], value);
@@ -79,7 +80,18 @@ export class AppDataService {
   getWorldbook(name) { return this.host.loadWorldbook(name); }
   getArchiveWorldbookOptions() { return this.archiveWorldbooks.options(); }
   configureArchiveWorldbook(options) { return this.archiveWorldbooks.configure(options); }
-  syncArchiveFromLatestReply(options) { return this.archiveWorldbooks.syncLatestReply(options); }
+  async getDatabaseSnapshot() {
+    return normalizeDatabaseSnapshot(await this.host.readDatabaseSnapshot?.());
+  }
+  syncDatabaseState() { return this.store.syncDatabaseRuntimeState(); }
+  async syncArchiveFromLatestReply(options) {
+    if (this.host.hasDatabaseRuntime?.()) {
+      await this.store.syncDatabaseRuntimeState('database-dialogue-round');
+      const snapshot = await this.getDatabaseSnapshot();
+      return { ok: true, skipped: true, reason: 'database-source', sheetCount: snapshot.sheets.length };
+    }
+    return this.archiveWorldbooks.syncLatestReply(options);
+  }
   activateArchiveWorldbookRules() { return this.archiveWorldbooks.activateRules(); }
   deactivateArchiveWorldbookRules() { return this.archiveWorldbooks.deactivateRules(); }
 }

@@ -16,6 +16,7 @@ class FakeHost {
       ['角色世界书', { entries: { 0: { uid: 0, comment: '林遥人设', content: '林遥是图书委员。', extensions: {} } } }],
       ['迁移目标', { entries: { 9: { uid: 9, comment: '玩家原条目', content: '必须保留', extensions: {} } } }],
     ]);
+    this.saveCalls = new Map();
     this.chatWorldbook = '';
     this.messages = [{ message_id: 4, message: '林遥放下书，仍记得刚才生效的安静扳机。', is_user: false }];
   }
@@ -24,7 +25,10 @@ class FakeHost {
   getWorldbookNames() { return [...this.books.keys()]; }
   getCharacterWorldbookNames() { return { primary: '角色世界书', additional: [] }; }
   loadWorldbook(name) { return clone(this.books.get(name)); }
-  async saveWorldbook(name, book) { this.books.set(name, clone(book)); }
+  async saveWorldbook(name, book) {
+    this.saveCalls.set(name, (this.saveCalls.get(name) || 0) + 1);
+    this.books.set(name, clone(book));
+  }
   getChatWorldbookName() { return this.chatWorldbook; }
   async bindChatWorldbook(name) { this.chatWorldbook = name; }
   getMessages() { return clone(this.messages); }
@@ -49,7 +53,7 @@ test('dedicated archive worldbook persists reply state without MVU and migrates 
   const binding = await service.configure({ mode: 'dedicated' });
   assert.equal(host.chatWorldbook, binding.worldbookName);
   assert.equal(ownedEntries(host.books.get(binding.worldbookName)).length, 2);
-  assert.equal(binding.rulesetVersion, '4.3.0-hypnoos.5');
+  assert.equal(binding.rulesetVersion, '4.3.0-hypnoos.6');
   const builtInRules = hypnosisRuleEntries(host.books.get(binding.worldbookName));
   assert.equal(builtInRules.length, 1);
   assert.equal(builtInRules[0].comment, '[HypnoOS内置]催眠规则');
@@ -74,6 +78,9 @@ test('dedicated archive worldbook persists reply state without MVU and migrates 
   const activated = await service.activateRules();
   assert.equal(activated.ok, true);
   assert.equal(hypnosisRuleEntries(host.books.get(binding.worldbookName)).length, 1);
+  const saveCountAfterActivation = host.saveCalls.get(binding.worldbookName);
+  await service.activateRules();
+  assert.equal(host.saveCalls.get(binding.worldbookName), saveCountAfterActivation, '重复进入同一聊天不应重写已经正确加载的条目');
 
   host.books.set('历史绑定世界书', {
     entries: {
@@ -101,6 +108,34 @@ test('dedicated archive worldbook persists reply state without MVU and migrates 
   assert.equal(ownedEntries(host.books.get('迁移目标')).length, 2);
   assert.equal(hypnosisRuleEntries(host.books.get('迁移目标')).length, 1);
   assert.equal(Object.values(host.books.get('迁移目标').entries).some((entry) => entry.comment === '玩家原条目' && entry.content === '必须保留'), true);
+});
+
+test('existing archive entries are reused and duplicates from older chat keys are collapsed', async () => {
+  const host = new FakeHost();
+  host.books.set('迁移目标', {
+    entries: {
+      9: { uid: 9, comment: '玩家原条目', content: '必须保留', extensions: {} },
+      20: { uid: 20, comment: '[HypnoOS档案]人物状态', content: '<HypnoOS人物档案存储>\n{"roles":[{"name":"旧人物","currentState":"旧状态"}]}\n</HypnoOS人物档案存储>\n<HypnoOS人物档案存储>\n{"roles":[{"name":"旧人物","currentState":"旧状态"}]}\n</HypnoOS人物档案存储>', extensions: { hypnoosArchive: { owner: 'hypnoos3-archive', chatKey: 'old-chat' } } },
+      21: { uid: 21, comment: '[HypnoOS档案]剧情与催眠上下文', content: '<HypnoOS剧情融合规则>\n旧上下文\n</HypnoOS剧情融合规则>\n<HypnoOS剧情融合规则>\n旧上下文\n</HypnoOS剧情融合规则>', extensions: { hypnoosArchive: { owner: 'hypnoos3-archive', chatKey: 'old-chat' } } },
+      22: { uid: 22, comment: '[HypnoOS档案]人物状态', content: '<HypnoOS人物档案存储>\n{"roles":[{"name":"重复人物"}]}\n</HypnoOS人物档案存储>', extensions: { hypnoosArchive: { owner: 'hypnoos3-archive', chatKey: 'other-chat' } } },
+      23: { uid: 23, comment: '[HypnoOS档案]剧情与催眠上下文', content: '<HypnoOS剧情融合规则>\n重复上下文\n</HypnoOS剧情融合规则>', extensions: { hypnoosArchive: { owner: 'hypnoos3-archive', chatKey: 'other-chat' } } },
+    },
+  });
+  const store = new FakeStore();
+  const service = new ArchiveWorldbookService(host, store);
+
+  await service.configure({ mode: 'selected', worldbookName: '迁移目标' });
+  const saved = host.books.get('迁移目标');
+  const owned = ownedEntries(saved);
+  assert.equal(owned.length, 2);
+  assert.deepEqual(owned.map((entry) => entry.uid).sort((a, b) => a - b), [20, 21]);
+  assert.equal(owned.every((entry) => entry.extensions.hypnoosArchive.chatKey === 'character:1:chat-a'), true);
+  assert.equal((owned.find((entry) => entry.uid === 20).content.match(/<HypnoOS人物档案存储>/g) || []).length, 1);
+  assert.equal((owned.find((entry) => entry.uid === 21).content.match(/<HypnoOS剧情融合规则>/g) || []).length, 1);
+  assert.match(owned.find((entry) => entry.uid === 21).content, /旧上下文/);
+  const options = await service.options();
+  assert.equal(options.records[0].name, '旧人物');
+  assert.equal(options.records[0].currentState, '旧状态');
 });
 
 test('built-in hypnosis rules preserve array-shaped worldbook format', async () => {

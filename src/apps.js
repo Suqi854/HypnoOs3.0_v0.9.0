@@ -29,6 +29,7 @@ export const PHONE_APPS = Object.freeze([
   define('help', '帮助', 'system', [], []),
   define('settings', '设置', 'system', ['custom'], ['custom']),
   define('operation-queue', '操作队列', 'control', ['operationQueue'], ['operationQueue']),
+  define('database', '数据库', 'system', ['custom.databaseSource', 'roles', 'inventory', 'tasks'], [], ['database-optional'], '显示数据库未连接状态'),
   define('school', '学校', 'world', ['location', 'timetable'], ['location']),
   define('timetable', '课程表', 'world', ['timetable'], ['timetable']),
   define('work', '打工', 'world', ['work', 'time', 'location'], ['work', 'resources', 'operationQueue'], ['model-optional']),

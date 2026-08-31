@@ -3255,7 +3255,8 @@ var __webpack_exports__ = __webpack_require__("./src/催眠APP前端/index.tsx")
     help: stInlineAppIcon("#64748b", '<circle cx="36" cy="36" r="21"/><path d="M29 29a7.5 7.5 0 0 1 14 3c0 5-7 5.5-7 11"/><path d="M36 50h.01"/>'),
     settings: stInlineAppIcon("#3f3f46", '<circle cx="36" cy="36" r="8"/><path d="M36 13v8"/><path d="M36 51v8"/><path d="M13 36h8"/><path d="M51 36h8"/><path d="m20 20 6 6"/><path d="m46 46 6 6"/><path d="m52 20-6 6"/><path d="m26 46-6 6"/>'),
     pendingInput: stInlineAppIcon("#b45309", '<path d="M21 18h30v36H21z"/><path d="M28 28h16"/><path d="M28 36h16"/><path d="M28 44h9"/><circle cx="19" cy="28" r="2"/><circle cx="19" cy="36" r="2"/><circle cx="19" cy="44" r="2"/>'),
-    information: stInlineAppIcon("#0369a1", '<circle cx="36" cy="36" r="21"/><path d="M36 32v16"/><path d="M36 24h.01"/>')
+    information: stInlineAppIcon("#0369a1", '<circle cx="36" cy="36" r="21"/><path d="M36 32v16"/><path d="M36 24h.01"/>'),
+    database: stInlineAppIcon("#0f766e", '<ellipse cx="36" cy="20" rx="19" ry="8"/><path d="M17 20v16c0 4 9 8 19 8s19-4 19-8V20"/><path d="M17 36v16c0 4 9 8 19 8s19-4 19-8V36"/><path d="M17 28c0 4 9 8 19 8s19-4 19-8"/>')
   };
   const ST_DEFAULT_PROFILE_PHOTOS = {
     "西园寺爱丽莎": stAssetUrl("profiles/saionji-alisa.png"),
@@ -40596,15 +40597,13 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     const profileOptions = settingsWorldbookCheckboxOptions(adaptiveWorldbooks, profileSelected, "data-settings-profile-worldbooks");
     const requestedTab = String(page.dataset.settingsTab || "general");
     const settingsTab = ["general", "models", "logs"].includes(requestedTab) ? requestedTab : "general";
-    const tabs = '';
+    const tabs = '<nav class="st-settings-tabs"><button type="button" data-settings-tab="general" class="' + (settingsTab === "general" ? "active" : "") + '">聊天与变量</button><button type="button" data-settings-tab="models" class="' + (settingsTab === "models" ? "active" : "") + '">模型插头</button><button type="button" data-settings-tab="logs" class="' + (settingsTab === "logs" ? "active" : "") + '">日志</button></nav>';
     page.innerHTML =
       renderLiteHeader(page, { title: "设置", html: '<strong>设置</strong>' }) +
       '<main class="st-lite-body">' +
         tabs +
         (status ? '<div class="st-settings-status">' + escapeHtml(status) + '</div>' : '') +
-        renderModelConnectorSettings(page) +
-        renderDiagnosticLogs() +
-        (
+        (settingsTab === "logs" ? renderDiagnosticLogs() : settingsTab === "models" ? renderModelConnectorSettings(page) : (
         '<section class="st-settings-panel">' +
           '<h3>完整聊天备份</h3>' +
           '<p>导出当前聊天的全部消息、所有 swipe、聊天元数据、每楼 MVU 变量，以及与本聊天有关的前端存储、邂逅数据和人物照片。全局界面位置与排序偏好不包含在内。</p>' +
@@ -40681,13 +40680,22 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
           '<div class="st-settings-actions is-single"><button type="button" class="st-settings-button danger" data-settings-action="clear-adaptive-data" ' + (!readAdaptiveGeneratedProfile() ? "disabled" : "") + '>清空数据</button></div>' +
         '</section>' +
         renderSettingsHelpSection(page)
-        ) +
+        )) +
       '</main>';
     const nextBody = page.querySelector(":scope > .st-lite-body");
     if (nextBody && previousScrollTop > 0) nextBody.scrollTop = previousScrollTop;
     bindLiteHeader(page, () => renderSettingsPage(page));
-    bindModelConnectorSettings(page);
-    {
+    page.querySelectorAll("[data-settings-tab]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        settingsStopEvent(event);
+        const nextTab = String(button.getAttribute("data-settings-tab") || "general");
+        page.dataset.settingsTab = ["general", "models", "logs"].includes(nextTab) ? nextTab : "general";
+        delete page.dataset.settingsStatus;
+        renderSettingsPage(page);
+      });
+    });
+    if (settingsTab === "models") bindModelConnectorSettings(page);
+    if (settingsTab === "logs") {
       page.querySelector('[data-settings-log-action="copy"]')?.addEventListener("click", async (event) => {
         settingsStopEvent(event);
         try { await navigator.clipboard?.writeText?.(diagnosticLogText()); page.dataset.settingsStatus = "日志已复制。"; }
@@ -42487,6 +42495,54 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     const page = document.createElement("section"); page.className = "st-lite-app st-avatar-library-app"; page.setAttribute("aria-label", "头像库"); root.appendChild(page); void renderAvatarLibraryPage(page);
   }
 
+  function ensureDatabaseStyle() {
+    if (document.getElementById("st-database-app-style")) return;
+    const style = document.createElement("style");
+    style.id = "st-database-app-style";
+    style.textContent = `
+      .st-database-app{background:linear-gradient(180deg,#111a36,#050919);color:#f7f1dc}.st-database-app .st-lite-body{padding:10px 12px 16px;gap:9px}
+      .st-database-status,.st-database-toolbar,.st-database-row{border:1px solid rgba(148,163,184,.22);border-radius:12px;background:rgba(15,23,42,.78);padding:10px}.st-database-status{display:flex;align-items:center;justify-content:space-between;gap:8px}.st-database-status strong{font-size:12px}.st-database-status span{color:#94a3b8;font-size:9px;font-weight:850}.st-database-status i{width:8px;height:8px;border-radius:50%;background:#64748b;box-shadow:0 0 0 4px rgba(100,116,139,.12)}.st-database-status.is-connected i{background:#34d399;box-shadow:0 0 0 4px rgba(52,211,153,.14),0 0 12px rgba(52,211,153,.42)}
+      .st-database-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px}.st-database-toolbar select,.st-database-toolbar button{min-height:38px;border:1px solid rgba(94,234,212,.35);border-radius:9px;background:#17213a;color:#f8fafc;padding:0 9px;font-size:10px;font-weight:850}.st-database-toolbar button{background:#0f5d65;cursor:pointer}.st-database-list{display:grid;gap:7px}.st-database-row{display:grid;gap:5px}.st-database-row header{display:flex;justify-content:space-between;gap:8px;color:#e2e8f0;font-size:10px}.st-database-field{display:grid;grid-template-columns:minmax(72px,.42fr) minmax(0,1fr);gap:8px;border-top:1px solid rgba(148,163,184,.12);padding-top:5px;font-size:9px;line-height:1.45}.st-database-field dt{color:#5eead4;font-weight:900}.st-database-field dd{margin:0;color:#cbd5e1;overflow-wrap:anywhere}.st-database-empty{margin:0;border:1px dashed rgba(148,163,184,.26);border-radius:12px;padding:24px 12px;text-align:center;color:#94a3b8;font-size:10px;line-height:1.6}
+    `;
+    document.head.appendChild(style);
+  }
+
+  async function renderDatabasePage(page) {
+    const token = Date.now() + ":" + Math.random();
+    page.dataset.databaseRenderToken = token;
+    let snapshot;
+    try {
+      snapshot = typeof getDatabaseSnapshot === "function" ? await getDatabaseSnapshot() : { available: false, sheets: [] };
+    } catch (error) {
+      snapshot = { available: false, sheets: [], error: String(error?.message || error || "读取失败") };
+    }
+    if (!page.isConnected || page.dataset.databaseRenderToken !== token) return;
+    const sheets = Array.isArray(snapshot?.sheets) ? snapshot.sheets : [];
+    const selectedKey = sheets.some((sheet) => sheet.key === page.dataset.databaseSheet) ? page.dataset.databaseSheet : String(sheets[0]?.key || "");
+    page.dataset.databaseSheet = selectedKey;
+    const selected = sheets.find((sheet) => sheet.key === selectedKey) || null;
+    const options = sheets.map((sheet) => '<option value="' + escapeAttr(sheet.key) + '" ' + (sheet.key === selectedKey ? "selected" : "") + '>' + escapeHtml(sheet.name) + ' · ' + String(sheet.rows?.length || 0) + ' 条</option>').join("");
+    const rows = (selected?.rows || []).slice(0, 100).map((record, index) => {
+      const fields = Object.entries(record?.values || {}).filter(([, value]) => String(value ?? "").trim()).map(([key, value]) => '<div class="st-database-field"><dt>' + escapeHtml(key) + '</dt><dd>' + escapeHtml(typeof value === "object" ? JSON.stringify(value) : String(value)) + '</dd></div>').join("");
+      return '<article class="st-database-row"><header><strong>记录 ' + String(index + 1) + '</strong><span>' + escapeHtml(record?.id || "") + '</span></header>' + (fields || '<p class="st-database-empty">空记录</p>') + '</article>';
+    }).join("");
+    const connected = Boolean(snapshot?.available);
+    page.innerHTML = renderLiteHeader(page, { title: "数据库", islandText: "DATABASE" }) +
+      '<main class="st-lite-body"><section class="st-database-status ' + (connected ? "is-connected" : "") + '"><div><strong>' + (connected ? "数据库已连接" : "数据库未连接") + '</strong><span>' + (connected ? (String(sheets.length) + " 张表 · 自动同步手机资料") : escapeHtml(snapshot?.error || "请先启用数据库本体脚本")) + '</span></div><i aria-hidden="true"></i></section>' +
+      (connected ? '<section class="st-database-toolbar"><select data-database-sheet aria-label="选择数据库表">' + options + '</select><button type="button" data-database-refresh>刷新</button></section><section class="st-database-list">' + (rows || '<p class="st-database-empty">当前数据表还没有记录。</p>') + '</section>' : '<p class="st-database-empty">检测到数据库后，人物、地点、库存和任务会直接从数据库同步；不会再为每轮回复新建档案世界书条目。</p>') + '</main>';
+    bindLiteHeader(page, () => renderDatabasePage(page));
+    page.querySelector('[data-lite-action="back"]')?.addEventListener("click", () => { const root = page.parentElement; setPhoneActiveApp(root, ""); page.remove(); void applyHomeWallpaper(root); });
+    page.querySelector('[data-database-sheet]')?.addEventListener("change", (event) => { page.dataset.databaseSheet = event.target.value || ""; void renderDatabasePage(page); });
+    page.querySelector('[data-database-refresh]')?.addEventListener("click", async (event) => { event.currentTarget.disabled = true; try { await window.syncDatabaseState?.(); } finally { if (page.isConnected) void renderDatabasePage(page); } });
+  }
+
+  function openDatabasePage(tile) {
+    ensureStyle(); ensurePhoneDarkThemeStyle(); ensureDatabaseStyle();
+    const root = findPhoneRoot(tile); if (!root) return;
+    setPhoneActiveApp(root, "database"); root.style.position = root.style.position || "relative"; clearPhoneInternalOverlays(root);
+    const page = document.createElement("section"); page.className = "st-lite-app st-database-app"; page.setAttribute("aria-label", "数据库"); root.appendChild(page); void renderDatabasePage(page);
+  }
+
   function closePendingInputPage(page) {
     if (!page) return;
     cleanupPhoneInternalOverlay(page);
@@ -42560,6 +42616,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   window.__ST_OPEN_PENDING_INPUT_APP__ = () => openPendingInputPage();
   window.__ST_OPEN_INFORMATION_APP__ = () => openInformationPage();
   window.__ST_OPEN_AVATAR_LIBRARY_APP__ = () => openAvatarLibraryPage();
+  window.__ST_OPEN_DATABASE_APP__ = () => openDatabasePage();
   window.__ST_HYPNOOS_LIST_AVATARS__ = () => readAvatarLibraryIndex().map((item) => ({ ...item }));
   window.__ST_HYPNOOS_GET_AVATAR__ = (id) => profileGetPhotoStorageIdb(avatarLibraryImageKey(id));
   window.__ST_OPEN_PLACEHOLDER_APP__ = (appName, title, subtitle) => openPlaceholderPage(null, appName, title, subtitle);
@@ -42568,7 +42625,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     const rootText = root?.innerText || "";
     return ["催眠APP", "日历", "成就和任务", "库存"].every((label) => rootText.includes(label)) &&
       (rootText.includes("MC匿名版") || rootText.includes("混沌心海")) &&
-      !root.querySelector(".st-mchan-internal-app, .st-calendar-lite-app, .st-timetable-app, .st-clock-app, .st-profile-app, .st-map-app, .st-city-map-app, .st-school-app, .st-special-location-app, .st-monitor-app, .st-work-app, .st-camera-app, .st-wallpaper-app, .st-encounter-app, .st-inventory-app, .st-reward-app, .st-hypnosis-lite-app, .st-help-app, .st-settings-app, .st-placeholder-app, .st-operation-phone-app, .st-information-app, .st-avatar-library-app, .st-adaptive-world-app");
+      !root.querySelector(".st-mchan-internal-app, .st-calendar-lite-app, .st-timetable-app, .st-clock-app, .st-profile-app, .st-map-app, .st-city-map-app, .st-school-app, .st-special-location-app, .st-monitor-app, .st-work-app, .st-camera-app, .st-wallpaper-app, .st-encounter-app, .st-inventory-app, .st-reward-app, .st-hypnosis-lite-app, .st-help-app, .st-settings-app, .st-placeholder-app, .st-operation-phone-app, .st-information-app, .st-avatar-library-app, .st-database-app, .st-adaptive-world-app");
   }
 
   function getHomeHeader(root) {
@@ -43439,6 +43496,28 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     bindHomeTileAction(tile, "stAvatarLibraryTilePatched", "打开头像库", openAvatarLibraryPage);
   }
 
+  function patchDatabaseTile() {
+    const root = findPhoneRoot(document.body);
+    if (!root || !looksLikePhoneHome(root)) return;
+    const avatarTile = findHomeTileByText("头像库");
+    const settingsTile = findHomeTileByText("设置");
+    const anchor = avatarTile || findHomeTileByText("信息") || settingsTile;
+    if (!anchor?.parentElement || !settingsTile) return;
+    let tile = dedupeHomeTilesByText("数据库") || anchor.parentElement.querySelector('[data-st-database-tile="true"]');
+    const created = !tile;
+    if (!tile) {
+      tile = settingsTile.cloneNode(true);
+      tile.querySelectorAll("[id]").forEach((node) => node.removeAttribute("id"));
+      for (const key of Object.keys(tile.dataset || {})) delete tile.dataset[key];
+      setHomeTileLabel(tile, "数据库");
+      tile.dataset.homeAppId = "database";
+      anchor.insertAdjacentElement("afterend", tile);
+    }
+    tile.dataset.stDatabaseTile = "true";
+    if (created) setHomeTileIcon(tile, ST_APP_ICONS.database, "数据库");
+    bindHomeTileAction(tile, "stDatabaseTilePatched", "打开数据库", openDatabasePage);
+  }
+
   function patchAdaptiveWorldTiles() {
     const root = findPhoneRoot(document.body);
     if (!root || !looksLikePhoneHome(root)) return;
@@ -43625,10 +43704,11 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     patchPendingInputTile();
     patchInformationTile();
     patchAvatarLibraryTile();
+    patchDatabaseTile();
     patchAdaptiveWorldTiles();
     applyHomeLayout();
     const labels = Array.from(document.querySelectorAll("span,button,div"))
-      .filter((element) => !element.closest(".st-mchan-internal-app,.st-calendar-lite-app,.st-timetable-app,.st-clock-app,.st-profile-app,.st-map-app,.st-city-map-app,.st-school-app,.st-special-location-app,.st-monitor-app,.st-work-app,.st-camera-app,.st-wallpaper-app,.st-encounter-app,.st-inventory-app,.st-reward-app,.st-hypnosis-lite-app,.st-help-app,.st-settings-app,.st-placeholder-app,.st-operation-phone-app,.st-avatar-library-app") && ["MC匿名版", "混沌心海"].includes(element.textContent?.trim()));
+      .filter((element) => !element.closest(".st-mchan-internal-app,.st-calendar-lite-app,.st-timetable-app,.st-clock-app,.st-profile-app,.st-map-app,.st-city-map-app,.st-school-app,.st-special-location-app,.st-monitor-app,.st-work-app,.st-camera-app,.st-wallpaper-app,.st-encounter-app,.st-inventory-app,.st-reward-app,.st-hypnosis-lite-app,.st-help-app,.st-settings-app,.st-placeholder-app,.st-operation-phone-app,.st-avatar-library-app,.st-database-app") && ["MC匿名版", "混沌心海"].includes(element.textContent?.trim()));
     for (const label of labels) {
       const tile = findTileFromLabel(label);
       if (!tile || tile.dataset.stMchanInternalPatched === "true") continue;

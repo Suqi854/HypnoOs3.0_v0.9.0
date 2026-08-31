@@ -41,6 +41,7 @@ test('worldbook-backed apps keep their specialized 4.3 routes', () => {
     'window.__ST_OPEN_ENCOUNTER_APP__ = (tab) => openEncounterPage(null, tab)',
     'window.__ST_OPEN_REWARD_APP__ = () => openRewardPage(null)',
     'window.__ST_OPEN_HYPNOSIS_LITE_APP__ = () => openHypnosisLitePage()',
+    'window.__ST_OPEN_DATABASE_APP__ = () => openDatabasePage()',
   ]) assert.ok(html.includes(route), `specialized route changed: ${route}`);
 });
 
@@ -88,6 +89,10 @@ test('fixed special locations cannot replace the selected-worldbook catalog', ()
 
 test('help moves below worldbook adaptation data and keeps the requested notice', () => {
   const settings = functionBody('renderSettingsPage');
+  assert.ok(settings.includes('data-settings-tab="general"'));
+  assert.ok(settings.includes('data-settings-tab="models"'));
+  assert.ok(settings.includes('data-settings-tab="logs"'));
+  assert.ok(settings.includes('settingsTab === "logs" ? renderDiagnosticLogs() : settingsTab === "models" ? renderModelConnectorSettings(page)'));
   assert.ok(settings.indexOf('<h3>世界书适配数据</h3>') < settings.indexOf('renderSettingsHelpSection(page)'));
   assert.ok(html.includes('data-settings-action="toggle-help"'));
   assert.ok(html.includes('aria-controls="st-settings-help-content"'));
@@ -162,6 +167,16 @@ test('information app selects six pets and toggles floating or wand storage mode
   assert.ok(floatingHost.includes('petMotionFrame = requestFrame(advancePetFrame)'), '桌宠帧动画没有使用浏览器动画帧调度');
   assert.ok(floatingHost.includes('host.requestAnimationFrame.bind(host)'), '动画帧调度仍被限制在局部作用域或丢失宿主绑定');
   assert.ok(!floatingHost.includes('if (event.pointerType !== "mouse") {\n        var longPressPointerId'), '桌宠长按仍仅支持触屏');
+});
+
+test('database app reads the external table runtime without changing the existing home UI', () => {
+  assert.ok(PHONE_APPS.some((item) => item.id === 'database' && item.label === '数据库'));
+  const page = functionBody('renderDatabasePage');
+  assert.ok(page.includes('getDatabaseSnapshot'));
+  assert.ok(page.includes('数据库已连接'));
+  assert.ok(page.includes('data-database-sheet'));
+  assert.ok(html.includes('function patchDatabaseTile()'));
+  assert.ok(html.includes('setHomeTileLabel(tile, "数据库")'));
 });
 
 test('phone resize is frame-coalesced without forced layout reads per pointer move', () => {
@@ -257,7 +272,7 @@ test('hypnosis commands wait in phone input before host write or direct send', (
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__(block, { append: false })'));
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_DIRECT_SEND__(block)'));
   assert.ok(floatingHost.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__'));
-  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-unblocked-pet-overlay-final'"));
+  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-database-source-v1'"));
   assert.ok(floatingHost.includes('overflow:visible;z-index:5;display:none'));
   assert.ok(floatingCore.includes("scriptUrl.searchParams.set('revision', FRONTEND_REVISION)"));
   assert.ok(floatingCore.includes('script.dataset.revision = FRONTEND_REVISION'));

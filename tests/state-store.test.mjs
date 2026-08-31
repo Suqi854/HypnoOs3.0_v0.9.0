@@ -91,7 +91,7 @@ test('bound worldbook owns the hypnosis prompt exactly once', async () => {
   const boundState = createDefaultState(getRegionPack('cn'));
   boundState.custom.archiveWorldbookBinding = {
     worldbookName: 'HypnoOS档案 - 测试',
-    rulesetVersion: '4.3.0-hypnoos.5',
+    rulesetVersion: '4.3.0-hypnoos.6',
   };
   const boundHost = new StubHost({ saved: boundState });
   const boundStore = new StateStore(boundHost, new MemorySettings());
