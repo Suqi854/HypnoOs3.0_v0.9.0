@@ -9,21 +9,22 @@ export function mergeDatabaseSnapshotIntoState(current, rawSnapshot, regionPack)
   const projection = projectDatabaseSnapshot(rawSnapshot);
   if (!projection.snapshot.available) return current;
   const base = clone(current);
-  const sheetNames = new Set(projection.metadata.sheets.map((sheet) => sheet.name));
-  if (sheetNames.has('重要人物表')) {
+  const sheetRows = new Map(projection.metadata.sheets.map((sheet) => [sheet.name, sheet.rowCount]));
+  const hasRows = (name) => Number(sheetRows.get(name) || 0) > 0;
+  if (hasRows('重要人物表')) {
     base.roles = Object.fromEntries(Object.entries(base.roles || {}).filter(([, role]) => role?.variables?.extensions?.数据来源 !== '数据库'));
   }
-  if (sheetNames.has('任务与事件表')) {
+  if (hasRows('任务与事件表')) {
     base.tasks = (base.tasks || []).filter((task) => task?.数据来源 !== '数据库');
   }
   const legacy = toLegacyVariables(base);
-  if (sheetNames.has('重要人物表')) {
+  if (hasRows('重要人物表')) {
     legacy.角色 = Object.fromEntries(Object.entries(legacy.角色 || {}).filter(([, role]) => role?.自定义?.数据来源 !== '数据库'));
   }
-  if (sheetNames.has('任务与事件表')) {
+  if (hasRows('任务与事件表')) {
     legacy.任务 = Object.fromEntries(Object.entries(legacy.任务 || {}).filter(([, task]) => task?.数据来源 !== '数据库'));
   }
-  if (sheetNames.has('背包物品表')) legacy.系统.持有物品 = projection.legacy.系统.持有物品 || {};
+  if (hasRows('背包物品表')) legacy.系统.持有物品 = projection.legacy.系统.持有物品 || {};
   const merged = mergeLegacyVariables(legacy, projection.legacy);
   const next = fromLegacyVariables(merged, base, regionPack);
   next.custom.databaseSource = projection.metadata;
@@ -35,6 +36,7 @@ export class StateStore extends EventTarget {
   #storage;
   #settings;
   #state;
+  #contextKey = '';
 
   constructor(host, storage) {
     super();
@@ -46,32 +48,46 @@ export class StateStore extends EventTarget {
   get settings() { return clone(this.#settings); }
 
   async initialize() {
-    this.#settings = await this.#storage.getSettings();
-    const region = getRegionPack(this.#settings.region);
-    const saved = this.#host.loadChatState();
-    let initial = saved || createDefaultState(region);
-    if (!saved && typeof this.#host.readOptionalRuntimeState === 'function') {
-      const snapshots = await this.#host.readOptionalRuntimeState();
-      const legacy = snapshots.map((snapshot) => findLegacyVariables(snapshot?.value ?? snapshot)).find(Boolean);
-      if (legacy) initial = fromLegacyVariables(legacy, initial, region);
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const contextKey = this.#currentContextKey();
+      const settings = await this.#storage.getSettings();
+      if (contextKey !== this.#currentContextKey()) continue;
+      const region = getRegionPack(settings.region);
+      const hostSaved = this.#host.loadChatState();
+      const mirrored = typeof this.#storage.getChatState === 'function' ? await this.#storage.getChatState(contextKey) : null;
+      if (contextKey !== this.#currentContextKey()) continue;
+      const saved = preferNewestState(hostSaved, mirrored);
+      let initial = saved || createDefaultState(region);
+      if (!saved && typeof this.#host.readOptionalRuntimeState === 'function') {
+        const snapshots = await this.#host.readOptionalRuntimeState();
+        if (contextKey !== this.#currentContextKey()) continue;
+        const legacy = snapshots.map((snapshot) => findLegacyVariables(snapshot?.value ?? snapshot)).find(Boolean);
+        if (legacy) initial = fromLegacyVariables(legacy, initial, region);
+      }
+      if (typeof this.#host.readDatabaseSnapshot === 'function') {
+        const database = await this.#host.readDatabaseSnapshot();
+        if (contextKey !== this.#currentContextKey()) continue;
+        if (database) initial = mergeDatabaseSnapshotIntoState(initial, database, region);
+      }
+      this.#settings = settings;
+      this.#state = normalizeState(migrateStateCompatibility(initial), region);
+      this.#contextKey = contextKey;
+      if (await this.#persist(false, 'initialize', contextKey)) return this.state;
     }
-    if (typeof this.#host.readDatabaseSnapshot === 'function') {
-      const database = await this.#host.readDatabaseSnapshot();
-      if (database) initial = mergeDatabaseSnapshotIntoState(initial, database, region);
-    }
-    this.#state = normalizeState(migrateStateCompatibility(initial), region);
-    await this.#persist(false);
-    return this.state;
+    throw new Error('聊天切换尚未稳定，HypnoOS 状态未写入。');
   }
 
   async update(mutator, reason = 'update') {
+    const contextKey = this.#contextKey || this.#currentContextKey();
+    if (contextKey !== this.#currentContextKey()) return this.state;
     const draft = clone(this.#state);
     const candidate = await mutator(draft);
+    if (contextKey !== this.#currentContextKey()) return this.state;
     const region = getRegionPack(candidate?.region || draft.region || this.#settings.region);
     const next = normalizeState(migrateStateCompatibility(candidate || draft), region);
     next.revision = this.#state.revision + 1;
     this.#state = next;
-    await this.#persist(true, reason);
+    if (!await this.#persist(true, reason, contextKey)) return this.state;
     return this.state;
   }
 
@@ -198,10 +214,27 @@ export class StateStore extends EventTarget {
     ].filter(Boolean).join('\n');
   }
 
-  async #persist(broadcast = true, reason = 'initialize') {
-    await this.#host.saveChatState(this.#state);
+  #currentContextKey() {
+    return String(this.#host.contextKey?.() || 'preview');
+  }
+
+  async #persist(broadcast = true, reason = 'initialize', expectedContextKey = this.#contextKey) {
+    if (expectedContextKey !== this.#currentContextKey()) return false;
+    if (!await this.#host.saveChatState(this.#state, expectedContextKey)) return false;
+    if (typeof this.#storage.saveChatState === 'function') await this.#storage.saveChatState(expectedContextKey, this.#state);
+    if (expectedContextKey !== this.#currentContextKey()) return false;
     this.#host.setPromptText(this.buildPromptProjection());
     await this.#host.writeOptionalRuntimeState(toLegacyVariables(this.#state), this.#settings);
+    if (expectedContextKey !== this.#currentContextKey()) return false;
     if (broadcast) this.dispatchEvent(new CustomEvent('change', { detail: { state: this.state, reason } }));
+    return true;
   }
+}
+
+function preferNewestState(hostSaved, mirrored) {
+  if (!hostSaved) return mirrored;
+  if (!mirrored) return hostSaved;
+  const hostRevision = Number(hostSaved.revision) || 0;
+  const mirrorRevision = Number(mirrored.revision) || 0;
+  return mirrorRevision > hostRevision ? mirrored : hostSaved;
 }

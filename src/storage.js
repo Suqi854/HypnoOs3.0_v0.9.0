@@ -4,6 +4,7 @@ import { clone } from './utils.js';
 const DB_NAME = 'hypnoos3';
 const DB_VERSION = 1;
 const STORES = ['global', 'characters', 'assets', 'adapters'];
+const CHAT_STATE_PREFIX = 'chat-state:';
 
 function openDatabase() {
   if (!globalThis.indexedDB) return Promise.resolve(null);
@@ -87,6 +88,19 @@ export class HypnoStorage {
     const safe = clone(settings);
     if (safe.directApi) delete safe.directApi.apiKey;
     return this.set('global', SETTINGS_KEY, safe);
+  }
+
+  async getChatState(contextKey) {
+    const key = String(contextKey || '').trim();
+    if (!key) return null;
+    return this.get('adapters', `${CHAT_STATE_PREFIX}${key}`, null);
+  }
+
+  async saveChatState(contextKey, state) {
+    const key = String(contextKey || '').trim();
+    if (!key) return false;
+    await this.set('adapters', `${CHAT_STATE_PREFIX}${key}`, state);
+    return true;
   }
 
   setDirectApiSecret(value, persist = false) {

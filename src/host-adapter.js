@@ -138,11 +138,13 @@ export class HostAdapter {
     return clone(this.context?.chatMetadata?.[CHAT_STATE_KEY] ?? null);
   }
 
-  async saveChatState(state) {
+  async saveChatState(state, expectedContextKey = '') {
     const context = this.context;
     if (!context) return false;
+    if (expectedContextKey && this.contextKey() !== expectedContextKey) return false;
     context.chatMetadata[CHAT_STATE_KEY] = clone(state);
-    context.saveMetadataDebounced?.();
+    if (typeof context.saveMetadata === 'function') await Promise.resolve(context.saveMetadata());
+    else context.saveMetadataDebounced?.();
     return true;
   }
 

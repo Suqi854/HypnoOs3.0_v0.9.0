@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeDatabaseSnapshot, projectDatabaseSnapshot } from '../src/database-adapter.js';
 import { mergeDatabaseSnapshotIntoState } from '../src/state-store.js';
-import { createDefaultState } from '../src/contracts.js';
+import { createDefaultRole, createDefaultState } from '../src/contracts.js';
 import { getRegionPack } from '../src/regions.js';
 
 const raw = {
@@ -43,4 +43,26 @@ test('database projection fills existing phone apps without deleting unrelated s
   assert.equal(next.tasks.find((item) => item.id === '归还图书').数据来源, '数据库');
   assert.equal(next.custom.keep, '保留');
   assert.equal(next.custom.databaseSource.adapter, 'AutoCardUpdaterAPI');
+});
+
+test('temporarily empty database sheets do not erase previously imported phone data', () => {
+  const pack = getRegionPack('cn');
+  const state = createDefaultState(pack);
+  const role = createDefaultRole('数据库人物');
+  role.variables.extensions = { 数据来源: '数据库' };
+  state.roles[role.id] = role;
+  state.tasks = [{ id: '数据库任务', title: '数据库任务', 数据来源: '数据库' }];
+  state.inventory = [{ id: '数据库物品', name: '数据库物品', 数量: 2 }];
+  const empty = {
+    mate: {},
+    sheet_1: { name: '重要人物表', content: [['记录ID', '姓名']] },
+    sheet_2: { name: '任务与事件表', content: [['记录ID', '任务名称']] },
+    sheet_3: { name: '背包物品表', content: [['记录ID', '物品名称']] },
+  };
+
+  const next = mergeDatabaseSnapshotIntoState(state, empty, pack);
+  assert.ok(Object.values(next.roles).some((item) => item.name === '数据库人物'));
+  assert.ok(next.tasks.some((item) => item.id === '数据库任务'));
+  assert.ok(next.inventory.some((item) => item.id === '数据库物品'));
+  assert.equal(next.custom.databaseSource.rowCount, 0);
 });

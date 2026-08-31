@@ -19,6 +19,9 @@ class MemorySettings {
 
   async getSettings() { return structuredClone(this.settings); }
   async saveSettings(value) { this.settings = structuredClone(value); }
+  chatStates = new Map();
+  async getChatState(key) { return structuredClone(this.chatStates.get(key) || null); }
+  async saveChatState(key, value) { this.chatStates.set(key, structuredClone(value)); return true; }
 }
 
 function savedState({ region = 'cn', money, roleName, location }) {
@@ -47,6 +50,7 @@ class StubHost {
   async saveChatState(value) { this.saved = structuredClone(value); return true; }
   setPromptText(value) { this.promptText = String(value || ''); }
   async writeOptionalRuntimeState() {}
+  contextKey() { return 'preview'; }
 }
 
 test('startup creates and persists a complete HypnoState without TH or MVU', async () => {
@@ -251,4 +255,62 @@ test('chat switching reloads each chat state and preserves its roles and app dat
   } finally {
     delete globalThis.SillyTavern;
   }
+});
+
+test('chat state mirror restores settings and worldbook binding when host metadata is missing', async () => {
+  const storage = new MemorySettings();
+  const mirrored = savedState({ money: 3210, roleName: '镜像人物', location: '镜像地点' });
+  mirrored.custom.archiveWorldbookBinding = {
+    schemaVersion: 1,
+    chatKey: 'preview',
+    mode: 'character',
+    worldbookName: '角色卡世界书',
+    rulesetVersion: '4.3.0-hypnoos.6',
+  };
+  storage.chatStates.set('preview', structuredClone(mirrored));
+  const host = new StubHost();
+  const store = new StateStore(host, storage);
+
+  const restored = await store.initialize();
+  assert.equal(restored.resources.money, 3210);
+  assert.equal(restored.location.current, '镜像地点');
+  assert.equal(Object.values(restored.roles)[0].name, '镜像人物');
+  assert.equal(restored.custom.archiveWorldbookBinding.worldbookName, '角色卡世界书');
+  assert.equal(host.saved.custom.archiveWorldbookBinding.worldbookName, '角色卡世界书');
+});
+
+test('an async update from the previous chat cannot write into the next chat', async () => {
+  const states = new Map([
+    ['chat-a', savedState({ money: 100, roleName: '人物A', location: '地点A' })],
+    ['chat-b', savedState({ money: 200, roleName: '人物B', location: '地点B' })],
+  ]);
+  let active = 'chat-a';
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const host = {
+    contextKey: () => active,
+    loadChatState: () => structuredClone(states.get(active)),
+    saveChatState: async (value, expected) => {
+      if (expected !== active) return false;
+      states.set(active, structuredClone(value));
+      return true;
+    },
+    setPromptText() {},
+    async writeOptionalRuntimeState() {},
+  };
+  const store = new StateStore(host, new MemorySettings());
+  await store.initialize();
+  const pending = store.update(async (draft) => {
+    await gate;
+    draft.resources.money = 999;
+    return draft;
+  }, 'delayed-old-chat-update');
+  active = 'chat-b';
+  release();
+  await pending;
+  await store.initialize();
+
+  assert.equal(states.get('chat-a').resources.money, 100);
+  assert.equal(states.get('chat-b').resources.money, 200);
+  assert.equal(store.state.resources.money, 200);
 });
