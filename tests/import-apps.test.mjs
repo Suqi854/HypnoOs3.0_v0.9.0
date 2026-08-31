@@ -39,6 +39,17 @@ test('map calendar monitor work and task apps read through AppDataService', asyn
   assert.equal((await service.getWorldbook('主世界书')).name, '主世界书');
 });
 
+test('map data does not expose a region template without an active chat', () => {
+  const state = createDefaultState(getRegionPack('cn'));
+  const service = new AppDataService({ hasActiveChat: () => false }, {
+    get state() { return structuredClone(state); },
+  });
+
+  assert.deepEqual(service.readAppData('map').locations, []);
+  assert.equal(service.readAppData('map').location.current, '');
+  assert.deepEqual(service.readAppData('school').locations, []);
+});
+
 test('database runtime becomes the per-round source instead of worldbook generation', async () => {
   let databaseSyncs = 0;
   const host = {

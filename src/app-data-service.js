@@ -35,7 +35,11 @@ export class AppDataService {
     const data = {};
     for (const path of app.readPaths) writePath(data, path, readPath(state, path));
     const region = getRegionPack(state.region);
-    if (appId === 'map' || appId === 'school') data.locations = clone(region.locations);
+    if (appId === 'map' || appId === 'school') {
+      const activeChat = this.host.hasActiveChat?.() !== false;
+      data.locations = activeChat ? clone(region.locations) : [];
+      if (!activeChat && isRecord(data.location)) data.location.current = '';
+    }
     if (appId === 'calendar' || appId === 'timetable') {
       data.calendar = { weekdays: clone(region.weekdays), holidays: clone(region.holidays), dateFormat: region.dateFormat };
     }

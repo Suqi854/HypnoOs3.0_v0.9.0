@@ -272,7 +272,7 @@ test('hypnosis commands wait in phone input before host write or direct send', (
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__(block, { append: false })'));
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_DIRECT_SEND__(block)'));
   assert.ok(floatingHost.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__'));
-  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-database-source-v1'"));
+  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-chat-lifecycle-v2'"));
   assert.ok(floatingHost.includes('overflow:visible;z-index:5;display:none'));
   assert.ok(floatingCore.includes("scriptUrl.searchParams.set('revision', FRONTEND_REVISION)"));
   assert.ok(floatingCore.includes('script.dataset.revision = FRONTEND_REVISION'));
@@ -422,6 +422,20 @@ test('profile photo area opens photo folder; folder slots open the avatar librar
   assert.ok(profileAction.includes('if (action === "upload-photo")'));
   assert.ok(profileAction.includes('openProfilePhotoDialog(page)'));
   assert.ok(!profileAction.includes('openProfilePhotoAvatarPicker(page)'));
+});
+
+test('chat lifecycle clears stale profiles and no-chat map data', () => {
+  const roles = functionBody('getStatsRoles');
+  const graph = functionBody('loadStaticGraph');
+  assert.match(html, /const __stHypnoosHasActiveChat = \(\) => \{/);
+  assert.match(html, /getCurrentChatId/);
+  assert.match(html, /context\?\.characterId/);
+  assert.match(roles, /__ST_HYPNOOS_HAS_ACTIVE_CHAT__/);
+  assert.match(graph, /__ST_HYPNOOS_HAS_ACTIVE_CHAT__/);
+  assert.match(graph, /locations: \[\]/);
+  assert.match(html, /chatRefreshToken/);
+  assert.match(html, /refreshAdaptiveWorldbookRoleCache\(true\)/);
+  assert.match(html, /refreshArchiveRoleSnapshotCache\(\)/);
 });
 
 test('archive worldbook binding stays optional in settings and remains reply-driven', () => {

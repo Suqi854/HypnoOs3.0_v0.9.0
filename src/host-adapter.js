@@ -110,6 +110,17 @@ export class HostAdapter {
 
   get context() { return findContext(); }
 
+  hasActiveChat() {
+    const context = this.context;
+    if (!context) return false;
+    const chatId = String(context.chatId ?? '').trim();
+    const characterId = context.characterId;
+    const groupId = context.groupId;
+    const hasCharacter = (characterId !== undefined && characterId !== null && String(characterId).trim() !== '' && String(characterId) !== '-1')
+      || (groupId !== undefined && groupId !== null && String(groupId).trim() !== '' && String(groupId) !== '-1');
+    return Boolean(chatId && hasCharacter);
+  }
+
   capabilities() {
     const context = this.context;
     return {

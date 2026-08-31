@@ -4,7 +4,7 @@ import { HYPNOSIS_RULES_API } from './hypnosis-rules.js';
 const BRIDGE_KEY = '__HYPNOOS3_CORE_BRIDGE__';
 const SINGLETON_KEY = '__HYPNOOS3_EXTENSION_FLOATING_SINGLETON__';
 const HOST_ID = 'hypnoos3-extension-floating-phone-host';
-const FRONTEND_REVISION = 'hypnoos3-1.0.0-database-source-v1';
+const FRONTEND_REVISION = 'hypnoos3-1.0.0-chat-lifecycle-v2';
 
 function phoneFrame() {
   return document.querySelector(`#${HOST_ID}`)?.shadowRoot?.querySelector('iframe.phone') || null;

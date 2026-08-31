@@ -274,6 +274,24 @@ html.st-hypnoos-booting.st-hypnoos-boot-failed .st-hypnoos-phone-preboot::after{
 	      try { return typeof getContext === "function" ? getContext() : null; } catch {}
 	      return null;
 	    };
+	    const __stHypnoosContextValuePresent = (value) => {
+	      if (value === undefined || value === null) return false;
+	      const text = String(value).trim();
+	      return Boolean(text && text !== "-1");
+	    };
+	    const __stHypnoosHasActiveChat = () => {
+	      if (window.__ST_LOCAL_PREVIEW__) return true;
+	      const context = __stHypnoosContext();
+	      let chatId = "";
+	      try { chatId = window.SillyTavern?.getCurrentChatId?.() ?? ""; } catch {}
+	      if (!__stHypnoosContextValuePresent(chatId)) {
+	        chatId = context?.chatId ?? context?.chat_id ?? context?.chatFile ?? context?.chat_file ?? "";
+	      }
+	      const hasCharacter = __stHypnoosContextValuePresent(context?.characterId)
+	        || __stHypnoosContextValuePresent(context?.groupId);
+	      return __stHypnoosContextValuePresent(chatId) && hasCharacter;
+	    };
+	    window.__ST_HYPNOOS_HAS_ACTIVE_CHAT__ = __stHypnoosHasActiveChat;
 	    const __stHypnoosIsUserMessage = (message, index = 0) => {
 	      if (!message || typeof message !== "object") return false;
 	      if (message.is_user === true || message.isUser === true || message.from_user === true || message.user === true) return true;
@@ -12993,6 +13011,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   }
 
   function getStatsRoles() {
+    if (!window.__ST_HYPNOOS_HAS_ACTIVE_CHAT__?.()) return {};
     const variables = activeStatDataReadScope !== undefined ? activeStatDataReadScope : getLatestStatDataSync();
     const roles = variables?.["角色"];
     const mvuRoles = roles && typeof roles === "object" && !Array.isArray(roles) ? roles : {};
@@ -33553,6 +33572,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
 	  }
 
 	  function getCurrentStoryLocation(systemSnapshot = null) {
+	    if (!window.__ST_HYPNOOS_HAS_ACTIVE_CHAT__?.()) return "";
 	    const system = systemSnapshot && typeof systemSnapshot === "object" && !Array.isArray(systemSnapshot)
 	      ? systemSnapshot
 	      : getSystemState();
@@ -33797,6 +33817,9 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   }
 
   function loadStaticGraph(scope) {
+    if (!window.__ST_HYPNOOS_HAS_ACTIVE_CHAT__?.()) {
+      return { title: scope === "school" ? "学校地图" : "区域地图", locations: [] };
+    }
     syncStaticGraphUpdatesFromChat();
     const adaptiveGraph = adaptiveStaticGraph(scope);
     if (adaptiveGraph) return adaptiveGraph;
@@ -40322,6 +40345,9 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   }
 
   async function readAdaptiveAppData(kind) {
+    if ((kind === "map" || kind === "specialLocations") && !window.__ST_HYPNOOS_HAS_ACTIVE_CHAT__?.()) {
+      return { kind, source: "empty", sourceLabel: "尚未进入角色聊天", records: [] };
+    }
     const region = readAdaptiveRegion();
     if (region === "auto") {
       const profile = readAdaptiveGeneratedProfile();
@@ -40336,6 +40362,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   }
 
   function adaptiveRecordsSync(kind) {
+    if ((kind === "map" || kind === "specialLocations") && !window.__ST_HYPNOOS_HAS_ACTIVE_CHAT__?.()) return [];
     const region = readAdaptiveRegion();
     if (region === "auto") return adaptiveNormalizeRecords(readAdaptiveGeneratedProfile()?.apps?.[kind]);
     return (ST_ADAPTIVE_TEMPLATES[region]?.[kind] || []).map((item, index) => ({ id: item.id || kind + "-" + index, ...item }));
@@ -44104,12 +44131,30 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
               .catch((error) => console.warn("[HypnoOS] 每轮档案世界书同步失败", error));
           }
         });
+        let chatRefreshToken = 0;
         const chatStop = eventOn(CHAOS_FORUM_CHAT_EVENT, () => {
+          const token = ++chatRefreshToken;
           delete window.__ST_MCHAN_FORUM_STATE_SCOPE__;
           delete window.__ST_MCHAN_FORUM_STATE__;
           const page = document.querySelector(".st-mchan-internal-app");
           if (page) renderPage(page, loadState());
+          adaptiveWorldbookRoleCache = {};
+          adaptiveWorldbookRoleCacheScope = "";
           archiveRoleSnapshotCache = {};
+          updateOpenPersonProfilePage();
+          window.setTimeout(() => {
+            if (runtimeDisposed || token !== chatRefreshToken) return;
+            const refresh = window.__ST_HYPNOOS_HAS_ACTIVE_CHAT__?.()
+              ? Promise.all([refreshAdaptiveWorldbookRoleCache(true), refreshArchiveRoleSnapshotCache()])
+              : Promise.resolve();
+            void refresh
+              .then(() => {
+                if (runtimeDisposed || token !== chatRefreshToken) return;
+                updateOpenPersonProfilePage();
+                schedulePhoneVariableRefresh();
+              })
+              .catch((error) => console.warn("[HypnoOS] 聊天切换后刷新人物档案失败", error));
+          }, 250);
         });
         if (roundStop?.stop) eventStops.push(roundStop);
         if (chatStop?.stop) eventStops.push(chatStop);
