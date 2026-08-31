@@ -20,7 +20,7 @@ for (const path of [manifest.js, manifest.css, 'capability-contract.json']) {
 const ui = await readFile(new URL('ui/index.html', root));
 const uiText = ui.toString('utf8');
 const uiHash = createHash('sha256').update(uiText.replace(/\r\n/g, '\n')).digest('hex');
-expect(uiHash === '071127b13be92398009d1d888d77c10799dc11ca99f097710ee00263776cae2b', `UI 基线哈希变化：${uiHash}`);
+expect(uiHash === '531cfb7b34ee6d69ba895008723e72a7e3ef04ac7b9d5c711218983044541218', `UI 基线哈希变化：${uiHash}`);
 const hypnosisRulesSource = await readFile(new URL('src/hypnosis-rules.js', root), 'utf8');
 expect(uiText.includes('html,body,#app{width:100%;height:100%;min-height:0;margin:0;overflow:hidden!important;overscroll-behavior:none}#app{contain:strict}'), '手机前端缺少满屏滚动锁');
 expect(uiText.includes('window.__ST_OPEN_PENDING_INPUT_APP__'), '手机前端缺少本轮输入应用入口');
@@ -72,7 +72,7 @@ expect(!uiText.includes('ST_HOME_AUTHOR_STATUS') && !uiText.includes('st-home-au
 expect(!uiText.includes('timeText: \\"Ramiel\\"'), 'React主页状态栏仍显示Ramiel');
 expect(uiText.includes('HypnoOS人物档案提取器') && uiText.includes('typeof globalThis.generateRaw === "function"'), '档案导入没有接入模型提取链');
 expect(uiText.includes('data-settings-profile-import-status') && uiText.includes('模型正在分析'), '档案导入缺少就地进度与结果反馈');
-expect(uiText.includes('data-settings-tab="logs"') && uiText.includes('data-settings-log-view') && uiText.includes('ST_DIAGNOSTIC_LOG_LIMIT'), '设置缺少诊断日志标签和有界日志存储');
+expect(uiText.includes('renderDiagnosticLogs() +') && uiText.includes('data-settings-log-view') && uiText.includes('ST_DIAGNOSTIC_LOG_LIMIT'), '设置单页缺少诊断日志和有界日志存储');
 expect(uiText.includes('diagnosticRedact') && uiText.includes('[REDACTED]') && uiText.includes('profile.import.failure'), '诊断日志缺少脱敏或关键档案错误记录');
 expect(uiText.includes('.st-settings-worldbook-option input:checked') && uiText.includes('background:#ff3f91'), '世界书下拉多选缺少粉色勾选反馈');
 expect(uiText.includes("html: '<strong>档案</strong>'"), '男女档案顶部没有显示档案');

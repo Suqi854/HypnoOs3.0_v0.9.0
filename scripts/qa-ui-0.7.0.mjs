@@ -291,7 +291,8 @@ async function openPhone(viewport, screenshotPrefix) {
   assert.doesNotMatch(settingsText, /酒馆后端代理/);
   const modelInput = frame.locator('[data-connector-field="model"]');
   assert.equal(await modelInput.getAttribute('readonly'), '', '模型名仍允许手动输入');
-  await frame.locator('[data-connector-field="enabled"]').check();
+  await frame.locator('[data-connector-field="presetName"]').fill('QA 主预设');
+  await frame.locator('[data-connector-enabled]').click();
   await frame.locator('[data-connector-field="endpoint"]').fill('https://qa-openai.example/v1');
   await frame.locator('[data-connector-secret="text"]').fill('qa-secret-not-logged');
   await frame.getByRole('button', { name: '加载模型' }).click();
@@ -306,6 +307,9 @@ async function openPhone(viewport, screenshotPrefix) {
   await frame.getByRole('button', { name: '测试连接' }).click();
   await frame.waitForFunction(() => document.body?.innerText?.includes('文生文插头连接成功'));
   const savedConnector = await frame.evaluate(() => JSON.parse(localStorage.getItem('hypnoos:model-connectors:v1')));
+  assert.equal(savedConnector.schemaVersion, 2);
+  assert.equal(savedConnector.presets.length, 1);
+  assert.equal(savedConnector.text.presetName, 'QA 主预设');
   assert.equal(savedConnector.text.mode, 'direct');
   assert.equal(savedConnector.text.model, 'qa-model-pro');
   assert.equal(savedConnector.text.endpoint, 'https://qa-openai.example/v1');
@@ -313,6 +317,28 @@ async function openPhone(viewport, screenshotPrefix) {
   assert.equal(directRequests[1]?.url, 'https://qa-openai.example/v1/chat/completions');
   assert.equal(directRequests[1]?.body?.model, 'qa-model-pro');
   assert.equal(directRequests[1]?.headers?.authorization, 'Bearer qa-secret-not-logged');
+  assert.equal(await frame.evaluate((presetId) => localStorage.getItem('hypnoos:model-connectors:persistent-secret:v2:' + presetId), savedConnector.activePresetId), 'qa-secret-not-logged', 'API 密钥没有持久保存到当前预设');
+
+  await frame.locator('[data-connector-preset-new]').click();
+  await frame.locator('[data-connector-field="presetName"]').fill('QA 备用预设');
+  await frame.locator('[data-connector-enabled]').click();
+  await frame.locator('[data-connector-field="endpoint"]').fill('https://qa-openai.example/v1');
+  await frame.locator('[data-connector-secret="text"]').fill('qa-secret-secondary');
+  await frame.getByRole('button', { name: '加载模型' }).click();
+  await frame.locator('[data-connector-model-list="text"]').selectOption('qa-model-small');
+  await frame.getByRole('button', { name: '保存当前预设' }).click();
+  await frame.waitForFunction(() => document.body?.innerText?.includes('QA 备用预设') && document.body?.innerText?.includes('切换聊天后仍会保留'));
+  const secondConnector = await frame.evaluate(() => JSON.parse(localStorage.getItem('hypnoos:model-connectors:v1')));
+  assert.equal(secondConnector.presets.length, 2);
+  assert.equal(secondConnector.text.presetName, 'QA 备用预设');
+  assert.equal(await frame.evaluate((presetId) => localStorage.getItem('hypnoos:model-connectors:persistent-secret:v2:' + presetId), secondConnector.activePresetId), 'qa-secret-secondary');
+  await frame.locator('[data-connector-preset-delete="' + secondConnector.activePresetId + '"]').click();
+  await frame.getByRole('button', { name: '确认删除' }).click();
+  await frame.waitForFunction(() => document.body?.innerText?.includes('已删除 API 预设'));
+  const afterPresetDelete = await frame.evaluate(() => JSON.parse(localStorage.getItem('hypnoos:model-connectors:v1')));
+  assert.equal(afterPresetDelete.presets.length, 1);
+  assert.equal(afterPresetDelete.text.presetName, 'QA 主预设');
+  assert.equal(await frame.evaluate((presetId) => localStorage.getItem('hypnoos:model-connectors:persistent-secret:v2:' + presetId), secondConnector.activePresetId), null, '删除预设后对应密钥仍残留');
   await page.screenshot({ path: `docs/screenshots/${screenshotPrefix}-model-settings.png`, fullPage: true });
   await frame.locator('.st-settings-app [data-lite-action="back"]').click();
   await frame.waitForFunction(() => document.body?.innerText?.includes('本轮输入'));

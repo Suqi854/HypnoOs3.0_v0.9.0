@@ -50,7 +50,7 @@ try {
   assert.equal(await settings.locator('[data-settings-action="archive-character"]').count(), 1);
   assert.equal(await settings.locator('[data-settings-action="archive-migrate"]').count(), 1);
   const order = await settings.evaluate((node) => ({
-    binding: node.innerHTML.indexOf('<h3>档案世界书绑定</h3>'),
+    binding: node.innerHTML.indexOf('<h3>世界书绑定</h3>'),
     archive: node.innerHTML.indexOf('<h3>档案</h3>'),
   }));
   assert.ok(order.binding >= 0 && order.binding < order.archive, '档案世界书绑定模块没有位于档案设置之前');
@@ -59,32 +59,32 @@ try {
   const createButton = settings.locator('[data-settings-action="archive-create"]');
   await createButton.click();
   assert.equal(await createButton.evaluate((node) => node.classList.contains('st-button-feedback')), true, '按钮点击后没有可见微动效反馈');
-  const createPopup = page.locator('dialog.popup[open]').last();
+  const createPopup = settings.locator('[data-settings-text-prompt]');
   await createPopup.waitFor({ state: 'visible' });
-  assert.match(await createPopup.textContent(), /创建新的世界书/);
-  assert.equal(await createPopup.locator('.popup-input').count(), 1, '新建世界书没有显示酒馆原生输入框');
-  assert.ok(String(await createPopup.locator('.popup-input').inputValue()).startsWith('HypnoOS档案 - '), '新建世界书没有提供专用名称');
-  await createPopup.locator('.popup-button-cancel').click();
+  assert.match(await createPopup.textContent(), /新建专属世界书/);
+  assert.equal(await createPopup.locator('[data-settings-text-prompt-input]').count(), 1, '新建世界书没有显示催眠手机输入框');
+  assert.ok(String(await createPopup.locator('[data-settings-text-prompt-input]').inputValue()).startsWith('HypnoOS档案 - '), '新建世界书没有提供专属名称');
+  await createPopup.locator('[data-settings-text-prompt-cancel]').click();
 
   const characterButton = settings.locator('[data-settings-action="archive-character"]');
   if (await characterButton.isEnabled()) {
     await characterButton.click();
-    const characterPopup = page.locator('dialog.popup[open]').last();
+    const characterPopup = settings.locator('.st-encounter-confirm-card[aria-label="绑定角色卡世界书"]');
     await characterPopup.waitFor({ state: 'visible' });
     assert.match(await characterPopup.textContent(), /绑定角色卡世界书/);
-    await characterPopup.locator('.popup-button-cancel').click();
+    await characterPopup.locator('[data-encounter-confirm="cancel"]').click();
   }
 
   if (!targetName) throw new Error('真实酒馆没有已有世界书，无法验证迁移弹窗和写入');
   const migrateButton = settings.locator('[data-settings-action="archive-migrate"]');
   await migrateButton.click();
-  const migratePopup = page.locator('dialog.popup[open]').last();
+  const migratePopup = settings.locator('[data-settings-select-prompt]');
   await migratePopup.waitFor({ state: 'visible' });
-  assert.match(await migratePopup.textContent(), /数据注入目标/);
-  const migrateSelect = migratePopup.locator('[data-hypnoos-archive-target]');
+  assert.match(await migratePopup.textContent(), /迁移到已有世界书/);
+  const migrateSelect = migratePopup.locator('[data-settings-select-prompt-input]');
   assert.ok(await migrateSelect.locator('option').count(), '迁移弹窗没有列出已有世界书');
   await migrateSelect.selectOption(targetName);
-  await migratePopup.locator('.popup-button-ok').click();
+  await migratePopup.locator('button[type="submit"]').click();
   await frame.waitForFunction(() => document.querySelector('[data-settings-archive-status]')?.textContent?.includes('内置催眠规则已加载'), null, { timeout: 30_000 });
   assert.match(await settings.locator('[data-settings-archive-status]').textContent(), /内置催眠规则已加载/);
   assert.equal(await settings.locator('[data-settings-action="archive-migrate"]').isEnabled(), true, '迁移完成后按钮仍处于卡死状态');
@@ -102,11 +102,18 @@ try {
     const book = await st?.loadWorldInfo?.(worldbookName);
     const entries = Array.isArray(book?.entries) ? book.entries : Object.values(book?.entries || {});
     const rules = entries.filter((entry) => entry?.extensions?.hypnoosRules?.owner === 'hypnoos3-hypnosis-rules');
+    const managedRuleBooks = [];
+    for (const name of await Promise.resolve(st?.getWorldInfoNames?.()) || []) {
+      const candidate = await st?.loadWorldInfo?.(name);
+      const candidateEntries = Array.isArray(candidate?.entries) ? candidate.entries : Object.values(candidate?.entries || {});
+      if (candidateEntries.some((entry) => entry?.extensions?.hypnoosRules?.owner === 'hypnoos3-hypnosis-rules')) managedRuleBooks.push(String(name));
+    }
     const scanChat = Array.isArray(st?.chat) ? st.chat.map((message) => String(message?.mes || message?.message || '')).reverse() : [];
     const worldInfoPrompt = await st?.getWorldInfoPrompt?.(scanChat, 32_768, true);
     return {
       entryCount: rules.length,
       entry: rules[0] || null,
+      managedRuleBooks,
       runtimePrompt: String(st?.extensionPrompts?.['hypnoos3-runtime-state']?.value || ''),
       worldInfoPrompt: String(worldInfoPrompt?.worldInfoString || ''),
     };
@@ -124,7 +131,7 @@ try {
   assert.match(runtimeRules.entry.content, /主角可疑度反映环境/);
   for (const command of getHypnosisRules().commands) assert.ok(runtimeRules.entry.content.includes(`${command.id}｜${command.tier}｜${command.title}`), `真实世界书缺少催眠指令：${command.id}`);
   assert.doesNotMatch(runtimeRules.runtimePrompt, /<HypnoOS催眠规则/, '绑定世界书后扩展提示仍重复注入催眠规则');
-  assert.equal((runtimeRules.worldInfoPrompt.match(/<HypnoOS催眠规则/g) || []).length, 1, '真实酒馆 World Info 扫描没有且仅有一份催眠规则');
+  assert.equal((runtimeRules.worldInfoPrompt.match(/<HypnoOS催眠规则/g) || []).length, 1, `真实酒馆 World Info 扫描没有且仅有一份催眠规则；含规则世界书：${runtimeRules.managedRuleBooks.join('、')}`);
   assert.match(runtimeRules.worldInfoPrompt, /vip5_permanent_personality｜VIP5｜永久人格植入/);
 
   const chatSwitch = await page.evaluate(async () => {

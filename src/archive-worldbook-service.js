@@ -179,6 +179,18 @@ export class ArchiveWorldbookService {
     return bindingFromState(this.store.state);
   }
 
+  async removeRulesFromOtherWorldbooks(activeWorldbookName) {
+    const activeName = String(activeWorldbookName || '').trim();
+    const names = await Promise.resolve(this.host.getWorldbookNames()) || [];
+    for (const name of [...new Set(names.map(String).filter((item) => item && item !== activeName))]) {
+      try {
+        const book = await this.host.loadWorldbook(name);
+        if (!entriesOf(book).some(managedRules)) continue;
+        await this.host.saveWorldbook(name, removeRulesEntry(book));
+      } catch {}
+    }
+  }
+
   async options() {
     const names = await Promise.resolve(this.host.getWorldbookNames()) || [];
     const character = await this.host.getCharacterWorldbookNames();
@@ -228,6 +240,7 @@ export class ArchiveWorldbookService {
     }
     targetBook = replaceManagedEntries(targetBook, chatKey, records, contextText);
     await this.host.saveWorldbook(targetName, targetBook);
+    await this.removeRulesFromOtherWorldbooks(targetName);
     const verify = await this.host.loadWorldbook(targetName);
     if (entriesOf(verify).filter((entry) => managed(entry, chatKey)).length !== 2) throw new Error('目标世界书写后校验失败，未更改绑定。');
     const ruleEntries = entriesOf(verify).filter(managedRules);
@@ -256,6 +269,7 @@ export class ArchiveWorldbookService {
       this.activeRulesBinding = null;
       return { ok: false, reason: 'not-bound' };
     }
+    await this.removeRulesFromOtherWorldbooks(binding.worldbookName);
     const book = await this.host.loadWorldbook(binding.worldbookName);
     await this.host.saveWorldbook(binding.worldbookName, replaceRulesEntry(book));
     const verify = await this.host.loadWorldbook(binding.worldbookName);

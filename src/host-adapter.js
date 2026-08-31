@@ -74,21 +74,6 @@ function messageText(message) {
   return typeof value === 'string' ? value : String(value || '');
 }
 
-function nextAvailableWorldbookName(names, baseName) {
-  const existing = new Set((Array.isArray(names) ? names : []).map(String));
-  const base = String(baseName || 'HypnoOS档案').trim() || 'HypnoOS档案';
-  if (!existing.has(base)) return base;
-  for (let index = 2; index < 100_000; index += 1) {
-    const candidate = `${base} ${index}`;
-    if (!existing.has(candidate)) return candidate;
-  }
-  return `${base} ${Date.now()}`;
-}
-
-function escapePopupText(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
-}
-
 export function extractLatestUserOperationBlock(chat) {
   const list = Array.isArray(chat) ? chat : [];
   const latest = [...list].reverse().find(visibleUserMessage);
@@ -257,51 +242,6 @@ export class HostAdapter {
     context.chatMetadata.world_info = String(name || '').trim();
     await Promise.resolve(context.saveMetadataDebounced?.());
     return true;
-  }
-
-  async requestArchiveWorldbookAction({ action, names = [], characterWorldbook = '', currentWorldbook = '' } = {}) {
-    const context = this.context;
-    const Popup = context?.Popup;
-    const popupType = context?.POPUP_TYPE;
-    const affirmative = context?.POPUP_RESULT?.AFFIRMATIVE ?? 1;
-    if (!Popup?.show || !popupType?.CONFIRM) throw new Error('SillyTavern 原生弹窗接口不可用');
-    const normalizedNames = [...new Set((Array.isArray(names) ? names : []).map(String).map((name) => name.trim()).filter(Boolean))];
-    if (action === 'create') {
-      const character = String(context?.characters?.[context?.characterId]?.name || context?.name2 || '当前角色').trim();
-      const chat = String(context?.chatId || '当前对话').replace(/[^\p{L}\p{N}._-]+/gu, '-').slice(0, 32);
-      const suggested = nextAvailableWorldbookName(normalizedNames, `HypnoOS档案 - ${character} - ${chat}`);
-      const value = await Popup.show.input('创建新的世界书', '输入新文件的名称：', suggested, { okButton: '确定', cancelButton: '取消' });
-      if (value === null) return { cancelled: true };
-      const worldbookName = String(value || '').trim();
-      if (!worldbookName) throw new Error('世界书名称不能为空');
-      return { cancelled: false, worldbookName };
-    }
-    if (action === 'character') {
-      const worldbookName = String(characterWorldbook || '').trim();
-      if (!worldbookName) throw new Error('当前角色卡没有可写入的外部世界书');
-      const result = await Popup.show.confirm('绑定角色卡世界书', `将 HypnoOS 档案与内置催眠规则写入“${escapePopupText(worldbookName)}”并绑定到当前聊天。`, { okButton: '确定绑定', cancelButton: '取消' });
-      return result === affirmative ? { cancelled: false, worldbookName } : { cancelled: true };
-    }
-    if (action !== 'migrate') throw new Error('未知的世界书操作');
-    if (!normalizedNames.length) throw new Error('当前没有可选世界书');
-    const wrapper = document.createElement('label');
-    wrapper.style.cssText = 'display:grid;gap:10px;text-align:left';
-    const label = document.createElement('span');
-    label.textContent = '数据注入目标：';
-    const select = document.createElement('select');
-    select.dataset.hypnoosArchiveTarget = 'true';
-    select.style.cssText = 'width:100%;min-height:42px;padding:8px 10px;border-radius:8px';
-    for (const name of normalizedNames) {
-      const option = document.createElement('option');
-      option.value = name;
-      option.textContent = name;
-      option.selected = name === currentWorldbook;
-      select.appendChild(option);
-    }
-    wrapper.append(label, select);
-    const popup = new Popup(wrapper, popupType.CONFIRM, null, { okButton: '确定迁移', cancelButton: '取消', wider: true });
-    const result = await popup.show();
-    return result === affirmative ? { cancelled: false, worldbookName: String(select.value || '').trim() } : { cancelled: true };
   }
 
   setPromptText(text) {

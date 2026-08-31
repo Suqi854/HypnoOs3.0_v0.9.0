@@ -204,6 +204,13 @@ test('model connector explains SiliconFlow balance failures', () => {
   assert.ok(html.includes('return prefix + normalizeConnectorProviderError(detail)'));
   assert.ok(html.includes('"文生文插头代理失败：" + normalizeConnectorProviderError(message)'));
   assert.ok(html.includes('if (data?.error) throw new Error("文生文插头返回错误：" + normalizeConnectorProviderError'));
+  assert.ok(html.includes('data-connector-preset-new'));
+  assert.ok(html.includes('data-connector-preset-select'));
+  assert.ok(html.includes('data-connector-preset-delete'));
+  assert.ok(html.includes('function deleteModelConnectorPreset(presetId)'));
+  assert.ok(html.includes('hypnoos:model-connectors:persistent-secret:v2:'));
+  assert.ok(html.includes('localStorage.setItem(ST_MODEL_CONNECTOR_SECRET_PREFIX + id, legacy)'));
+  assert.ok(html.includes('保存后会随此预设持久保留'));
 });
 
 test('chaos forum keeps the original surface with bounded model-driven updates', () => {
@@ -250,7 +257,8 @@ test('hypnosis commands wait in phone input before host write or direct send', (
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__(block, { append: false })'));
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_DIRECT_SEND__(block)'));
   assert.ok(floatingHost.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__'));
-  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-worldbook-dialogs'"));
+  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-unblocked-pet-overlay-final'"));
+  assert.ok(floatingHost.includes('overflow:visible;z-index:5;display:none'));
   assert.ok(floatingCore.includes("scriptUrl.searchParams.set('revision', FRONTEND_REVISION)"));
   assert.ok(floatingCore.includes('script.dataset.revision = FRONTEND_REVISION'));
   assert.ok(floatingHost.includes('writeInput: function (text, options) { return callApi("setInput", [text, options]); }'));
@@ -407,18 +415,22 @@ test('archive worldbook binding stays optional in settings and remains reply-dri
   assert.ok(html.includes('data-settings-action="archive-create"'));
   assert.ok(html.includes('data-settings-action="archive-character"'));
   assert.ok(html.includes('data-settings-action="archive-migrate"'));
-  assert.ok(html.includes('requestArchiveWorldbookAction({'));
+  assert.ok(html.includes('settingsTextPrompt(page, {'));
+  assert.ok(html.includes('settingsSelectPrompt(page, {'));
+  assert.ok(html.includes('title: "绑定角色卡世界书"'));
   assert.ok(html.includes('data-settings-archive-status'));
   assert.ok(html.includes('内置催眠规则已加载'));
   assert.ok(!html.includes('data-settings-archive-target'));
-  assert.ok(html.indexOf('<h3>档案世界书绑定</h3>') < html.indexOf('<h3>档案</h3>'));
+  assert.ok(html.indexOf('<h3>世界书绑定</h3>') < html.indexOf('<h3>档案</h3>'));
+  assert.ok(html.includes('>新建专属世界书</button>'));
   assert.ok(html.includes('syncArchiveFromLatestReply({ knownRoles: archiveKnownRoleNames() })'));
   assert.ok(!functionBody('archiveConfigure').includes('syncArchiveFromLatestReply'));
   assert.ok(html.includes('await refreshArchiveRoleSnapshotCache()'));
   assert.ok(html.includes('function installGlobalButtonFeedback()'));
   assert.ok(html.includes('button:not(:disabled).st-button-feedback'));
   assert.ok(html.includes('@media(prefers-reduced-motion:reduce)'));
-  assert.ok(floatingHost.includes("'requestArchiveWorldbookAction','configureArchiveWorldbook'"));
+  assert.ok(floatingHost.includes("'getArchiveWorldbookOptions','configureArchiveWorldbook'"));
+  assert.ok(!floatingHost.includes('requestArchiveWorldbookAction'));
   assert.ok(!floatingHost.includes("'deleteWorldbook','configureArchiveWorldbook'"));
   assert.ok(!html.includes('以世界书与当前剧情为准'));
 });

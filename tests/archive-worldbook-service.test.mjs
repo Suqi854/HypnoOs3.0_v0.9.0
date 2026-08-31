@@ -75,6 +75,17 @@ test('dedicated archive worldbook persists reply state without MVU and migrates 
   assert.equal(activated.ok, true);
   assert.equal(hypnosisRuleEntries(host.books.get(binding.worldbookName)).length, 1);
 
+  host.books.set('历史绑定世界书', {
+    entries: {
+      1: { uid: 1, comment: '用户条目', content: '必须保留', extensions: {} },
+      2: { uid: 2, comment: '[HypnoOS内置]催眠规则', content: '历史残留', extensions: { hypnoosRules: { owner: 'hypnoos3-hypnosis-rules' } } },
+    },
+  });
+  await service.activateRules();
+  assert.equal(hypnosisRuleEntries(host.books.get('历史绑定世界书')).length, 0);
+  assert.equal(Object.values(host.books.get('历史绑定世界书').entries).some((entry) => entry.comment === '用户条目'), true);
+  assert.equal(hypnosisRuleEntries(host.books.get(binding.worldbookName)).length, 1);
+
   const synced = await service.syncLatestReply({ knownRoles: ['林遥'] });
   assert.equal(synced.ok, true);
   const options = await service.options();
