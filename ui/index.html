@@ -12401,6 +12401,10 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
         if (added) playHypnosisTranceAnimation(page);
         page.dataset.hypnosisNotice = added ? actionText + "已暂存。" : actionText + "已在暂存区。";
         rerenderPreservingScroll();
+      }).catch((error) => {
+        console.warn("[HypnoOS] 催眠操作暂存失败", error);
+        page.dataset.hypnosisNotice = actionText + "失败，请重试。";
+        rerenderPreservingScroll();
       });
     };
     bindHypnosisStartActivation(startButton, startHypnosis);
@@ -12408,24 +12412,41 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
 
   function bindHypnosisStartActivation(button, handler) {
     if (!button || typeof handler !== "function") return;
+    let lastActivationAt = 0;
     const activate = (event) => {
+      if (event.type === "pointerdown" && event.button !== undefined && event.button !== 0) return;
       if (event.type === "mousedown" && event.button !== undefined && event.button !== 0) return;
       if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
+      const now = Date.now();
+      if (now - lastActivationAt < 700) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
       if (button.dataset.hypnosisStartBusy === "true") return;
       event.preventDefault();
       event.stopImmediatePropagation();
+      lastActivationAt = now;
       button.dataset.hypnosisStartBusy = "true";
-      Promise.resolve(handler()).finally(() => {
+      let result;
+      try {
+        result = handler();
+      } catch (error) {
+        console.warn("[HypnoOS] 启动催眠按钮处理失败", error);
+        delete button.dataset.hypnosisStartBusy;
+        return;
+      }
+      Promise.resolve(result).catch((error) => {
+        console.warn("[HypnoOS] 启动催眠按钮处理失败", error);
+      }).finally(() => {
         if (button.isConnected) delete button.dataset.hypnosisStartBusy;
       });
     };
+    button.addEventListener("pointerdown", activate);
     button.addEventListener("mousedown", activate);
     button.addEventListener("touchstart", activate, { passive: false });
     button.addEventListener("keydown", activate);
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    });
+    button.addEventListener("click", activate);
   }
 
   function openHypnosisLitePage(tile) {

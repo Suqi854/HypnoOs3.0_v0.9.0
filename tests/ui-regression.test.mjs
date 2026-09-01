@@ -272,7 +272,7 @@ test('hypnosis commands wait in phone input before host write or direct send', (
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__(block, { append: false })'));
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_DIRECT_SEND__(block)'));
   assert.ok(floatingHost.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__'));
-  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-database-profile-v3'"));
+  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-hypnosis-start-v4'"));
   assert.ok(floatingHost.includes('overflow:visible;z-index:5;display:none'));
   assert.ok(floatingCore.includes("scriptUrl.searchParams.set('revision', FRONTEND_REVISION)"));
   assert.ok(floatingCore.includes('script.dataset.revision = FRONTEND_REVISION'));
@@ -469,11 +469,15 @@ test('archive worldbook binding stays optional in settings and remains reply-dri
 test('hypnosis start uses a touch-safe activation path before mobile blur rerenders', () => {
   const binding = functionBody('bindHypnosisStartActivation');
   const render = functionBody('renderHypnosisLitePage');
+  assert.ok(binding.includes('button.addEventListener("pointerdown", activate)'));
   assert.ok(binding.includes('button.addEventListener("mousedown"'));
   assert.ok(binding.includes('button.addEventListener("touchstart"'));
   assert.ok(binding.includes('button.addEventListener("keydown"'));
-  assert.ok(binding.includes('button.addEventListener("click"'));
+  assert.ok(binding.includes('button.addEventListener("click", activate)'));
+  assert.ok(binding.includes('now - lastActivationAt < 700'));
+  assert.ok(binding.includes('result = handler()'));
   assert.ok(render.includes('bindHypnosisStartActivation(startButton, startHypnosis)'));
+  assert.ok(render.includes('催眠操作暂存失败'));
 });
 
 test('raw operation containers use the built-in fold renderer without a SillyTavern regex', () => {
