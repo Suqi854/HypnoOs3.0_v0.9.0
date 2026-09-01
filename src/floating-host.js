@@ -4,7 +4,7 @@ import { HYPNOSIS_RULES_API } from './hypnosis-rules.js';
 const BRIDGE_KEY = '__HYPNOOS3_CORE_BRIDGE__';
 const SINGLETON_KEY = '__HYPNOOS3_EXTENSION_FLOATING_SINGLETON__';
 const HOST_ID = 'hypnoos3-extension-floating-phone-host';
-const FRONTEND_REVISION = 'hypnoos3-1.0.0-database-profile-source-v1';
+const FRONTEND_REVISION = 'hypnoos3-1.0.0-map-trigger-model-v1';
 
 function phoneFrame() {
   return document.querySelector(`#${HOST_ID}`)?.shadowRoot?.querySelector('iframe.phone') || null;
@@ -16,6 +16,7 @@ export function shouldSyncArchiveReply(type) {
 
 export function createStateBridge(host, dataService) {
   return {
+    hasActiveChat: () => host.hasActiveChat(),
     getVariables: () => dataService.readLegacyVariables(),
     updateVariablesWith: (updater) => dataService.updateLegacyVariables(updater),
     Mvu: {
@@ -119,6 +120,7 @@ export class FloatingHost {
     const stateBridge = createStateBridge(host, dataService);
     const bridge = {
       getVariables: stateBridge.getVariables,
+      hasActiveChat: stateBridge.hasActiveChat,
       updateVariablesWith: stateBridge.updateVariablesWith,
       getChatMessages() { return host.getMessages(); },
       setChatMessages() { return false; },

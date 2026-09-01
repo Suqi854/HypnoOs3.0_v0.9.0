@@ -118,7 +118,8 @@ export class HostAdapter {
     const groupId = context.groupId;
     const hasCharacter = (characterId !== undefined && characterId !== null && String(characterId).trim() !== '' && String(characterId) !== '-1')
       || (groupId !== undefined && groupId !== null && String(groupId).trim() !== '' && String(groupId) !== '-1');
-    return Boolean(chatId && hasCharacter);
+    const hasLoadedMessages = !Array.isArray(context.chat) || context.chat.length > 0;
+    return Boolean(chatId && hasCharacter && hasLoadedMessages);
   }
 
   capabilities() {

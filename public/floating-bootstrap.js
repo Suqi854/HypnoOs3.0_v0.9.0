@@ -2198,6 +2198,7 @@
         "function option(o){return r.normalizeMessageOption(o)}function writeOption(o){return r.normalizeWriteMessageOption(o)}" +
         "globalThis.getCurrentMessageId=function(){return r.getSelectedId()};" +
         "globalThis.__ST_HYPNOOS_REQUIRE_WRITABLE_FLOOR__=function(){if(r.isWritable())return true;r.notifyReadOnly();return false};" +
+        "if(r.hasApi('hasActiveChat'))globalThis.__ST_HYPNOOS_HOST_HAS_ACTIVE_CHAT__=function(){return r.readApi('hasActiveChat',[])};" +
         "if(r.hasApi('getVariables'))globalThis.getVariables=function(o){return r.readApi('getVariables',[option(o)])};" +
         "if(r.hasApi('updateVariablesWith'))globalThis.updateVariablesWith=function(fn,o){return r.guardedApi('updateVariablesWith',[fn,writeOption(o)])};" +
         "if(r.hasApi('getChatMessages'))globalThis.getChatMessages=function(){return r.callApi('getChatMessages',Array.prototype.slice.call(arguments))||[]};" +

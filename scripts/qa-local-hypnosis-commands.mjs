@@ -106,6 +106,7 @@ try {
         featureId: id,
         notice: document.querySelector('.st-hypnosis-lite-app:last-of-type .st-hypnosis-notice')?.textContent || '',
         operationId: operation?.功能列表?.[0]?.指令ID || '',
+        content: operation?.功能列表?.[0]?.备注 || '',
         preStart,
       };
     }, { id: featureId, preStart }).then((item) => ({ ...item, featureId: item.featureId || featureId })));
@@ -134,8 +135,9 @@ try {
     input.checked = true;
     input.dispatchEvent(new Event('change', { bubbles: true }));
   });
-  await triggerPage.locator('[data-hypnosis-trigger-field="triggerStimuli"]').fill(`{{user}}→${triggerRole}→QA扳机→QA效果`);
-  await triggerPage.locator('[data-hypnosis-start]').dispatchEvent('click');
+  const triggerContent = '任意→内容→保持原样';
+  await triggerPage.locator('[data-hypnosis-trigger-field="triggerStimuli"]').fill(triggerContent);
+  await triggerPage.locator('[data-hypnosis-start]').click();
   await page.waitForTimeout(300);
   results.push(await frame.evaluate(() => {
     const pending = globalThis.__ST_GET_PENDING_OPERATION_INPUT_LOG__?.() || [];
@@ -144,8 +146,14 @@ try {
       featureId: 'vip3_hypnosis_trigger',
       notice: document.querySelector('.st-hypnosis-lite-app:last-of-type .st-hypnosis-notice')?.textContent || '',
       operationId: operation?.功能列表?.[0]?.指令ID || '',
+      trigger: operation?.功能列表?.[0]?.催眠扳机 || '',
+      target: operation?.功能列表?.[0]?.被催眠者 || '',
     };
   }));
+
+  assert.equal(results.at(-1)?.trigger, triggerContent, '催眠扳机输入被错误解析或改写');
+  assert.equal(results.at(-1)?.target, triggerRole, '催眠扳机没有使用界面已选目标');
+  assert.deepEqual(results.slice(0, -1).filter((item) => item.content !== 'QA指令内容'), [], '普通催眠指令输入没有原样进入操作载荷');
 
   const failed = results.filter((item) => item.operationId !== item.featureId);
   assert.deepEqual(failed, [], `催眠指令启动失败：${JSON.stringify(failed, null, 2)}`);

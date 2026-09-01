@@ -169,6 +169,9 @@ test('phone bridge reads and writes HypnoState even when external runtimes disag
   };
   const bridge = createStateBridge(host, new AppDataService(host, store));
 
+  host.hasActiveChat = () => true;
+  assert.equal(bridge.hasActiveChat(), true);
+
   assert.equal(bridge.getVariables({ type: 'message', message_id: 3 }).系统.持有零花钱, 1200);
   assert.equal(bridge.Mvu.getMvuData({ type: 'chat' }).stat_data.系统.持有零花钱, 1200);
 

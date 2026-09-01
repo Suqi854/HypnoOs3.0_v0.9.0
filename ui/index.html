@@ -281,6 +281,11 @@ html.st-hypnoos-booting.st-hypnoos-boot-failed .st-hypnoos-phone-preboot::after{
 	    };
 	    const __stHypnoosHasActiveChat = () => {
 	      if (window.__ST_LOCAL_PREVIEW__) return true;
+	      try {
+	        if (typeof window.__ST_HYPNOOS_HOST_HAS_ACTIVE_CHAT__ === "function") {
+	          return window.__ST_HYPNOOS_HOST_HAS_ACTIVE_CHAT__() === true;
+	        }
+	      } catch {}
 	      const context = __stHypnoosContext();
 	      let chatId = "";
 	      try { chatId = window.SillyTavern?.getCurrentChatId?.() ?? ""; } catch {}
@@ -289,7 +294,8 @@ html.st-hypnoos-booting.st-hypnoos-boot-failed .st-hypnoos-phone-preboot::after{
 	      }
 	      const hasCharacter = __stHypnoosContextValuePresent(context?.characterId)
 	        || __stHypnoosContextValuePresent(context?.groupId);
-	      return __stHypnoosContextValuePresent(chatId) && hasCharacter;
+	      const hasLoadedMessages = !Array.isArray(context?.chat) || context.chat.length > 0;
+	      return __stHypnoosContextValuePresent(chatId) && hasCharacter && hasLoadedMessages;
 	    };
 	    window.__ST_HYPNOOS_HAS_ACTIVE_CHAT__ = __stHypnoosHasActiveChat;
 	    const __stHypnoosIsUserMessage = (message, index = 0) => {
@@ -11685,14 +11691,13 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     return rolePageVariablePath(roleName, "效果", "催眠扳机") + "/" + String(trigger || "").replace(/~/g, "~0").replace(/\//g, "~1");
   }
 
-  function parseHypnosisTriggerSpecification(value) {
-    const parts = String(value || "").split("→").map((part) => part.trim()).filter(Boolean);
-    if (parts.length < 4) return { hypnotist: "", target: "", trigger: "", effect: "" };
+  function parseHypnosisTriggerSpecification(value, fallbackHypnotist = "", fallbackTarget = "") {
+    const content = String(value || "").trim();
     return {
-      hypnotist: parts[0],
-      target: parts[1],
-      trigger: parts[2],
-      effect: parts.slice(3).join("→")
+      hypnotist: String(fallbackHypnotist || "").trim(),
+      target: String(fallbackTarget || "").trim(),
+      trigger: content,
+      effect: content
     };
   }
 
@@ -12262,6 +12267,18 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
         return;
       }
       const system = getSystemState();
+      const notes = draft.notes && typeof draft.notes === "object" ? draft.notes : {};
+      const missingContentFeature = selected.find((feature) => {
+        const content = hypnosisFeatureRequiresNamedRoles(feature)
+          ? hypnosisLiteInputValue(draft, "triggerStimuli", feature.id, "")
+          : notes[feature.id];
+        return !String(content || "").trim();
+      });
+      if (missingContentFeature) {
+        page.dataset.hypnosisNotice = "请填写「" + missingContentFeature.title + "」的指令内容。";
+        rerenderPreservingScroll();
+        return;
+      }
       const selectedNeedsTargetDelivery = hypnosisSelectedNeedsTargetDelivery(selected);
       const deliveryMode = hypnosisEffectiveDeliveryMode(draft, system, selected);
       if (hypnosisWantsSoundwaveMode(draft) && selectedNeedsTargetDelivery && !hypnosisSoundwaveUnlocked(system)) {
@@ -12288,15 +12305,15 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       const triggerFeature = selected.find(hypnosisFeatureRequiresNamedRoles);
       if (triggerFeature) {
         const hypnotist = hypnosisLiteInputValue(draft, "triggerHypnotists", triggerFeature.id, "{{user}}").trim();
-        const specification = parseHypnosisTriggerSpecification(hypnosisLiteInputValue(draft, "triggerStimuli", triggerFeature.id, ""));
-        const missingTriggerField = !hypnotist ? "催眠者" : !specification.trigger || !specification.effect ? "催眠者→目标角色→催眠扳机→效果" : "";
+        const roleNames = hypnosisSelectedRoleNames(triggerFeature, draft);
+        const specification = parseHypnosisTriggerSpecification(hypnosisLiteInputValue(draft, "triggerStimuli", triggerFeature.id, ""), hypnotist, roleNames.join("、"));
+        const missingTriggerField = !hypnotist ? "催眠者" : "";
         if (missingTriggerField) {
           page.dataset.hypnosisNotice = "请填写催眠扳机的「" + missingTriggerField + "」。";
           rerenderPreservingScroll();
           return;
         }
       }
-      const notes = draft.notes && typeof draft.notes === "object" ? draft.notes : {};
       const soundwaveCost = hypnosisSoundwaveSurcharge(draft, system, selected);
       const totalCost = selected.reduce((sum, feature) => sum + hypnosisLiteFeatureCost(feature, draft), 0) + soundwaveCost;
       const totalStarlightCost = selected.reduce((sum, feature) => sum + hypnosisLiteFeatureStarlightCost(feature, draft), 0);
@@ -12323,12 +12340,12 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
         if (hypnosisFeatureRequiresNamedRoles(feature)) {
           const roleNames = hypnosisSelectedRoleNames(feature, draft);
           const hypnotist = hypnosisLiteInputValue(draft, "triggerHypnotists", feature.id, "{{user}}").trim();
-          const specification = parseHypnosisTriggerSpecification(hypnosisLiteInputValue(draft, "triggerStimuli", feature.id, ""));
+          const specification = parseHypnosisTriggerSpecification(hypnosisLiteInputValue(draft, "triggerStimuli", feature.id, ""), hypnotist, roleNames.join("、"));
           const trigger = specification.trigger;
           const effect = specification.effect;
           detail["催眠者"] = hypnotist;
           detail["被催眠者"] = roleNames.join("、");
-          detail["用户填写"] = [specification.hypnotist, specification.target, trigger, effect].join("→");
+          detail["用户填写"] = trigger;
           detail["催眠扳机"] = trigger;
           detail["扳机效果"] = effect;
           detail["永久效果"] = "是；无结束时间，直到明确解除或删除";
@@ -12980,7 +12997,10 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       showIndependentConnectorFeedback("text", "running", "正在调用酒馆当前模型读取人物档案…");
       diagnosticLog("info", "model.host.request", { purpose: "profile-import", worldbookCount: selected.length });
       try {
-        const generated = await globalThis.generateRaw({ prompt: user, systemPrompt: system, responseLength: 6000, quietToLoud: false, trimNames: true });
+        const generated = await runModelRequestWithTimeout(
+          () => globalThis.generateRaw({ prompt: user, systemPrompt: system, responseLength: 6000, quietToLoud: false, trimNames: true }),
+          { label: "酒馆当前模型" }
+        );
         text = typeof generated === "string" ? generated : (independentConnectorTextContent(generated) || JSON.stringify(generated));
         diagnosticLog("info", "model.host.success", { purpose: "profile-import", responseChars: text.length });
       } catch (error) {
@@ -41831,6 +41851,41 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     return "";
   }
 
+  function modelRequestTimeoutMs() {
+    const override = Number(globalThis.__ST_HYPNOOS_MODEL_REQUEST_TIMEOUT_MS__);
+    if (Number.isFinite(override) && override >= 1000) return Math.min(300000, Math.floor(override));
+    return 90000;
+  }
+
+  async function runModelRequestWithTimeout(request, { signal, label = "文生文模型" } = {}) {
+    if (typeof request !== "function") throw new TypeError("模型请求函数不可用。");
+    const controller = new AbortController();
+    let timedOut = false;
+    const forwardAbort = () => controller.abort(signal?.reason);
+    if (signal?.aborted) forwardAbort();
+    else signal?.addEventListener?.("abort", forwardAbort, { once: true });
+    const timeoutMs = modelRequestTimeoutMs();
+    let timer = 0;
+    const timeoutError = new Error(label + "连接超时（" + Math.ceil(timeoutMs / 1000) + "秒），请检查接口、网络或模型服务后重试。");
+    try {
+      const timeoutPromise = new Promise((_, reject) => {
+        timer = window.setTimeout(() => {
+          timedOut = true;
+          controller.abort();
+          reject(timeoutError);
+        }, timeoutMs);
+      });
+      return await Promise.race([Promise.resolve().then(() => request(controller.signal)), timeoutPromise]);
+    } catch (error) {
+      if (timedOut) throw timeoutError;
+      if (signal?.aborted || error?.name === "AbortError") throw new Error(label + "请求已取消。");
+      throw error;
+    } finally {
+      if (timer) window.clearTimeout(timer);
+      signal?.removeEventListener?.("abort", forwardAbort);
+    }
+  }
+
   async function invokeIndependentTextModel({
     system,
     user,
@@ -41866,20 +41921,22 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       Object.assign(body, parseConnectorBodyAdditions(profile.additionalBody));
       connectorExcludedBodyKeys(profile.excludedBody).forEach((key) => delete body[key]);
       let data;
-      if (useHostProxy) {
-        data = await invokeIndependentTextModelThroughHost({ ...profile, maxTokens: requestedMaxTokens }, messages, signal);
-      } else {
+      data = await runModelRequestWithTimeout(async (requestSignal) => {
+        if (useHostProxy) {
+          return invokeIndependentTextModelThroughHost({ ...profile, maxTokens: requestedMaxTokens }, messages, requestSignal);
+        }
         const response = await fetch(connectorChatCompletionsUrl(profile.endpoint), {
           method: "POST",
           headers: independentConnectorHeaders("text", profile),
           credentials: "omit",
-          signal,
+          signal: requestSignal,
           body: JSON.stringify(body)
         });
         if (!response.ok) throw new Error(await connectorErrorMessage(response, "文生文插头返回错误："));
-        data = await response.json();
-        if (data?.error) throw new Error("文生文插头返回错误：" + normalizeConnectorProviderError(data.error?.message || data.error));
-      }
+        const responseData = await response.json();
+        if (responseData?.error) throw new Error("文生文插头返回错误：" + normalizeConnectorProviderError(responseData.error?.message || responseData.error));
+        return responseData;
+      }, { signal, label: "文生文模型" });
       const text = independentConnectorTextContent(data);
       if (!String(text || "").trim()) {
         const keys = data && typeof data === "object" ? Object.keys(data).slice(0, 12).join(", ") : "";

@@ -201,6 +201,27 @@ test('custom connector accepts structured text returned in reasoning fields', ()
   assert.equal(extractText({ choices: [{ message: { content: 'normal', reasoning_content: payload } }] }), 'normal');
 });
 
+test('model requests stop waiting and report a bounded timeout', async () => {
+  const timeoutSource = functionBody('runModelRequestWithTimeout');
+  assert.ok(timeoutSource.includes('Promise.race'));
+  assert.ok(timeoutSource.includes('controller.abort()'));
+  assert.ok(timeoutSource.includes('连接超时'));
+  assert.ok(functionBody('invokeIndependentTextModel').includes('runModelRequestWithTimeout'));
+  assert.ok(functionBody('extractProfileRolesWithModel').includes('runModelRequestWithTimeout'));
+  const context = {
+    AbortController,
+    clearTimeout,
+    setTimeout,
+    window: { clearTimeout, setTimeout },
+    __ST_HYPNOOS_MODEL_REQUEST_TIMEOUT_MS__: 1000,
+  };
+  vm.runInNewContext(`${functionBody('modelRequestTimeoutMs')}\n${timeoutSource.replace(/^function /, 'async function ')}; globalThis.run = runModelRequestWithTimeout;`, context);
+  await assert.rejects(
+    context.run(() => new Promise(() => {}), { label: '测试模型' }),
+    /测试模型连接超时（1秒）/,
+  );
+});
+
 test('phone resize is frame-coalesced without forced layout reads per pointer move', () => {
   const moveStart = floatingHost.indexOf('function moveResize(event)');
   const moveEnd = floatingHost.indexOf('function endResize(event)', moveStart);
@@ -240,7 +261,7 @@ test('model connector explains SiliconFlow balance failures', () => {
   assert.ok(html.includes('硅基流动账户余额不足，请充值当前 API 密钥所属账户，或更换有余额的 API 密钥。'));
   assert.ok(html.includes('return prefix + normalizeConnectorProviderError(detail)'));
   assert.ok(html.includes('"文生文插头代理失败：" + normalizeConnectorProviderError(message)'));
-  assert.ok(html.includes('if (data?.error) throw new Error("文生文插头返回错误：" + normalizeConnectorProviderError'));
+  assert.ok(html.includes('if (responseData?.error) throw new Error("文生文插头返回错误：" + normalizeConnectorProviderError'));
   assert.ok(html.includes('data-connector-preset-new'));
   assert.ok(html.includes('data-connector-preset-select'));
   assert.ok(html.includes('data-connector-preset-delete'));
@@ -274,7 +295,7 @@ test('monitor preserves three gates while consuming generated worldbook location
   assert.ok(html.includes('监控必须生成3至6个彼此不同的地点'));
 });
 
-test('VIP3 hypnosis trigger stays first and uses the permanent four-part contract', () => {
+test('VIP3 hypnosis trigger stays first and keeps its four-part placeholder hint', () => {
   const triggerIndex = html.indexOf('["vip3_hypnosis_trigger","VIP3","催眠扳机"');
   const formerFirstIndex = html.indexOf('["vip3_forced","VIP3","强制高潮"');
   assert.ok(triggerIndex >= 0 && triggerIndex < formerFirstIndex);
@@ -294,7 +315,7 @@ test('hypnosis commands wait in phone input before host write or direct send', (
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__(block, { append: false })'));
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_DIRECT_SEND__(block)'));
   assert.ok(floatingHost.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__'));
-  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-database-profile-source-v1'"));
+  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-map-trigger-model-v1'"));
   assert.ok(floatingHost.includes('overflow:visible;z-index:5;display:none'));
   assert.ok(floatingCore.includes("scriptUrl.searchParams.set('revision', FRONTEND_REVISION)"));
   assert.ok(floatingCore.includes('script.dataset.revision = FRONTEND_REVISION'));
@@ -453,6 +474,10 @@ test('chat lifecycle clears stale profiles and no-chat map data', () => {
   assert.match(html, /const __stHypnoosHasActiveChat = \(\) => \{/);
   assert.match(html, /getCurrentChatId/);
   assert.match(html, /context\?\.characterId/);
+  assert.match(html, /__ST_HYPNOOS_HOST_HAS_ACTIVE_CHAT__/);
+  assert.match(floatingHost, /hasApi\('hasActiveChat'\)/);
+  assert.match(floatingCore, /hasActiveChat: \(\) => host\.hasActiveChat\(\)/);
+  assert.match(html, /context\.chat\.length > 0/);
   assert.match(roles, /__ST_HYPNOOS_HAS_ACTIVE_CHAT__/);
   assert.match(graph, /__ST_HYPNOOS_HAS_ACTIVE_CHAT__/);
   assert.match(graph, /locations: \[\]/);
@@ -460,6 +485,26 @@ test('chat lifecycle clears stale profiles and no-chat map data', () => {
   assert.match(html, /refreshAdaptiveWorldbookRoleCache\(true\)/);
   assert.match(html, /refreshArchiveRoleSnapshotCache\(\)/);
   assert.match(html, /!hasDatabaseProfileSource\(\)/);
+});
+
+test('hypnosis placeholders are hints and trigger content is never parsed as syntax', () => {
+  const parse = evaluateUiFunction('parseHypnosisTriggerSpecification');
+  assert.deepEqual(
+    { ...parse('123', '{{user}}', '数据库女角色') },
+    { hypnotist: '{{user}}', target: '数据库女角色', trigger: '123', effect: '123' },
+  );
+  assert.deepEqual(
+    { ...parse('口令→进入待命状态', '{{user}}', '数据库女角色') },
+    { hypnotist: '{{user}}', target: '数据库女角色', trigger: '口令→进入待命状态', effect: '口令→进入待命状态' },
+  );
+  assert.deepEqual(
+    { ...parse('{{user}}→数据库女角色→旧口令→旧效果', '备用施术者', '备用目标') },
+    { hypnotist: '备用施术者', target: '备用目标', trigger: '{{user}}→数据库女角色→旧口令→旧效果', effect: '{{user}}→数据库女角色→旧口令→旧效果' },
+  );
+  const render = functionBody('renderHypnosisLitePage');
+  assert.match(render, /missingContentFeature/);
+  assert.match(render, /请填写「/);
+  assert.ok(html.includes('detail["用户填写"] = trigger'));
 });
 
 test('archive worldbook binding stays optional in settings and remains reply-driven', () => {

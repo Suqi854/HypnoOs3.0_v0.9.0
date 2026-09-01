@@ -3,6 +3,19 @@ import assert from 'node:assert/strict';
 import { shouldSyncArchiveReply } from '../src/floating-host.js';
 import { HostAdapter } from '../src/host-adapter.js';
 
+test('active chat requires a loaded message list instead of stale identifiers alone', () => {
+  const context = { characterId: 0, chatId: 'stale-chat', chat: [] };
+  globalThis.SillyTavern = { getContext: () => context };
+  try {
+    const host = new HostAdapter();
+    assert.equal(host.hasActiveChat(), false);
+    context.chat.push({ mes: 'first message' });
+    assert.equal(host.hasActiveChat(), true);
+  } finally {
+    delete globalThis.SillyTavern;
+  }
+});
+
 test('reads current character worldbook binding and latest message variables without writing', async () => {
   const context = {
     characterId: '0',
