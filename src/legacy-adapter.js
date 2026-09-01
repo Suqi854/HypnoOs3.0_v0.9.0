@@ -88,11 +88,16 @@ export function toLegacyVariables(state) {
       _buff: String(state.custom?.buff || ''),
       _buff结束时间: String(state.custom?.buffEndTime || ''),
       _user身份: isRecord(state.custom?.userIdentity) ? clone(state.custom.userIdentity) : {},
+      _hypnoos数据库: isRecord(state.custom?.databaseSource) ? clone(state.custom.databaseSource) : { available: false },
     },
     规则: state.custom?.rules || {},
     角色: roles,
     任务: recordBy(state.tasks, 'task'),
   };
+  const databaseAppData = isRecord(state.custom?.databaseAppData) ? state.custom.databaseAppData : {};
+  if (Array.isArray(databaseAppData.skills)) projected.系统.主角技能 = clone(databaseAppData.skills);
+  if (Array.isArray(databaseAppData.summaries)) projected.系统._数据库总结 = clone(databaseAppData.summaries);
+  if (Array.isArray(databaseAppData.outline)) projected.系统._数据库总体大纲 = clone(databaseAppData.outline);
   const merged = mergeLegacyVariables(state.custom?.legacyVariables, projected);
   merged.系统.派遣岗位 = projected.系统.派遣岗位;
   return merged;

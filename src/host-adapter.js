@@ -1,5 +1,5 @@
 import { CHAT_STATE_KEY, EXTENSION_ID, PROMPT_ID } from './constants.js';
-import { mergeLegacyVariables } from './legacy-adapter.js';
+import { mergeLegacyVariables } from './legacy-adapter.js?revision=database-profile-v3';
 import { clone } from './utils.js';
 
 function findContext() {

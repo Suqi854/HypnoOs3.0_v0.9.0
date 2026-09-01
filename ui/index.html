@@ -13015,10 +13015,15 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     const variables = activeStatDataReadScope !== undefined ? activeStatDataReadScope : getLatestStatDataSync();
     const roles = variables?.["角色"];
     const mvuRoles = roles && typeof roles === "object" && !Array.isArray(roles) ? roles : {};
-    const importedRoles = readImportedProfileWorldbookRoles();
-    const visibleRoles = { ...importedRoles, ...adaptiveWorldbookRoleCache, ...archiveRoleSnapshotCache, ...mvuRoles };
+    const visibleRoles = hasDatabaseProfileSource(variables)
+      ? { ...mvuRoles }
+      : { ...readImportedProfileWorldbookRoles(), ...adaptiveWorldbookRoleCache, ...archiveRoleSnapshotCache, ...mvuRoles };
     for (const name of readDismissedProfileRoleNames()) delete visibleRoles[name];
     return visibleRoles;
+  }
+
+  function hasDatabaseProfileSource(variables = getLatestStatDataSync()) {
+    return variables?.["系统"]?.["_hypnoos数据库"]?.available === true;
   }
 
   // 人物档案一次同步 render 只读取一次当前楼层快照。这里只保存调用栈内
@@ -20744,8 +20749,10 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     ensureStyle();
     ensurePhoneDarkThemeStyle();
     const root = findPhoneRoot(tile);
-    await refreshAdaptiveWorldbookRoleCache(true);
-    await refreshArchiveRoleSnapshotCache();
+    if (!hasDatabaseProfileSource()) {
+      await refreshAdaptiveWorldbookRoleCache(true);
+      await refreshArchiveRoleSnapshotCache();
+    }
     const roles = getStatsRoles();
     const requestedRoleName = String(initialRoleName || "").trim();
     const requestedRole = requestedRoleName && isPlainObject(roles[requestedRoleName]) ? roles[requestedRoleName] : null;
@@ -44144,7 +44151,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
           updateOpenPersonProfilePage();
           window.setTimeout(() => {
             if (runtimeDisposed || token !== chatRefreshToken) return;
-            const refresh = window.__ST_HYPNOOS_HAS_ACTIVE_CHAT__?.()
+            const refresh = window.__ST_HYPNOOS_HAS_ACTIVE_CHAT__?.() && !hasDatabaseProfileSource()
               ? Promise.all([refreshAdaptiveWorldbookRoleCache(true), refreshArchiveRoleSnapshotCache()])
               : Promise.resolve();
             void refresh

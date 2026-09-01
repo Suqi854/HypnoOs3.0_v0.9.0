@@ -1,9 +1,9 @@
 import { appById } from './apps.js';
-import { toLegacyVariables } from './contracts.js';
+import { toLegacyVariables } from './legacy-adapter.js?revision=database-profile-v3';
 import { getRegionPack } from './regions.js';
 import { clone, isRecord } from './utils.js';
 import { ArchiveWorldbookService } from './archive-worldbook-service.js';
-import { normalizeDatabaseSnapshot } from './database-adapter.js';
+import { normalizeDatabaseSnapshot } from './database-adapter.js?revision=database-profile-v3';
 
 function readPath(value, path) {
   return String(path).split('.').reduce((current, key) => current?.[key], value);

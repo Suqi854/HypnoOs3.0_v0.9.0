@@ -272,7 +272,7 @@ test('hypnosis commands wait in phone input before host write or direct send', (
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__(block, { append: false })'));
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_DIRECT_SEND__(block)'));
   assert.ok(floatingHost.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__'));
-  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-chat-lifecycle-v2'"));
+  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-database-profile-v3'"));
   assert.ok(floatingHost.includes('overflow:visible;z-index:5;display:none'));
   assert.ok(floatingCore.includes("scriptUrl.searchParams.set('revision', FRONTEND_REVISION)"));
   assert.ok(floatingCore.includes('script.dataset.revision = FRONTEND_REVISION'));
@@ -346,7 +346,8 @@ test('profile removal clears only phone-side profile data and hides the whole do
   assert.ok(remove.includes('profileClearLocalPhotoSlots(name)'));
   assert.ok(!remove.includes('appendAppOperation'));
   const roles = functionBody('getStatsRoles');
-  assert.ok(roles.includes('const visibleRoles = { ...importedRoles, ...adaptiveWorldbookRoleCache, ...archiveRoleSnapshotCache, ...mvuRoles }'));
+  assert.ok(roles.includes('hasDatabaseProfileSource(variables)'));
+  assert.ok(roles.includes('? { ...mvuRoles }'));
   assert.ok(roles.includes('delete visibleRoles[name]'));
   assert.ok(html.includes('确认移除'));
   assert.ok(!html.includes('确认请求 AI 删除'));
@@ -436,6 +437,7 @@ test('chat lifecycle clears stale profiles and no-chat map data', () => {
   assert.match(html, /chatRefreshToken/);
   assert.match(html, /refreshAdaptiveWorldbookRoleCache\(true\)/);
   assert.match(html, /refreshArchiveRoleSnapshotCache\(\)/);
+  assert.match(html, /!hasDatabaseProfileSource\(\)/);
 });
 
 test('archive worldbook binding stays optional in settings and remains reply-driven', () => {

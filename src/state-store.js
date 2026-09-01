@@ -1,9 +1,9 @@
-import { createDefaultState, fromLegacyVariables, makeOperation, normalizeState, toLegacyVariables } from './contracts.js';
+import { createDefaultState, makeOperation, normalizeState } from './contracts.js';
 import { buildHypnosisRulePrompt, DEFAULT_HYPNOSIS_RULESET_VERSION } from './hypnosis-rules.js';
-import { findLegacyVariables, mergeLegacyVariables, migrateStateCompatibility } from './legacy-adapter.js';
+import { findLegacyVariables, fromLegacyVariables, mergeLegacyVariables, migrateStateCompatibility, toLegacyVariables } from './legacy-adapter.js?revision=database-profile-v3';
 import { getRegionPack } from './regions.js';
 import { clone, stableStringify } from './utils.js';
-import { projectDatabaseSnapshot } from './database-adapter.js';
+import { projectDatabaseSnapshot } from './database-adapter.js?revision=database-profile-v3';
 
 export function mergeDatabaseSnapshotIntoState(current, rawSnapshot, regionPack) {
   const projection = projectDatabaseSnapshot(rawSnapshot);
@@ -27,6 +27,11 @@ export function mergeDatabaseSnapshotIntoState(current, rawSnapshot, regionPack)
   if (hasRows('背包物品表')) legacy.系统.持有物品 = projection.legacy.系统.持有物品 || {};
   const merged = mergeLegacyVariables(legacy, projection.legacy);
   const next = fromLegacyVariables(merged, base, regionPack);
+  const databaseAppData = clone(base.custom?.databaseAppData || {});
+  if (hasRows('主角技能表')) databaseAppData.skills = clone(projection.legacy.系统.主角技能 || []);
+  if (hasRows('总结表')) databaseAppData.summaries = clone(projection.legacy.系统._数据库总结 || []);
+  if (hasRows('总体大纲')) databaseAppData.outline = clone(projection.legacy.系统._数据库总体大纲 || []);
+  if (Object.keys(databaseAppData).length) next.custom.databaseAppData = databaseAppData;
   next.custom.databaseSource = projection.metadata;
   return next;
 }

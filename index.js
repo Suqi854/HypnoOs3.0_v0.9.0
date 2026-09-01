@@ -1,4 +1,4 @@
-import { startExtension, stopExtension } from './src/extension.js';
+import { startExtension, stopExtension } from './src/extension.js?revision=database-profile-v3';
 
 const READY_KEY = '__HYPNOOS3_AUTO_START__';
 

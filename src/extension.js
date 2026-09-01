@@ -1,8 +1,8 @@
 import { ControlPanel } from './control-panel.js';
-import { FloatingHost } from './floating-host.js';
-import { HostAdapter } from './host-adapter.js';
+import { FloatingHost } from './floating-host.js?revision=database-profile-v3';
+import { HostAdapter } from './host-adapter.js?revision=database-profile-v3';
 import { HypnoStorage } from './storage.js';
-import { StateStore } from './state-store.js';
+import { StateStore } from './state-store.js?revision=database-profile-v3';
 import { EXTENSION_ID, RUNTIME_KEY } from './constants.js';
 import { HYPNOSIS_RULES_API } from './hypnosis-rules.js';
 

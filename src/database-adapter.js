@@ -80,6 +80,58 @@ function rowName(row, ...keys) {
   return '';
 }
 
+function splitGenderAge(value) {
+  const source = clean(value, 160);
+  if (!source) return { gender: '', age: '' };
+  const genderMatch = source.match(/(?:^|[\s/／,，;；|｜-])(男(?:性)?|女(?:性)?|male|female|boy|girl)(?=$|[\s/／,，;；|｜-])/iu)
+    || source.match(/^(男(?:性)?|女(?:性)?|male|female|boy|girl)/iu);
+  const token = clean(genderMatch?.[1], 20).toLowerCase();
+  const gender = /^(?:男|男性|male|boy)$/iu.test(token) ? '男' : /^(?:女|女性|female|girl)$/iu.test(token) ? '女' : '';
+  const age = clean(source
+    .replace(genderMatch?.[0] || '', ' ')
+    .replace(/^[\s/／,，;；|｜-]+|[\s/／,，;；|｜-]+$/gu, ''), 80);
+  return { gender, age };
+}
+
+function databaseRolePages(name, row, favor) {
+  const genderAge = splitGenderAge(rowName(row, '性别/年龄'));
+  const appearance = rowName(row, '外貌特征');
+  const occupation = rowName(row, '职业/身份', '职业', '身份');
+  const personality = rowName(row, '性格特点');
+  const history = rowName(row, '过往经历');
+  const away = rowName(row, '是否离场');
+  const importantItems = rowName(row, '持有的重要物品');
+  const info = { 姓名: name };
+  if (genderAge.gender) info.性别 = genderAge.gender;
+  if (genderAge.age) info._年龄 = genderAge.age;
+  if (appearance) info.外貌特征 = appearance;
+  if (occupation) info.社团或职业 = occupation;
+  const pages = { 信息: info };
+  if (appearance) pages.衣着 = { 面部: appearance };
+  const status = {};
+  if (Number.isFinite(favor)) status.好感度 = favor;
+  if (away) status.是否离场 = away;
+  if (Object.keys(status).length) pages.状态 = status;
+  if (history) pages.事件 = { 至关重要记忆: history };
+  if (personality) pages.效果 = { 心理: personality };
+  if (importantItems) {
+    const holding = {};
+    for (const item of importantItems.split(/[、,，;；|｜]+/u).map((entry) => clean(entry, 160)).filter(Boolean)) {
+      holding[item] = { 描述: '数据库记录', 数量: 1, 固定: true };
+    }
+    if (Object.keys(holding).length) pages.物品 = { 持有: holding };
+  }
+  return pages;
+}
+
+function rowsByName(snapshot, name) {
+  return (sheetByName(snapshot, name)?.rows || []).map((record) => ({
+    ...clone(record.values),
+    数据库记录ID: record.id,
+    数据来源: '数据库',
+  }));
+}
+
 export function projectDatabaseSnapshot(value) {
   const snapshot = value?.schema === 'HypnoDatabaseSnapshot/v1' ? clone(value) : normalizeDatabaseSnapshot(value);
   const legacy = { 系统: {}, 角色: {}, 任务: {} };
@@ -112,8 +164,10 @@ export function projectDatabaseSnapshot(value) {
     const name = rowName(row, '姓名', '人物名称');
     if (!name) continue;
     const favor = Number(row?.好感度);
+    const pages = databaseRolePages(name, row, favor);
     legacy.角色[name] = {
       ...(Number.isFinite(favor) ? { 好感度: favor } : {}),
+      ...pages,
       人物档案: {
         '性别/年龄': rowName(row, '性别/年龄'),
         外貌特征: rowName(row, '外貌特征'),
@@ -140,12 +194,31 @@ export function projectDatabaseSnapshot(value) {
   }
   if (Object.keys(inventory).length) legacy.系统.持有物品 = inventory;
 
+  const skills = rowsByName(snapshot, SHEET_NAMES.skills);
+  if (skills.length) legacy.系统.主角技能 = skills;
+
   for (const record of sheetByName(snapshot, SHEET_NAMES.tasks)?.rows || []) {
     const row = record.values;
     const name = rowName(row, '任务名称', '名称');
     if (!name) continue;
-    legacy.任务[name] = { ...clone(row), 数据库记录ID: record.id, 数据来源: '数据库' };
+    const condition = rowName(row, '详细描述', '完成条件', '描述');
+    const progress = rowName(row, '当前进度', '状态');
+    const reward = Number(row?.奖励星光点 ?? row?.奖励);
+    legacy.任务[name] = {
+      ...clone(row),
+      任务: name,
+      ...(condition ? { 完成条件: condition } : {}),
+      ...(progress ? { 已完成: /^(?:已完成|完成|completed|done)$/iu.test(progress) } : {}),
+      ...(Number.isFinite(reward) ? { 奖励星光点: reward } : {}),
+      数据库记录ID: record.id,
+      数据来源: '数据库',
+    };
   }
+
+  const summaries = rowsByName(snapshot, SHEET_NAMES.summaries);
+  if (summaries.length) legacy.系统._数据库总结 = summaries;
+  const outline = rowsByName(snapshot, SHEET_NAMES.outline);
+  if (outline.length) legacy.系统._数据库总体大纲 = outline;
 
   return {
     snapshot,
