@@ -40121,7 +40121,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     });
   }
 
-  const ST_ADAPTIVE_REGION_KEY = "hypnoos:adaptive-region:v1";
+  const ST_ADAPTIVE_REGION_PREFIX = "hypnoos:adaptive-region:v1";
   const ST_ADAPTIVE_SELECTED_WORLDBOOK_PREFIX = "hypnoos:adaptive-worldbook:v1";
   const ST_ADAPTIVE_GENERATED_PREFIX = "hypnoos:world-adaptation:v1";
   const ST_PROFILE_WORLDBOOK_SELECTION_PREFIX = "hypnoos:profile-worldbooks:v1";
@@ -40160,16 +40160,28 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     }
   };
 
+  function adaptiveRegionKey() {
+    return ST_ADAPTIVE_REGION_PREFIX + ":" + adaptiveStorageScope();
+  }
+
   function readAdaptiveRegion() {
     try {
-      const value = localStorage.getItem(ST_ADAPTIVE_REGION_KEY);
+      const scopedKey = adaptiveRegionKey();
+      let value = localStorage.getItem(scopedKey);
+      if (!value) {
+        const legacy = localStorage.getItem(ST_ADAPTIVE_REGION_PREFIX);
+        if (legacy === "japan" || legacy === "auto" || legacy === "china") {
+          value = legacy;
+          localStorage.setItem(scopedKey, legacy);
+        }
+      }
       return value === "japan" || value === "auto" ? value : "china";
     } catch { return "china"; }
   }
 
   function writeAdaptiveRegion(region) {
     const value = region === "japan" || region === "auto" ? region : "china";
-    try { localStorage.setItem(ST_ADAPTIVE_REGION_KEY, value); } catch {}
+    try { localStorage.setItem(adaptiveRegionKey(), value); } catch {}
     return value;
   }
 
@@ -44105,6 +44117,25 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     updateOperationSidePanel();
   }
 
+  function refreshOpenChatBoundApps() {
+    document.querySelectorAll(".st-calendar-lite-app").forEach((page) => renderLiteCalendarPage(page));
+    document.querySelectorAll(".st-timetable-app").forEach((page) => renderTimetablePage(page));
+    document.querySelectorAll(".st-clock-app").forEach((page) => renderClockPage(page));
+    document.querySelectorAll(".st-monitor-app").forEach((page) => renderMonitorPage(page));
+    document.querySelectorAll(".st-work-app").forEach((page) => renderWorkPage(page));
+    document.querySelectorAll(".st-reward-app").forEach((page) => renderRewardPage(page));
+    document.querySelectorAll(".st-inventory-app").forEach((page) => renderInventoryPage(page));
+    document.querySelectorAll(".st-map-app:not(.st-city-map-app)").forEach((page) => renderMapPage(page));
+    document.querySelectorAll(".st-city-map-app:not(.st-police-hq-app):not(.st-hospital-remodel-app)").forEach((page) => {
+      if (page.classList.contains("st-campus-map-app")) renderCampusPage(page);
+      else renderCityMapPage(page);
+    });
+    document.querySelectorAll(".st-adaptive-world-app").forEach((page) => void renderAdaptiveWorldApp(page));
+    document.querySelectorAll(".st-database-app").forEach((page) => void renderDatabasePage(page));
+    const mchan = document.querySelector(".st-mchan-internal-app");
+    if (mchan) renderPage(mchan, loadState());
+  }
+
   let phoneDomPatchScheduled = false;
   function schedulePhoneDomPatch() {
     if (!syncLatestPhoneVariableViewVisibility() || phoneDomPatchScheduled) return;
@@ -44252,6 +44283,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
               .then(() => {
                 if (runtimeDisposed || token !== chatRefreshToken) return;
                 updateOpenPersonProfilePage();
+                refreshOpenChatBoundApps();
                 schedulePhoneVariableRefresh();
               })
               .catch((error) => console.warn("[HypnoOS] 聊天切换后刷新人物档案失败", error));

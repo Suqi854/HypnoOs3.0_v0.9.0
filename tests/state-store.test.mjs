@@ -6,6 +6,7 @@ import { createDefaultRole, createDefaultState } from '../src/contracts.js';
 import { AppDataService } from '../src/app-data-service.js';
 import { createStateBridge } from '../src/floating-host.js';
 import { HostAdapter } from '../src/host-adapter.js';
+import { toLegacyVariables } from '../src/legacy-adapter.js';
 import { getRegionPack } from '../src/regions.js';
 import { StateStore } from '../src/state-store.js';
 
@@ -138,6 +139,25 @@ test('saved HypnoState wins over conflicting optional runtime snapshots', async 
   assert.equal(host.readCount, 0);
 });
 
+test('the restored chat save ignores the current message initialization echo until a new floor exists', async () => {
+  const saved = savedState({ money: 3100, roleName: '存档人物', location: '存档地点' });
+  let latestMessageId = 8;
+  const stale = toLegacyVariables(savedState({ money: 900, roleName: '旧楼层人物', location: '旧楼层地点' }));
+  const host = new StubHost({ saved, snapshots: [{ value: stale }] });
+  host.latestMessageId = () => latestMessageId;
+  const store = new StateStore(host, new MemorySettings());
+  await store.initialize();
+
+  await store.syncOptionalRuntimeState('runtime-initialized');
+  assert.equal(store.state.location.current, '存档地点');
+  assert.equal(store.state.tasks[0].title, '存档人物任务');
+
+  latestMessageId = 9;
+  await store.syncOptionalRuntimeState('runtime-message-received');
+  assert.equal(store.state.location.current, '旧楼层地点');
+  assert.equal(store.state.tasks[0].title, '旧楼层人物任务');
+});
+
 test('optional runtime updates enter HypnoState once without mirror loops', async () => {
   const saved = savedState({ money: 1200, roleName: '同步角色', location: '同步地点' });
   const host = new StubHost({ saved });
@@ -238,6 +258,10 @@ test('chat switching reloads each chat state and preserves its roles and app dat
   try {
     const host = new HostAdapter();
     const store = new StateStore(host, new MemorySettings());
+    const initializedContexts = [];
+    store.addEventListener('change', (event) => {
+      if (event.detail?.reason === 'initialize') initializedContexts.push(host.contextKey());
+    });
     const first = await store.initialize();
     assert.equal(host.contextKey(), 'character:0:chat-a');
     assert.equal(first.resources.money, 1200);
@@ -255,6 +279,7 @@ test('chat switching reloads each chat state and preserves its roles and app dat
     assert.equal(second.work[0].title, '旧人物B打工');
     assert.equal(second.hypnosis.activeEffects[0].roleName, '旧人物B');
     assert.equal(chatA.chatMetadata[CHAT_STATE_KEY].resources.money, 1200);
+    assert.deepEqual(initializedContexts, ['character:0:chat-a', 'character:0:chat-b']);
   } finally {
     delete globalThis.SillyTavern;
   }

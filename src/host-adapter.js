@@ -369,7 +369,7 @@ export class HostAdapter {
 
   installOptionalRuntimeLifecycle(listener) {
     if (typeof listener !== 'function') return;
-    const notify = () => Promise.resolve().then(listener).catch((error) => console.warn(`[${EXTENSION_ID}] 兼容状态导入失败`, error));
+    const notify = (reason = 'runtime-variable-update') => Promise.resolve().then(() => listener(reason)).catch((error) => console.warn(`[${EXTENSION_ID}] 兼容状态导入失败`, error));
     const subscribed = new Set();
     let retryTimer = null;
     let retryCount = 0;
@@ -389,11 +389,12 @@ export class HostAdapter {
       subscribeRuntimeEvent(helper, 'global_Mvu_initialized', bindRuntimeEvents);
       const mvuEvents = this.getMvuEvents();
       for (const key of ['VARIABLE_INITIALIZED', 'VARIABLE_UPDATE_ENDED']) {
-        subscribeRuntimeEvent(helper, mvuEvents[key], notify);
+        const reason = key === 'VARIABLE_INITIALIZED' ? 'runtime-initialized' : 'runtime-variable-update';
+        subscribeRuntimeEvent(helper, mvuEvents[key], () => notify(reason));
       }
       if (runtimeMvu() && !runtimeSynced) {
         runtimeSynced = true;
-        notify();
+        notify('runtime-initialized');
       }
       const runtimeEventNames = ['VARIABLE_INITIALIZED', 'VARIABLE_UPDATE_ENDED']
         .map((key) => mvuEvents[key])
@@ -418,9 +419,11 @@ export class HostAdapter {
     for (const key of ['MESSAGE_RECEIVED', 'MESSAGE_UPDATED']) {
       const eventName = context?.eventTypes?.[key];
       if (!eventName || subscribed.has(eventName) || !context?.eventSource) continue;
-      context.eventSource.on(eventName, notify);
+      const reason = key === 'MESSAGE_RECEIVED' ? 'runtime-message-received' : 'runtime-message-updated';
+      const callback = () => notify(reason);
+      context.eventSource.on(eventName, callback);
       subscribed.add(eventName);
-      this.#disposers.push(() => context.eventSource.removeListener(eventName, notify));
+      this.#disposers.push(() => context.eventSource.removeListener(eventName, callback));
     }
   }
 

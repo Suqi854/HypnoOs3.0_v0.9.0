@@ -42,6 +42,8 @@ export class StateStore extends EventTarget {
   #settings;
   #state;
   #contextKey = '';
+  #optionalRuntimeBaselineMessageId = '';
+  #optionalRuntimeAwaitingNewMessage = false;
 
   constructor(host, storage) {
     super();
@@ -77,7 +79,12 @@ export class StateStore extends EventTarget {
       this.#settings = settings;
       this.#state = normalizeState(migrateStateCompatibility(initial), region);
       this.#contextKey = contextKey;
-      if (await this.#persist(false, 'initialize', contextKey)) return this.state;
+      if (await this.#persist(false, 'initialize', contextKey)) {
+        this.#optionalRuntimeBaselineMessageId = String(this.#host.latestMessageId?.() ?? '');
+        this.#optionalRuntimeAwaitingNewMessage = Boolean(saved);
+        this.dispatchEvent(new CustomEvent('change', { detail: { state: this.state, reason: 'initialize' } }));
+        return this.state;
+      }
     }
     throw new Error('聊天切换尚未稳定，HypnoOS 状态未写入。');
   }
@@ -137,6 +144,16 @@ export class StateStore extends EventTarget {
 
   async syncOptionalRuntimeState(reason = 'runtime-adapter') {
     if (typeof this.#host.readOptionalRuntimeState !== 'function') return this.state;
+    const runtimeReason = String(reason || 'runtime-adapter');
+    if (this.#optionalRuntimeAwaitingNewMessage) {
+      if (!/^runtime-message-(?:received|updated)$/u.test(runtimeReason)) {
+        if (/^runtime-(?:initialized|variable-update)$/u.test(runtimeReason)) return this.state;
+      } else {
+        this.#optionalRuntimeAwaitingNewMessage = false;
+      }
+    }
+    const latestMessageId = String(this.#host.latestMessageId?.() ?? '');
+    if (/^runtime-(?:initialized|variable-update)$/u.test(runtimeReason) && latestMessageId && latestMessageId === this.#optionalRuntimeBaselineMessageId) return this.state;
     const snapshots = await this.#host.readOptionalRuntimeState();
     const legacy = snapshots.map((snapshot) => findLegacyVariables(snapshot?.value ?? snapshot)).find(Boolean);
     if (!legacy) return this.state;
@@ -144,7 +161,9 @@ export class StateStore extends EventTarget {
     const pack = getRegionPack(this.#state.region);
     const next = fromLegacyVariables(merged, this.#state, pack);
     if (stableStringify(toLegacyVariables(next)) === stableStringify(toLegacyVariables(this.#state))) return this.state;
-    return this.replace(next, reason);
+    const replaced = await this.replace(next, runtimeReason);
+    this.#optionalRuntimeBaselineMessageId = latestMessageId;
+    return replaced;
   }
 
   async syncDatabaseRuntimeState(reason = 'database-adapter') {

@@ -4,7 +4,7 @@ import { HYPNOSIS_RULES_API } from './hypnosis-rules.js';
 const BRIDGE_KEY = '__HYPNOOS3_CORE_BRIDGE__';
 const SINGLETON_KEY = '__HYPNOOS3_EXTENSION_FLOATING_SINGLETON__';
 const HOST_ID = 'hypnoos3-extension-floating-phone-host';
-const FRONTEND_REVISION = 'hypnoos3-1.0.0-map-trigger-model-v1';
+const FRONTEND_REVISION = 'hypnoos3-1.0.0-chat-save-ready-v1';
 
 function phoneFrame() {
   return document.querySelector(`#${HOST_ID}`)?.shadowRoot?.querySelector('iframe.phone') || null;
@@ -59,9 +59,9 @@ export class FloatingHost {
         try { listener(payload); } catch (error) { console.warn('[HypnoOS3] 前端事件监听失败', error); }
       }
     };
+    this.emitBridgeEvent = emitBridgeEvent;
     const context = this.host.context;
     const receivedEvent = context?.eventTypes?.MESSAGE_RECEIVED;
-    const chatChangedEvent = context?.eventTypes?.CHAT_CHANGED;
     if (receivedEvent && context?.eventSource) {
       const onDialogueRoundEnded = (...args) => {
         if (!shouldSyncArchiveReply(args[1])) return;
@@ -70,11 +70,6 @@ export class FloatingHost {
       };
       context.eventSource.on(receivedEvent, onDialogueRoundEnded);
       this.disposers.push(() => context.eventSource.removeListener(receivedEvent, onDialogueRoundEnded));
-    }
-    if (chatChangedEvent && context?.eventSource) {
-      const onChatChanged = (...args) => emitBridgeEvent('HYPNOOS3_CHAT_CHANGED', { args });
-      context.eventSource.on(chatChangedEvent, onChatChanged);
-      this.disposers.push(() => context.eventSource.removeListener(chatChangedEvent, onChatChanged));
     }
 
     const onMessage = async (event) => {
@@ -110,6 +105,10 @@ export class FloatingHost {
       script.addEventListener('error', () => reject(new Error('4.3 悬浮宿主加载失败')), { once: true });
     });
     return this;
+  }
+
+  notifyChatReady(payload = {}) {
+    this.emitBridgeEvent?.('HYPNOOS3_CHAT_CHANGED', { ...payload, ready: true });
   }
 
   #createBridge() {
@@ -167,6 +166,7 @@ export class FloatingHost {
   destroy() {
     while (this.disposers.length) { try { this.disposers.pop()?.(); } catch {} }
     this.listeners.clear();
+    this.emitBridgeEvent = null;
     try { globalThis[SINGLETON_KEY]?.destroy?.(); } catch {}
     if (globalThis[SINGLETON_KEY]) delete globalThis[SINGLETON_KEY];
     if (globalThis[BRIDGE_KEY] === this.bridge) delete globalThis[BRIDGE_KEY];

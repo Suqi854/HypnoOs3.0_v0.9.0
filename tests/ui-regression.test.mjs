@@ -9,6 +9,7 @@ import { getRegionPack } from '../src/regions.js';
 const html = await readFile(new URL('../ui/index.html', import.meta.url), 'utf8');
 const floatingHost = await readFile(new URL('../public/floating-bootstrap.js', import.meta.url), 'utf8');
 const floatingCore = await readFile(new URL('../src/floating-host.js', import.meta.url), 'utf8');
+const extensionCore = await readFile(new URL('../src/extension.js', import.meta.url), 'utf8');
 
 function functionBody(name) {
   const start = html.indexOf(`function ${name}(`);
@@ -315,12 +316,25 @@ test('hypnosis commands wait in phone input before host write or direct send', (
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__(block, { append: false })'));
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_DIRECT_SEND__(block)'));
   assert.ok(floatingHost.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__'));
-  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-map-trigger-model-v1'"));
+  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-chat-save-ready-v1'"));
   assert.ok(floatingHost.includes('overflow:visible;z-index:5;display:none'));
   assert.ok(floatingCore.includes("scriptUrl.searchParams.set('revision', FRONTEND_REVISION)"));
   assert.ok(floatingCore.includes('script.dataset.revision = FRONTEND_REVISION'));
   assert.ok(floatingHost.includes('writeInput: function (text, options) { return callApi("setInput", [text, options]); }'));
   assert.ok(floatingCore.includes('this.host.setInput(command, { append: false })'));
+});
+
+test('chat switching restores scoped world data only after the full phone save is ready', () => {
+  assert.ok(html.includes('function adaptiveRegionKey()'));
+  assert.ok(html.includes('ST_ADAPTIVE_REGION_PREFIX + ":" + adaptiveStorageScope()'));
+  assert.ok(html.includes('localStorage.setItem(adaptiveRegionKey(), value)'));
+  assert.ok(html.includes('function refreshOpenChatBoundApps()'));
+  for (const renderer of ['renderLiteCalendarPage(page)', 'renderTimetablePage(page)', 'renderMonitorPage(page)', 'renderWorkPage(page)', 'renderRewardPage(page)', 'renderMapPage(page)', 'renderAdaptiveWorldApp(page)', 'renderDatabasePage(page)']) {
+    assert.ok(html.includes(renderer), `missing chat-ready renderer: ${renderer}`);
+  }
+  assert.ok(floatingCore.includes("notifyChatReady(payload = {})"));
+  assert.ok(floatingCore.includes("'HYPNOOS3_CHAT_CHANGED', { ...payload, ready: true }"));
+  assert.ok(extensionCore.includes("this.floatingHost.notifyChatReady({ contextKey: this.host.contextKey() })"));
 });
 
 test('hypnosis target selection does not rerender the long command page', () => {

@@ -15,7 +15,7 @@ class Runtime {
     this.store = new StateStore(this.host, this.storage);
     await this.store.initialize();
     this.host.installPromptLifecycle();
-    this.host.installOptionalRuntimeLifecycle(() => this.store.syncOptionalRuntimeState());
+    this.host.installOptionalRuntimeLifecycle((reason) => this.store.syncOptionalRuntimeState(reason));
     this.host.installDatabaseRuntimeLifecycle(() => this.store.syncDatabaseRuntimeState());
 
     this.control = document.createElement('div');
@@ -51,6 +51,7 @@ class Runtime {
     } catch (error) {
       console.warn('[HypnoOS3] 进入聊天时加载即插即用催眠规则失败', error);
     }
+    this.floatingHost.notifyChatReady({ contextKey: this.host.contextKey(), initial: true });
     globalThis.__HYPNOOS3_HYPNOSIS_RULES__ = HYPNOSIS_RULES_API;
     this.disposers.push(() => {
       if (globalThis.__HYPNOOS3_HYPNOSIS_RULES__ === HYPNOSIS_RULES_API) delete globalThis.__HYPNOOS3_HYPNOSIS_RULES__;
@@ -65,6 +66,7 @@ class Runtime {
         await this.store.initialize();
         try { await this.floatingHost.dataService.activateArchiveWorldbookRules(); }
         catch (error) { console.warn('[HypnoOS3] 进入聊天时加载即插即用催眠规则失败', error); }
+        this.floatingHost.notifyChatReady({ contextKey: this.host.contextKey() });
       };
       const reload = () => {
         this.chatTransition = (this.chatTransition || Promise.resolve()).then(transition)
