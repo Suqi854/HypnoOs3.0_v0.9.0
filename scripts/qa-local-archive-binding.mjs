@@ -92,6 +92,19 @@ try {
   const configured = await frame.evaluate(() => globalThis.getArchiveWorldbookOptions());
   const binding = configured?.binding;
   assert.ok(binding?.worldbookName, '真实酒馆没有建立可写世界书绑定');
+  await page.evaluate(async (worldbookName) => {
+    const st = globalThis.SillyTavern?.getContext?.();
+    const book = await st?.loadWorldInfo?.(worldbookName);
+    const entries = Array.isArray(book?.entries) ? book.entries : Object.values(book?.entries || {});
+    const nextUid = entries.reduce((max, entry) => Math.max(max, Number(entry?.uid ?? entry?.id ?? -1) || -1), -1) + 1;
+    const duplicates = [
+      { ...structuredClone(entries.find((entry) => entry?.extensions?.hypnoosRules?.owner === 'hypnoos3-hypnosis-rules') || {}), uid: nextUid, extensions: {}, comment: '[HypnoOS内置]催眠规则' },
+      { uid: nextUid + 1, comment: 'QA旧式规则副本', content: '<HypnoOS催眠规则 version="qa-old">重复规则</HypnoOS催眠规则>', extensions: {} },
+    ];
+    if (Array.isArray(book.entries)) book.entries.push(...duplicates);
+    else for (const entry of duplicates) book.entries[String(entry.uid)] = entry;
+    await st?.saveWorldInfo?.(worldbookName, book, true);
+  }, binding.worldbookName);
   await frame.evaluate((name) => globalThis.configureArchiveWorldbook({ mode: 'selected', worldbookName: name }), binding.worldbookName);
   options = await frame.evaluate(() => globalThis.getArchiveWorldbookOptions());
   assert.equal(options?.binding?.rulesetVersion, getHypnosisRules().version);
@@ -101,7 +114,7 @@ try {
     const st = globalThis.SillyTavern?.getContext?.();
     const book = await st?.loadWorldInfo?.(worldbookName);
     const entries = Array.isArray(book?.entries) ? book.entries : Object.values(book?.entries || {});
-    const rules = entries.filter((entry) => entry?.extensions?.hypnoosRules?.owner === 'hypnoos3-hypnosis-rules');
+    const rules = entries.filter((entry) => entry?.extensions?.hypnoosRules?.owner === 'hypnoos3-hypnosis-rules' || entry?.comment === '[HypnoOS内置]催眠规则' || String(entry?.content || '').includes('<HypnoOS催眠规则'));
     const archives = entries.filter((entry) => entry?.extensions?.hypnoosArchive?.owner === 'hypnoos3-archive');
     const managedRuleBooks = [];
     for (const name of await Promise.resolve(st?.getWorldInfoNames?.()) || []) {
@@ -114,13 +127,14 @@ try {
     return {
       entryCount: rules.length,
       entry: rules[0] || null,
+      ruleDetails: rules.map((entry) => ({ uid: entry?.uid, comment: entry?.comment, owner: entry?.extensions?.hypnoosRules?.owner || '', contentStart: String(entry?.content || '').slice(0, 100) })),
       archives: archives.map((entry) => ({ comment: entry.comment, archiveWrappers: (String(entry.content || '').match(/<HypnoOS人物档案存储>/g) || []).length, contextWrappers: (String(entry.content || '').match(/<HypnoOS剧情融合规则>/g) || []).length })),
       managedRuleBooks,
       runtimePrompt: String(st?.extensionPrompts?.['hypnoos3-runtime-state']?.value || ''),
       worldInfoPrompt: String(worldInfoPrompt?.worldInfoString || ''),
     };
   }, binding.worldbookName);
-  assert.equal(runtimeRules.entryCount, 1, '真实世界书中的内置催眠规则不是唯一条目');
+  assert.equal(runtimeRules.entryCount, 1, `真实世界书中的内置催眠规则不是唯一条目：${JSON.stringify(runtimeRules.ruleDetails)}`);
   assert.equal(runtimeRules.archives.filter((entry) => entry.comment === '[HypnoOS档案]人物状态').length, 1, '真实世界书人物状态条目不是唯一条目');
   assert.equal(runtimeRules.archives.filter((entry) => entry.comment === '[HypnoOS档案]剧情与催眠上下文').length, 1, '真实世界书剧情上下文条目不是唯一条目');
   assert.equal(runtimeRules.archives.reduce((total, entry) => total + entry.archiveWrappers, 0), 1, '人物状态正文存在重复包裹');
@@ -166,7 +180,7 @@ try {
           const st = globalThis.SillyTavern?.getContext?.();
           const book = await st?.loadWorldInfo?.(worldbookName);
           const entries = Array.isArray(book?.entries) ? book.entries : Object.values(book?.entries || {});
-          const rules = entries.filter((entry) => entry?.extensions?.hypnoosRules?.owner === 'hypnoos3-hypnosis-rules');
+          const rules = entries.filter((entry) => entry?.extensions?.hypnoosRules?.owner === 'hypnoos3-hypnosis-rules' || entry?.comment === '[HypnoOS内置]催眠规则' || String(entry?.content || '').includes('<HypnoOS催眠规则'));
           const archives = entries.filter((entry) => entry?.extensions?.hypnoosArchive?.owner === 'hypnoos3-archive');
           return rules.length === 0 && archives.length === 2;
         }, binding.worldbookName, { timeout: 5_000 });
@@ -184,7 +198,7 @@ try {
     const st = globalThis.SillyTavern?.getContext?.();
     const book = await st?.loadWorldInfo?.(worldbookName);
     const entries = Array.isArray(book?.entries) ? book.entries : Object.values(book?.entries || {});
-    return entries.filter((entry) => entry?.extensions?.hypnoosRules?.owner === 'hypnoos3-hypnosis-rules').length === 1;
+    return entries.filter((entry) => entry?.extensions?.hypnoosRules?.owner === 'hypnoos3-hypnosis-rules' || entry?.comment === '[HypnoOS内置]催眠规则' || String(entry?.content || '').includes('<HypnoOS催眠规则')).length === 1;
   }, binding.worldbookName, { timeout: 30_000 });
 
   const closeResults = await page.evaluate(() => {

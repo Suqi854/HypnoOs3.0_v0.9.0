@@ -45,6 +45,12 @@ function hypnosisRuleEntries(book) {
   return Object.values(book.entries || {}).filter((entry) => entry?.extensions?.hypnoosRules?.owner === 'hypnoos3-hypnosis-rules');
 }
 
+function allHypnosisRuleCopies(book) {
+  return Object.values(book.entries || {}).filter((entry) => entry?.extensions?.hypnoosRules?.owner === 'hypnoos3-hypnosis-rules'
+    || entry?.comment === '[HypnoOS内置]催眠规则'
+    || String(entry?.content || '').includes('<HypnoOS催眠规则'));
+}
+
 test('dedicated archive worldbook persists reply state without MVU and migrates only owned entries', async () => {
   const host = new FakeHost();
   const store = new FakeStore();
@@ -155,6 +161,43 @@ test('built-in hypnosis rules preserve array-shaped worldbook format', async () 
   assert.equal(Array.isArray(deactivated.entries), true);
   assert.equal(hypnosisRuleEntries(deactivated).length, 0);
   assert.equal(deactivated.entries.some((entry) => entry.comment === '玩家数组条目'), true);
+});
+
+test('first load and concurrent chat activation collapse matching managed entries before writing', async () => {
+  const host = new FakeHost();
+  host.books.set('迁移目标', {
+    entries: {
+      9: { uid: 9, comment: '玩家原条目', content: '必须保留', extensions: {} },
+      30: { uid: 30, comment: '[HypnoOS内置]催眠规则', content: '缺少旧版所有者元数据', extensions: {} },
+      31: { uid: 31, comment: '旧规则副本', content: '<HypnoOS催眠规则 version="旧版">重复规则</HypnoOS催眠规则>', extensions: {} },
+      32: { uid: 32, comment: '[HypnoOS档案]人物状态', content: '<HypnoOS人物档案存储>\n{"roles":[{"name":"保留人物"}]}\n</HypnoOS人物档案存储>', extensions: {} },
+      33: { uid: 33, comment: '[HypnoOS档案]人物状态', content: '<HypnoOS人物档案存储>\n{"roles":[{"name":"重复人物"}]}\n</HypnoOS人物档案存储>', extensions: {} },
+      34: { uid: 34, comment: '[HypnoOS档案]剧情与催眠上下文', content: '<HypnoOS剧情融合规则>\n保留上下文\n</HypnoOS剧情融合规则>', extensions: {} },
+      35: { uid: 35, comment: '[HypnoOS档案]剧情与催眠上下文', content: '<HypnoOS剧情融合规则>\n重复上下文\n</HypnoOS剧情融合规则>', extensions: {} },
+    },
+  });
+  const store = new FakeStore();
+  store.value.custom.archiveWorldbookBinding = {
+    schemaVersion: 1,
+    chatKey: 'character:1:chat-a',
+    mode: 'dedicated',
+    worldbookName: '迁移目标',
+  };
+  const service = new ArchiveWorldbookService(host, store);
+
+  await Promise.all([service.activateRules(), service.activateRules(), service.activateRules()]);
+
+  const saved = host.books.get('迁移目标');
+  assert.equal(hypnosisRuleEntries(saved).length, 1);
+  assert.equal(allHypnosisRuleCopies(saved).length, 1);
+  assert.equal(hypnosisRuleEntries(saved)[0].uid, 30, '应复用第一条相同内置规则的 UID');
+  assert.equal(ownedEntries(saved).filter((entry) => entry.comment === '[HypnoOS档案]人物状态').length, 1);
+  assert.equal(ownedEntries(saved).filter((entry) => entry.comment === '[HypnoOS档案]剧情与催眠上下文').length, 1);
+  assert.equal(Object.values(saved.entries).some((entry) => entry.comment === '玩家原条目'), true);
+  assert.equal(host.saveCalls.get('迁移目标'), 1, '并发加载只能产生一次去重写入');
+
+  await service.activateRules();
+  assert.equal(host.saveCalls.get('迁移目标'), 1, '后续切换回聊天不能重复写入相同条目');
 });
 
 test('new worldbook flow refuses to overwrite an existing book', async () => {

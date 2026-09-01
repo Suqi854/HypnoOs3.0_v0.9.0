@@ -42,7 +42,11 @@ function managedArchive(entry) {
 }
 
 function managedRules(entry) {
-  return entry?.extensions?.hypnoosRules?.owner === RULES_OWNER;
+  const comment = String(entry?.comment || '');
+  const content = String(entry?.content || '');
+  return entry?.extensions?.hypnoosRules?.owner === RULES_OWNER
+    || comment === RULES_COMMENT
+    || content.includes('<HypnoOS催眠规则');
 }
 
 function nextUid(entries) {
@@ -278,6 +282,31 @@ export class ArchiveWorldbookService {
     this.store = store;
     this.syncing = null;
     this.activeRulesBinding = null;
+    this.worldbookWrites = new Map();
+  }
+
+  async saveCheckedWorldbook(name, updater, initialBook = null) {
+    const worldbookName = String(name || '').trim();
+    const previous = this.worldbookWrites.get(worldbookName) || Promise.resolve();
+    const operation = previous.catch(() => {}).then(async () => {
+      let current;
+      try {
+        current = await this.host.loadWorldbook(worldbookName);
+      } catch (error) {
+        if (initialBook === null) throw error;
+        current = clone(initialBook);
+      }
+      const next = await updater(clone(current));
+      if (stableStringify(next) === stableStringify(current)) return current;
+      await this.host.saveWorldbook(worldbookName, next);
+      return next;
+    });
+    this.worldbookWrites.set(worldbookName, operation);
+    try {
+      return await operation;
+    } finally {
+      if (this.worldbookWrites.get(worldbookName) === operation) this.worldbookWrites.delete(worldbookName);
+    }
   }
 
   getBinding() {
@@ -291,7 +320,7 @@ export class ArchiveWorldbookService {
       try {
         const book = await this.host.loadWorldbook(name);
         if (!entriesOf(book).some(managedRules)) continue;
-        await this.host.saveWorldbook(name, removeRulesEntry(book));
+        await this.saveCheckedWorldbook(name, removeRulesEntry);
       } catch {}
     }
   }
@@ -340,8 +369,11 @@ export class ArchiveWorldbookService {
         if (!targetSnapshot.context) contextText = oldSnapshot.contextText;
       } catch {}
     }
-    targetBook = ensureManagedEntries(targetBook, chatKey, records, contextText);
-    await this.host.saveWorldbook(targetName, targetBook);
+    targetBook = await this.saveCheckedWorldbook(
+      targetName,
+      (current) => ensureManagedEntries(current, chatKey, records, contextText),
+      targetBook,
+    );
     await this.removeRulesFromOtherWorldbooks(targetName);
     const verify = await this.host.loadWorldbook(targetName);
     const verifyArchives = entriesOf(verify).filter(managedArchive);
@@ -360,8 +392,10 @@ export class ArchiveWorldbookService {
     }, 'archive-worldbook-bind');
     this.activeRulesBinding = { worldbookName: targetName };
     if (previous?.worldbookName && previous.worldbookName !== targetName) {
-      const oldBook = await this.host.loadWorldbook(previous.worldbookName);
-      await this.host.saveWorldbook(previous.worldbookName, removeRulesEntry(removeManagedEntries(oldBook, previous.chatKey || chatKey)));
+      await this.saveCheckedWorldbook(
+        previous.worldbookName,
+        (oldBook) => removeRulesEntry(removeManagedEntries(oldBook, previous.chatKey || chatKey)),
+      );
     }
     return this.getBinding();
   }
@@ -373,9 +407,7 @@ export class ArchiveWorldbookService {
       return { ok: false, reason: 'not-bound' };
     }
     await this.removeRulesFromOtherWorldbooks(binding.worldbookName);
-    const book = await this.host.loadWorldbook(binding.worldbookName);
-    const normalized = normalizeActiveEntries(book, binding.chatKey);
-    if (stableStringify(normalized) !== stableStringify(book)) await this.host.saveWorldbook(binding.worldbookName, normalized);
+    await this.saveCheckedWorldbook(binding.worldbookName, (book) => normalizeActiveEntries(book, binding.chatKey));
     const verify = await this.host.loadWorldbook(binding.worldbookName);
     const rules = entriesOf(verify).filter(managedRules);
     if (rules.length !== 1 || rules[0].content !== buildHypnosisRulePrompt()) throw new Error('进入聊天时加载内置催眠规则失败。');
@@ -387,8 +419,7 @@ export class ArchiveWorldbookService {
     const binding = this.activeRulesBinding || this.getBinding();
     this.activeRulesBinding = null;
     if (!binding?.worldbookName) return { ok: false, reason: 'not-bound' };
-    const book = await this.host.loadWorldbook(binding.worldbookName);
-    await this.host.saveWorldbook(binding.worldbookName, removeRulesEntry(book));
+    await this.saveCheckedWorldbook(binding.worldbookName, removeRulesEntry);
     const verify = await this.host.loadWorldbook(binding.worldbookName);
     if (entriesOf(verify).some(managedRules)) throw new Error('退出聊天时删除内置催眠规则失败。');
     return { ok: true, worldbookName: binding.worldbookName };
@@ -442,7 +473,10 @@ export class ArchiveWorldbookService {
     }
     const records = [...merged.values()].slice(0, 80);
     const contextText = `最近同步楼层：${messageId}\n最近AI回复摘要：${String(message.message || '').replace(/\s+/g, ' ').slice(0, 1800)}\n当前催眠运行状态：${stableStringify(this.store.state.hypnosis || {}).slice(0, 2400)}`;
-    await this.host.saveWorldbook(binding.worldbookName, replaceManagedEntries(book, binding.chatKey, records, contextText));
+    await this.saveCheckedWorldbook(
+      binding.worldbookName,
+      (current) => replaceManagedEntries(current, binding.chatKey, records, contextText),
+    );
     await this.store.update((state) => {
       if (state.custom[BINDING_KEY]?.worldbookName === binding.worldbookName) {
         state.custom[BINDING_KEY].lastSyncedMessageId = messageId;
