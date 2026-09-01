@@ -13044,7 +13044,12 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
   }
 
   function hasDatabaseProfileSource(variables = getLatestStatDataSync()) {
-    return variables?.["系统"]?.["_hypnoos数据库"]?.available === true;
+    const source = variables?.["系统"]?.["_hypnoos数据库"];
+    if (source?.available !== true) return false;
+    const sheets = Array.isArray(source?.sheets) ? source.sheets : [];
+    const roleSheet = sheets.find((sheet) => String(sheet?.name || sheet?.key || "").trim() === "重要人物表");
+    if (roleSheet) return Number(roleSheet.rowCount || 0) > 0;
+    return Object.values(variables?.["角色"] || {}).some((role) => role?.["自定义"]?.["数据来源"] === "数据库");
   }
 
   // 人物档案一次同步 render 只读取一次当前楼层快照。这里只保存调用栈内
@@ -41808,6 +41813,17 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
       data?.candidates?.[0]?.content?.parts,
       data?.candidates?.[0]?.content,
       data?.data
+    ]) {
+      const parts = collect(candidate);
+      if (parts.length) return parts.join("\n").trim();
+    }
+    for (const candidate of [
+      data?.choices?.[0]?.message?.reasoning_content,
+      data?.choices?.[0]?.message?.reasoning,
+      data?.choices?.[0]?.reasoning_content,
+      data?.choices?.[0]?.reasoning,
+      data?.reasoning_content,
+      data?.reasoning
     ]) {
       const parts = collect(candidate);
       if (parts.length) return parts.join("\n").trim();

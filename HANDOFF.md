@@ -22,6 +22,8 @@
 - 远端：`https://github.com/Suqi854/HypnoOs3.0_v0.9.0.git`
 - 最新远端提交以 `git ls-remote origin refs/heads/main` 为准；只有用户在当前任务明确要求时才能推送。
 - 当前关键提交：
+  - `fix: restore profile fallback and connector responses`（本轮待提交）
+  - `80a994f fix: make hypnosis start activation reliable`
   - `352ff9e fix: sync database data into phone profiles`
   - `5af061c feat: integrate database-backed phone state`
   - `7d389a8 feat: persist model presets and unify phone settings`
@@ -37,6 +39,15 @@
   - `2442255 fix: smooth pet interactions and phone resizing`
   - `1b7c381 fix: stabilize mobile input and finite cheat resources`
   - `6863013 fix: stabilize mobile input and avatar selection`
+
+## 2026-09-01 档案来源与模型响应修复
+
+- 仓库先按用户指定版本包核对并回退到 `80a994f`；错误的本地 `2e957f6` 已移除，修复从干净基线重新完成。
+- 截图日志确认档案模型调用本身成功（女性 12、男性 6）；实际问题是数据库插件存在但“重要人物表”为空时，手机仍把数据库标记为独占档案来源，遮住了已成功导入的世界书档案。
+- 现在只有“重要人物表”存在有效记录时才由数据库独占人物档案；空表时继续显示当前聊天已导入/已缓存的档案。旧版没有表元数据时，仍可用角色的“数据来源=数据库”兼容识别。
+- 自定义文生文响应保持优先读取正常 `content/text`，仅在正文为空时兼容 `reasoning_content/reasoning`，解决 OpenAI 兼容响应外壳存在但正文无法识别的问题。
+- 未改现有设置三板块、应用布局或其他 UI；仅更新前端缓存标记与静态哈希。
+- 自动验证：86/86、`check`、309 文件构建均通过。真实酒馆验证覆盖：空数据库人物表的世界书档案回退、真实 AutoCardUpdaterAPI 连接、人物/地点/库存/任务/技能/总结/大纲可逆投影，以及 reasoning-only 模拟响应；未调用付费 API，临时数据已恢复且复查无残留。
 
 ## 本地运行环境
 

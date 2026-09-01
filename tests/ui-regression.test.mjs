@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile, stat } from 'node:fs/promises';
 import test from 'node:test';
+import vm from 'node:vm';
 
 import { PHONE_APPS } from '../src/apps.js';
 import { getRegionPack } from '../src/regions.js';
@@ -21,6 +22,12 @@ function functionBodyFrom(source, name) {
   assert.notEqual(start, -1, `missing function ${name}`);
   const next = source.indexOf('\n    function ', start + 1);
   return source.slice(start, next < 0 ? source.length : next);
+}
+
+function evaluateUiFunction(name) {
+  const context = {};
+  vm.runInNewContext(`${functionBody(name)}; globalThis.result = ${name};`, context);
+  return context.result;
 }
 
 test('critical phone apps remain registered under the existing 4.3 surface', () => {
@@ -179,6 +186,21 @@ test('database app reads the external table runtime without changing the existin
   assert.ok(html.includes('setHomeTileLabel(tile, "数据库")'));
 });
 
+test('database owns profile visibility only when its character sheet has records', () => {
+  const hasDatabaseProfiles = evaluateUiFunction('hasDatabaseProfileSource');
+  const source = (rowCount) => ({ 系统: { _hypnoos数据库: { available: true, sheets: [{ name: '重要人物表', rowCount }] } }, 角色: {} });
+  assert.equal(hasDatabaseProfiles(source(0)), false);
+  assert.equal(hasDatabaseProfiles(source(2)), true);
+  assert.equal(hasDatabaseProfiles({ 系统: { _hypnoos数据库: { available: true } }, 角色: { 旧版人物: { 自定义: { 数据来源: '数据库' } } } }), true);
+});
+
+test('custom connector accepts structured text returned in reasoning fields', () => {
+  const extractText = evaluateUiFunction('independentConnectorTextContent');
+  const payload = '{"apps":{"map":[]}}';
+  assert.equal(extractText({ choices: [{ message: { content: null, reasoning_content: payload } }] }), payload);
+  assert.equal(extractText({ choices: [{ message: { content: 'normal', reasoning_content: payload } }] }), 'normal');
+});
+
 test('phone resize is frame-coalesced without forced layout reads per pointer move', () => {
   const moveStart = floatingHost.indexOf('function moveResize(event)');
   const moveEnd = floatingHost.indexOf('function endResize(event)', moveStart);
@@ -272,7 +294,7 @@ test('hypnosis commands wait in phone input before host write or direct send', (
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__(block, { append: false })'));
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_DIRECT_SEND__(block)'));
   assert.ok(floatingHost.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__'));
-  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-hypnosis-start-v4'"));
+  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-database-profile-source-v1'"));
   assert.ok(floatingHost.includes('overflow:visible;z-index:5;display:none'));
   assert.ok(floatingCore.includes("scriptUrl.searchParams.set('revision', FRONTEND_REVISION)"));
   assert.ok(floatingCore.includes('script.dataset.revision = FRONTEND_REVISION'));

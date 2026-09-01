@@ -10,6 +10,7 @@ const browser = await chromium.launch({ headless: true, executablePath: process.
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
 const page = await context.newPage();
 const errors = [];
+let originalState = null;
 page.on('pageerror', (error) => errors.push(String(error?.stack || error)));
 
 try {
@@ -29,6 +30,43 @@ try {
     }
     return false;
   }, null, { timeout: 30_000 });
+  await page.evaluate(async () => {
+    const runtime = globalThis.__HYPNOOS3_RUNTIME__;
+    const state = runtime?.store?.state;
+    const hasStaleFixture = Object.values(state?.roles || {}).some((role) => role?.name === 'QA数据库人物')
+      || (state?.inventory || []).some((item) => item?.id === 'QA物品' || item?.name === 'QA物品' || item?.物品名称 === 'QA物品')
+      || (state?.tasks || []).some((item) => item?.id === 'QA任务' || item?.name === 'QA任务' || item?.任务 === 'QA任务');
+    if (!hasStaleFixture) return;
+    const snapshots = await runtime.host.readOptionalRuntimeState?.() || [];
+    const pending = snapshots.map((item) => item?.value ?? item);
+    const seen = new Set();
+    let fallbackSystem = null;
+    while (pending.length && !fallbackSystem) {
+      const value = pending.shift();
+      if (!value || typeof value !== 'object' || Array.isArray(value) || seen.has(value)) continue;
+      seen.add(value);
+      if (value.系统 && typeof value.系统 === 'object' && value.系统.当前地点 !== 'QA地点') fallbackSystem = value.系统;
+      for (const key of ['stat_data', 'variables', 'mvu']) if (value[key] && typeof value[key] === 'object') pending.push(value[key]);
+    }
+    await runtime.store.update((draft) => {
+      draft.roles = Object.fromEntries(Object.entries(draft.roles || {}).filter(([, role]) => role?.name !== 'QA数据库人物'));
+      draft.inventory = (draft.inventory || []).filter((item) => item?.id !== 'QA物品' && item?.name !== 'QA物品' && item?.物品名称 !== 'QA物品');
+      draft.tasks = (draft.tasks || []).filter((item) => item?.id !== 'QA任务' && item?.name !== 'QA任务' && item?.任务 !== 'QA任务');
+      for (const [key, field, value] of [['skills', '技能名称', 'QA技能'], ['summaries', '纪要', 'QA纪要'], ['outline', '阶段', 'QA阶段']]) {
+        if (Array.isArray(draft.custom?.databaseAppData?.[key])) draft.custom.databaseAppData[key] = draft.custom.databaseAppData[key].filter((item) => item?.[field] !== value);
+      }
+      const legacy = draft.custom?.legacyVariables;
+      if (legacy?.角色) delete legacy.角色.QA数据库人物;
+      if (legacy?.任务) delete legacy.任务.QA任务;
+      if (legacy?.系统?.持有物品) delete legacy.系统.持有物品.QA物品;
+      if (Array.isArray(legacy?.系统?.主角技能)) legacy.系统.主角技能 = legacy.系统.主角技能.filter((item) => item?.技能名称 !== 'QA技能');
+      if (Array.isArray(legacy?.系统?._数据库总结)) legacy.系统._数据库总结 = legacy.系统._数据库总结.filter((item) => item?.纪要 !== 'QA纪要');
+      if (Array.isArray(legacy?.系统?._数据库总体大纲)) legacy.系统._数据库总体大纲 = legacy.系统._数据库总体大纲.filter((item) => item?.阶段 !== 'QA阶段');
+      if (fallbackSystem && draft.location?.current === 'QA地点') draft.location.current = String(fallbackSystem.当前地点 || '');
+      if (fallbackSystem && draft.time?.clock === '12:34') draft.time.clock = String(fallbackSystem.当前时间 || draft.time.clock);
+      return draft;
+    }, 'qa-database-stale-fixture-cleanup');
+  });
   await page.evaluate(() => globalThis.__HYPNOOS3_EXTENSION_FLOATING_SINGLETON__?.openPhone?.());
   await page.waitForTimeout(1200);
   let frame = null;
@@ -57,11 +95,104 @@ try {
   assert.ok(snapshot.sheets.length >= 8, `数据库标准表数量不足：${snapshot.sheets.length}`);
   assert.ok(snapshot.sheets.some((sheet) => sheet.name === '重要人物表'));
   assert.ok(snapshot.sheets.some((sheet) => sheet.name === '任务与事件表'));
+  await frame.evaluate(() => globalThis.syncDatabaseState());
+  const projection = await page.evaluate(() => {
+    const state = globalThis.__HYPNOOS3_RUNTIME__?.store?.state;
+    const legacy = globalThis.__HYPNOOS3_RUNTIME__?.floatingHost?.dataService?.readLegacyVariables?.();
+    const source = state?.custom?.databaseSource || {};
+    const count = (value) => value && typeof value === 'object' && !Array.isArray(value) ? Object.keys(value).length : 0;
+    return {
+      sourceAvailable: source.available === true,
+      sourceSignature: String(source.signature || ''),
+      stateRoleCount: count(state?.roles),
+      legacyRoleCount: count(legacy?.角色),
+      femaleRoleCount: Object.values(legacy?.角色 || {}).filter((role) => String(role?.信息?.性别 || '').trim() === '女').length,
+      maleRoleCount: Object.values(legacy?.角色 || {}).filter((role) => String(role?.信息?.性别 || '').trim() === '男').length,
+      inventoryCount: Array.isArray(state?.inventory) ? state.inventory.length : 0,
+      taskCount: Array.isArray(state?.tasks) ? state.tasks.length : 0,
+      skillCount: Array.isArray(state?.custom?.databaseAppData?.skills) ? state.custom.databaseAppData.skills.length : 0,
+      summaryCount: Array.isArray(state?.custom?.databaseAppData?.summaries) ? state.custom.databaseAppData.summaries.length : 0,
+      outlineCount: Array.isArray(state?.custom?.databaseAppData?.outline) ? state.custom.databaseAppData.outline.length : 0,
+      qaFixtureResidue: Object.values(state?.roles || {}).some((role) => role?.name === 'QA数据库人物')
+        || (state?.inventory || []).some((item) => item?.id === 'QA物品' || item?.name === 'QA物品' || item?.物品名称 === 'QA物品')
+        || (state?.tasks || []).some((item) => item?.id === 'QA任务' || item?.name === 'QA任务' || item?.任务 === 'QA任务'),
+    };
+  });
+  const roleSheet = snapshot.sheets.find((sheet) => sheet.name === '重要人物表');
+  assert.equal(projection.sourceAvailable, true);
+  assert.equal(projection.sourceSignature, snapshot.signature);
+  assert.equal(projection.qaFixtureResidue, false, '上一次数据库 QA 的临时数据没有恢复');
+  if (roleSheet.rows.length) {
+    assert.ok(projection.legacyRoleCount >= roleSheet.rows.length, '数据库人物没有完整同步到手机变量');
+    assert.ok(projection.femaleRoleCount + projection.maleRoleCount >= roleSheet.rows.length, '数据库人物性别没有完整投影到档案应用');
+  }
+  if (!roleSheet.rows.length) {
+    const fallbackVisible = await frame.evaluate(async () => {
+      await globalThis.__ST_OPEN_FEMALE_PROFILE_APP__?.();
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      const count = document.querySelectorAll('.st-profile-app [data-profile-desk-role]').length;
+      document.querySelector('.st-profile-app [data-lite-action="back"]')?.click();
+      return count;
+    });
+    assert.ok(fallbackVisible > projection.legacyRoleCount, `数据库人物表为空时仍遮住了已导入的世界书档案：档案选项 ${fallbackVisible}，手机变量人物 ${projection.legacyRoleCount}`);
+  }
+
+  originalState = await page.evaluate(() => globalThis.__HYPNOOS3_RUNTIME__.store.state);
+  await page.evaluate(async () => {
+    const runtime = globalThis.__HYPNOOS3_RUNTIME__;
+    runtime.host.__qaDatabaseOriginalReadSnapshot = runtime.host.readDatabaseSnapshot;
+    runtime.host.readDatabaseSnapshot = async () => ({
+      mate: { version: 'qa' },
+      sheet_global: { name: '全局数据表', content: [['', '主角当前所在地点', '当前时间'], [1, 'QA地点', '12:34']] },
+      sheet_user: { name: '主角信息', content: [['', '人物名称'], [1, 'QA玩家']] },
+      sheet_roles: { name: '重要人物表', content: [['', '姓名', '性别/年龄', '外貌特征'], [1, 'QA数据库人物', '女/20', 'QA外貌']] },
+      sheet_skills: { name: '主角技能表', content: [['', '技能名称'], [1, 'QA技能']] },
+      sheet_inventory: { name: '背包物品表', content: [['', '物品名称', '数量'], [1, 'QA物品', 2]] },
+      sheet_tasks: { name: '任务与事件表', content: [['', '任务名称', '当前进度'], [1, 'QA任务', '进行中']] },
+      sheet_summary: { name: '总结表', content: [['', '纪要'], [1, 'QA纪要']] },
+      sheet_outline: { name: '总体大纲', content: [['', '阶段'], [1, 'QA阶段']] },
+    });
+    await runtime.store.syncDatabaseRuntimeState('qa-database-projection');
+  });
+  const fixtureProjection = await page.evaluate(() => {
+    const runtime = globalThis.__HYPNOOS3_RUNTIME__;
+    const legacy = runtime.floatingHost.dataService.readLegacyVariables();
+    return {
+      roleVisible: legacy?.角色?.QA数据库人物?.信息?.性别 === '女',
+      locationVisible: legacy?.系统?.当前地点 === 'QA地点',
+      inventoryVisible: Boolean(legacy?.系统?.持有物品?.QA物品),
+      taskVisible: Boolean(legacy?.任务?.QA任务),
+      skillVisible: Array.isArray(legacy?.系统?.主角技能) && legacy.系统.主角技能.some((item) => item?.技能名称 === 'QA技能'),
+      summaryVisible: Array.isArray(legacy?.系统?._数据库总结) && legacy.系统._数据库总结.some((item) => item?.纪要 === 'QA纪要'),
+      outlineVisible: Array.isArray(legacy?.系统?._数据库总体大纲) && legacy.系统._数据库总体大纲.some((item) => item?.阶段 === 'QA阶段'),
+    };
+  });
+  assert.deepEqual(fixtureProjection, {
+    roleVisible: true,
+    locationVisible: true,
+    inventoryVisible: true,
+    taskVisible: true,
+    skillVisible: true,
+    summaryVisible: true,
+    outlineVisible: true,
+  });
   assert.equal(await app.locator('[data-database-sheet] option').count(), snapshot.sheets.length);
   await app.locator('[data-database-refresh]').click();
   await frame.waitForFunction(() => !document.querySelector('[data-database-refresh]')?.disabled, null, { timeout: 15_000 });
   assert.deepEqual(errors, []);
-  console.log('PASS local SillyTavern database app, three settings tabs and live AutoCardUpdaterAPI tables', { sheetCount: snapshot.sheets.length, signature: snapshot.signature });
+  console.log('PASS local SillyTavern database app, three settings tabs and live AutoCardUpdaterAPI projection', { sheetCount: snapshot.sheets.length, signature: snapshot.signature, sheetRows: Object.fromEntries(snapshot.sheets.map((sheet) => [sheet.name, sheet.rows.length])), ...projection });
 } finally {
+  if (originalState) {
+    try {
+      await page.evaluate(async (state) => {
+        const runtime = globalThis.__HYPNOOS3_RUNTIME__;
+        if (runtime?.host?.__qaDatabaseOriginalReadSnapshot) {
+          runtime.host.readDatabaseSnapshot = runtime.host.__qaDatabaseOriginalReadSnapshot;
+          delete runtime.host.__qaDatabaseOriginalReadSnapshot;
+        }
+        await runtime?.store?.replace?.(state, 'qa-database-restore');
+      }, originalState);
+    } catch {}
+  }
   await browser.close();
 }

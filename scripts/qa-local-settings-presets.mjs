@@ -11,13 +11,15 @@ const context = await browser.newContext({ viewport: { width: 1440, height: 1000
 const page = await context.newPage();
 const errors = [];
 page.on('pageerror', (error) => errors.push(String(error?.stack || error)));
-await page.route('https://qa-hypnoos.local/**', async (route) => {
+const fulfillModelRoute = async (route) => {
   if (route.request().url().endsWith('/models')) {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [{ id: 'qa-persistent-model' }] }) });
     return;
   }
-  await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: 'OK' } }] }) });
-});
+  await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: null, reasoning_content: 'OK' } }] }) });
+};
+await page.route('https://qa-hypnoos.local/**', fulfillModelRoute);
+await page.route('**/api/backends/chat-completions/generate', fulfillModelRoute);
 
 let frame = null;
 let storageSnapshot = null;
@@ -84,6 +86,9 @@ try {
   assert.equal(saved.config.schemaVersion, 2);
   assert.equal(saved.preset.model, 'qa-persistent-model');
   assert.equal(saved.secret, 'qa-persistent-secret');
+
+  await settings.locator('[data-connector-test="text"]').click();
+  await frame.waitForFunction(() => document.querySelector('.st-settings-app')?.dataset?.settingsStatus === '文生文插头连接成功。', null, { timeout: 30_000 });
 
   const candidates = await page.evaluate(async () => {
     const st = globalThis.SillyTavern?.getContext?.();
