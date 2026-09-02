@@ -174,6 +174,34 @@ test('optional runtime updates enter HypnoState once without mirror loops', asyn
   assert.equal(unchanged.resources.money, 2468);
 });
 
+test('database callback snapshot replaces stale exported dossier data immediately', async () => {
+  const host = new StubHost({ saved: createDefaultState(getRegionPack('cn')) });
+  const store = new StateStore(host, new MemorySettings());
+  await store.initialize();
+  let exportReads = 0;
+  host.readDatabaseSnapshot = async () => {
+    exportReads += 1;
+    return {
+      sheet_roles: { name: '重要人物表', content: [['', '姓名', '性别/年龄', '外貌特征'], [1, '旧人物', '男/22', '旧资料']] },
+    };
+  };
+  const callbackSnapshot = {
+    sheet_roles: { name: '重要人物表', content: [['', '姓名', '性别/年龄', '外貌特征'], [1, '新人物', '女/20', '第一次更新']] },
+  };
+
+  await store.syncDatabaseRuntimeState('database-update', callbackSnapshot);
+  let legacy = toLegacyVariables(store.state);
+  assert.equal(exportReads, 0);
+  assert.equal(legacy.角色.新人物.信息.性别, '女');
+  assert.equal(legacy.角色.新人物.信息.外貌特征, '第一次更新');
+  assert.equal(legacy.角色.旧人物, undefined);
+
+  callbackSnapshot.sheet_roles.content[1][3] = '第二次更新';
+  await store.syncDatabaseRuntimeState('database-update', callbackSnapshot);
+  legacy = toLegacyVariables(store.state);
+  assert.equal(legacy.角色.新人物.信息.外貌特征, '第二次更新');
+});
+
 test('phone bridge reads and writes HypnoState even when external runtimes disagree', async () => {
   const state = createDefaultState(getRegionPack('cn'));
   state.resources.money = 1200;

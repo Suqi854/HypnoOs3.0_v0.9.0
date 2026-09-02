@@ -166,9 +166,11 @@ export class StateStore extends EventTarget {
     return replaced;
   }
 
-  async syncDatabaseRuntimeState(reason = 'database-adapter') {
-    if (typeof this.#host.readDatabaseSnapshot !== 'function') return this.state;
-    const database = await this.#host.readDatabaseSnapshot();
+  async syncDatabaseRuntimeState(reason = 'database-adapter', providedSnapshot = null) {
+    if (!providedSnapshot && typeof this.#host.readDatabaseSnapshot !== 'function') return this.state;
+    const contextKey = this.#contextKey || this.#currentContextKey();
+    const database = providedSnapshot || await this.#host.readDatabaseSnapshot();
+    if (contextKey !== this.#currentContextKey()) return this.state;
     if (!database) return this.state;
     const pack = getRegionPack(this.#state.region);
     const next = mergeDatabaseSnapshotIntoState(this.#state, database, pack);

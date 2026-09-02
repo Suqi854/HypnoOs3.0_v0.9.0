@@ -1,8 +1,8 @@
 import { ControlPanel } from './control-panel.js';
 import { FloatingHost } from './floating-host.js?revision=database-profile-v3';
-import { HostAdapter } from './host-adapter.js?revision=database-profile-v3';
+import { HostAdapter } from './host-adapter.js?revision=database-profile-v4';
 import { HypnoStorage } from './storage.js';
-import { StateStore } from './state-store.js?revision=database-profile-v3';
+import { StateStore } from './state-store.js?revision=database-profile-v4';
 import { EXTENSION_ID, RUNTIME_KEY } from './constants.js';
 import { HYPNOSIS_RULES_API } from './hypnosis-rules.js';
 
@@ -16,7 +16,7 @@ class Runtime {
     await this.store.initialize();
     this.host.installPromptLifecycle();
     this.host.installOptionalRuntimeLifecycle((reason) => this.store.syncOptionalRuntimeState(reason));
-    this.host.installDatabaseRuntimeLifecycle(() => this.store.syncDatabaseRuntimeState());
+    this.host.installDatabaseRuntimeLifecycle((snapshot, reason) => this.store.syncDatabaseRuntimeState(reason, snapshot));
 
     this.control = document.createElement('div');
     this.control.id = 'hypnoos3-control-host';

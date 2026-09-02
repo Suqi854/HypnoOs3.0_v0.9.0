@@ -443,10 +443,49 @@ export class HostAdapter {
     let activeApi = null;
     let retryTimer = null;
     let retryCount = 0;
-    const notify = () => Promise.resolve().then(listener).catch((error) => console.warn(`[${EXTENSION_ID}] 数据库状态导入失败`, error));
+    let refreshTimer = null;
+    let refreshRunning = false;
+    let refreshPending = false;
+    let latestSnapshot = null;
+    let latestReason = 'database-adapter';
+    const flush = async () => {
+      if (refreshRunning) {
+        refreshPending = true;
+        return;
+      }
+      refreshRunning = true;
+      try {
+        do {
+          refreshPending = false;
+          const snapshot = latestSnapshot;
+          const reason = latestReason;
+          latestSnapshot = null;
+          await listener(snapshot, reason);
+        } while (refreshPending || latestSnapshot);
+      } catch (error) {
+        console.warn(`[${EXTENSION_ID}] 数据库状态导入失败`, error);
+      } finally {
+        refreshRunning = false;
+      }
+    };
+    const notify = (snapshot = null, reason = 'database-update') => {
+      if (usableObject(snapshot)) latestSnapshot = clone(snapshot);
+      latestReason = reason;
+      refreshPending = true;
+      void Promise.resolve().then(flush);
+    };
+    const onTableUpdate = (snapshot) => notify(snapshot, 'database-update');
+    const scheduleRefresh = (reason, delay = 0) => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        refreshTimer = null;
+        notify(null, reason);
+      }, delay);
+      refreshTimer.unref?.();
+    };
     const unbind = () => {
       if (!activeApi) return;
-      try { activeApi.unregisterTableUpdateCallback?.(notify); } catch {}
+      try { activeApi.unregisterTableUpdateCallback?.(onTableUpdate); } catch {}
       activeApi = null;
     };
     const bind = (shouldNotify = true) => {
@@ -456,8 +495,8 @@ export class HostAdapter {
       if (api !== activeApi) {
         unbind();
         activeApi = api;
-        try { activeApi.registerTableUpdateCallback?.(notify); } catch {}
-        if (shouldNotify) notify();
+        try { activeApi.registerTableUpdateCallback?.(onTableUpdate); } catch {}
+        if (shouldNotify) notify(null, 'database-runtime-ready');
       }
       if (retryTimer) {
         clearInterval(retryTimer);
@@ -489,6 +528,7 @@ export class HostAdapter {
           }, 250);
           retryTimer.unref?.();
         }
+        scheduleRefresh('database-chat-changed', 250);
       };
       context.eventSource.on(chatChanged, rebind);
       this.#disposers.push(() => context.eventSource.removeListener(chatChanged, rebind));
@@ -496,6 +536,8 @@ export class HostAdapter {
     this.#disposers.push(() => {
       if (retryTimer) clearInterval(retryTimer);
       retryTimer = null;
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = null;
       unbind();
     });
   }

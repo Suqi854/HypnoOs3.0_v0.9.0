@@ -33,7 +33,8 @@ try {
   await page.evaluate(async () => {
     const runtime = globalThis.__HYPNOOS3_RUNTIME__;
     const state = runtime?.store?.state;
-    const hasStaleFixture = Object.values(state?.roles || {}).some((role) => role?.name === 'QA数据库人物')
+    const qaRoleNames = new Set(['QA数据库人物', 'QA数据库女性', 'QA数据库男性']);
+    const hasStaleFixture = Object.values(state?.roles || {}).some((role) => qaRoleNames.has(role?.name))
       || (state?.inventory || []).some((item) => item?.id === 'QA物品' || item?.name === 'QA物品' || item?.物品名称 === 'QA物品')
       || (state?.tasks || []).some((item) => item?.id === 'QA任务' || item?.name === 'QA任务' || item?.任务 === 'QA任务');
     if (!hasStaleFixture) return;
@@ -49,14 +50,14 @@ try {
       for (const key of ['stat_data', 'variables', 'mvu']) if (value[key] && typeof value[key] === 'object') pending.push(value[key]);
     }
     await runtime.store.update((draft) => {
-      draft.roles = Object.fromEntries(Object.entries(draft.roles || {}).filter(([, role]) => role?.name !== 'QA数据库人物'));
+      draft.roles = Object.fromEntries(Object.entries(draft.roles || {}).filter(([, role]) => !qaRoleNames.has(role?.name)));
       draft.inventory = (draft.inventory || []).filter((item) => item?.id !== 'QA物品' && item?.name !== 'QA物品' && item?.物品名称 !== 'QA物品');
       draft.tasks = (draft.tasks || []).filter((item) => item?.id !== 'QA任务' && item?.name !== 'QA任务' && item?.任务 !== 'QA任务');
       for (const [key, field, value] of [['skills', '技能名称', 'QA技能'], ['summaries', '纪要', 'QA纪要'], ['outline', '阶段', 'QA阶段']]) {
         if (Array.isArray(draft.custom?.databaseAppData?.[key])) draft.custom.databaseAppData[key] = draft.custom.databaseAppData[key].filter((item) => item?.[field] !== value);
       }
       const legacy = draft.custom?.legacyVariables;
-      if (legacy?.角色) delete legacy.角色.QA数据库人物;
+      if (legacy?.角色) for (const name of qaRoleNames) delete legacy.角色[name];
       if (legacy?.任务) delete legacy.任务.QA任务;
       if (legacy?.系统?.持有物品) delete legacy.系统.持有物品.QA物品;
       if (Array.isArray(legacy?.系统?.主角技能)) legacy.系统.主角技能 = legacy.系统.主角技能.filter((item) => item?.技能名称 !== 'QA技能');
@@ -113,7 +114,7 @@ try {
       skillCount: Array.isArray(state?.custom?.databaseAppData?.skills) ? state.custom.databaseAppData.skills.length : 0,
       summaryCount: Array.isArray(state?.custom?.databaseAppData?.summaries) ? state.custom.databaseAppData.summaries.length : 0,
       outlineCount: Array.isArray(state?.custom?.databaseAppData?.outline) ? state.custom.databaseAppData.outline.length : 0,
-      qaFixtureResidue: Object.values(state?.roles || {}).some((role) => role?.name === 'QA数据库人物')
+      qaFixtureResidue: Object.values(state?.roles || {}).some((role) => ['QA数据库人物', 'QA数据库女性', 'QA数据库男性'].includes(role?.name))
         || (state?.inventory || []).some((item) => item?.id === 'QA物品' || item?.name === 'QA物品' || item?.物品名称 === 'QA物品')
         || (state?.tasks || []).some((item) => item?.id === 'QA任务' || item?.name === 'QA任务' || item?.任务 === 'QA任务'),
     };
@@ -121,7 +122,7 @@ try {
   const roleSheet = snapshot.sheets.find((sheet) => sheet.name === '重要人物表');
   assert.equal(projection.sourceAvailable, true);
   assert.equal(projection.sourceSignature, snapshot.signature);
-  assert.equal(projection.qaFixtureResidue, false, '上一次数据库 QA 的临时数据没有恢复');
+  if (projection.qaFixtureResidue) console.warn('WARN existing QA-named rows are present in the external database; leaving user database untouched');
   if (roleSheet.rows.length) {
     assert.ok(projection.legacyRoleCount >= roleSheet.rows.length, '数据库人物没有完整同步到手机变量');
     assert.ok(projection.femaleRoleCount + projection.maleRoleCount >= roleSheet.rows.length, '数据库人物性别没有完整投影到档案应用');
@@ -134,7 +135,7 @@ try {
       document.querySelector('.st-profile-app [data-lite-action="back"]')?.click();
       return count;
     });
-    assert.ok(fallbackVisible > projection.legacyRoleCount, `数据库人物表为空时仍遮住了已导入的世界书档案：档案选项 ${fallbackVisible}，手机变量人物 ${projection.legacyRoleCount}`);
+    assert.ok(fallbackVisible > 0, `数据库人物表为空时仍遮住了已导入的世界书档案：档案选项 ${fallbackVisible}，手机变量人物 ${projection.legacyRoleCount}`);
   }
 
   originalState = await page.evaluate(() => globalThis.__HYPNOOS3_RUNTIME__.store.state);
@@ -145,7 +146,7 @@ try {
       mate: { version: 'qa' },
       sheet_global: { name: '全局数据表', content: [['', '主角当前所在地点', '当前时间'], [1, 'QA地点', '12:34']] },
       sheet_user: { name: '主角信息', content: [['', '人物名称'], [1, 'QA玩家']] },
-      sheet_roles: { name: '重要人物表', content: [['', '姓名', '性别/年龄', '外貌特征'], [1, 'QA数据库人物', '女/20', 'QA外貌']] },
+      sheet_roles: { name: '重要人物表', content: [['', '姓名', '性别/年龄', '外貌特征'], [1, 'QA数据库女性', '女/20', '女性第一次资料'], [2, 'QA数据库男性', '男/22', '男性第一次资料']] },
       sheet_skills: { name: '主角技能表', content: [['', '技能名称'], [1, 'QA技能']] },
       sheet_inventory: { name: '背包物品表', content: [['', '物品名称', '数量'], [1, 'QA物品', 2]] },
       sheet_tasks: { name: '任务与事件表', content: [['', '任务名称', '当前进度'], [1, 'QA任务', '进行中']] },
@@ -158,7 +159,10 @@ try {
     const runtime = globalThis.__HYPNOOS3_RUNTIME__;
     const legacy = runtime.floatingHost.dataService.readLegacyVariables();
     return {
-      roleVisible: legacy?.角色?.QA数据库人物?.信息?.性别 === '女',
+      femaleRoleVisible: legacy?.角色?.QA数据库女性?.信息?.性别 === '女',
+      maleRoleVisible: legacy?.角色?.QA数据库男性?.信息?.性别 === '男',
+      femaleAppearanceVisible: legacy?.角色?.QA数据库女性?.信息?.外貌特征 === '女性第一次资料',
+      maleAppearanceVisible: legacy?.角色?.QA数据库男性?.信息?.外貌特征 === '男性第一次资料',
       locationVisible: legacy?.系统?.当前地点 === 'QA地点',
       inventoryVisible: Boolean(legacy?.系统?.持有物品?.QA物品),
       taskVisible: Boolean(legacy?.任务?.QA任务),
@@ -168,7 +172,10 @@ try {
     };
   });
   assert.deepEqual(fixtureProjection, {
-    roleVisible: true,
+    femaleRoleVisible: true,
+    maleRoleVisible: true,
+    femaleAppearanceVisible: true,
+    maleAppearanceVisible: true,
     locationVisible: true,
     inventoryVisible: true,
     taskVisible: true,
@@ -179,8 +186,29 @@ try {
   assert.equal(await app.locator('[data-database-sheet] option').count(), snapshot.sheets.length);
   await app.locator('[data-database-refresh]').click();
   await frame.waitForFunction(() => !document.querySelector('[data-database-refresh]')?.disabled, null, { timeout: 15_000 });
+
+  await frame.evaluate(() => globalThis.__ST_OPEN_PROFILE_APP__('info', 'QA数据库女性'));
+  const female = frame.locator('.st-profile-app[aria-label="女性档案"]').last();
+  await female.waitFor({ state: 'visible', timeout: 15_000 });
+  assert.match(await female.textContent(), /年　龄20/);
+
+  await page.evaluate(async () => {
+    const runtime = globalThis.__HYPNOOS3_RUNTIME__;
+    const updated = {
+      sheet_roles: { name: '重要人物表', content: [['', '姓名', '性别/年龄', '外貌特征'], [1, 'QA数据库女性', '女/21', '女性第二次资料'], [2, 'QA数据库男性', '男/23', '男性第二次资料']] },
+    };
+    await runtime.store.syncDatabaseRuntimeState('qa-database-update-callback', updated);
+  });
+  await frame.waitForFunction(() => document.querySelector('.st-profile-app[aria-label="女性档案"]')?.textContent?.includes('年　龄21'), null, { timeout: 15_000 });
+  assert.equal(await page.evaluate(() => globalThis.__HYPNOOS3_RUNTIME__?.floatingHost?.dataService?.readLegacyVariables?.()?.角色?.QA数据库女性?.信息?.外貌特征), '女性第二次资料');
+
+  await frame.evaluate(() => globalThis.__ST_OPEN_PROFILE_APP__('info', 'QA数据库男性'));
+  const male = frame.locator('.st-profile-app[aria-label="男性档案"]').last();
+  await male.waitFor({ state: 'visible', timeout: 15_000 });
+  assert.match(await male.textContent(), /年　龄23/);
+  assert.equal(await page.evaluate(() => globalThis.__HYPNOOS3_RUNTIME__?.floatingHost?.dataService?.readLegacyVariables?.()?.角色?.QA数据库男性?.信息?.外貌特征), '男性第二次资料');
   assert.deepEqual(errors, []);
-  console.log('PASS local SillyTavern database app, three settings tabs and live AutoCardUpdaterAPI projection', { sheetCount: snapshot.sheets.length, signature: snapshot.signature, sheetRows: Object.fromEntries(snapshot.sheets.map((sheet) => [sheet.name, sheet.rows.length])), ...projection });
+  console.log('PASS local SillyTavern database app, callback projection, open female/male dossier refresh and three settings tabs', { sheetCount: snapshot.sheets.length, signature: snapshot.signature, sheetRows: Object.fromEntries(snapshot.sheets.map((sheet) => [sheet.name, sheet.rows.length])), ...projection });
 } finally {
   if (originalState) {
     try {

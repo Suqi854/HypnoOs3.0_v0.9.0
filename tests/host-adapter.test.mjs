@@ -306,3 +306,57 @@ test('optional runtime snapshots prefer current message MVU over chat mirrors', 
     else globalThis.document = previousDocument;
   }
 });
+
+test('database lifecycle consumes updated callback data and refreshes after chat changes', async () => {
+  const previousDocument = globalThis.document;
+  const hostListeners = new Map();
+  const registered = [];
+  const unregistered = [];
+  let tableCallback = null;
+  globalThis.document = { querySelectorAll: () => [] };
+  globalThis.AutoCardUpdaterAPI = {
+    exportTableAsJson: () => ({ mate: { source: 'export' } }),
+    registerTableUpdateCallback(callback) {
+      tableCallback = callback;
+      registered.push(callback);
+    },
+    unregisterTableUpdateCallback(callback) { unregistered.push(callback); },
+  };
+  globalThis.SillyTavern = { getContext: () => ({
+    eventTypes: { CHAT_CHANGED: 'chat-changed' },
+    eventSource: {
+      on: (name, listener) => hostListeners.set(name, listener),
+      removeListener: (name) => hostListeners.delete(name),
+    },
+  }) };
+  const host = new HostAdapter();
+  try {
+    const updates = [];
+    host.installDatabaseRuntimeLifecycle(async (snapshot, reason) => {
+      updates.push({ snapshot, reason });
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(updates[0].reason, 'database-runtime-ready');
+    assert.equal(updates[0].snapshot, null);
+
+    const updated = {
+      mate: { source: 'callback' },
+      sheet_roles: { name: '重要人物表', content: [['', '姓名'], [1, '回调人物']] },
+    };
+    tableCallback(updated);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.deepEqual(updates.at(-1), { snapshot: updated, reason: 'database-update' });
+
+    hostListeners.get('chat-changed')();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    assert.equal(updates.at(-1).reason, 'database-chat-changed');
+    assert.equal(registered.length, 2);
+    assert.equal(unregistered[0], registered[0]);
+  } finally {
+    host.destroy();
+    delete globalThis.AutoCardUpdaterAPI;
+    delete globalThis.SillyTavern;
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  }
+});
