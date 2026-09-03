@@ -257,6 +257,25 @@ test('mobile keyboard keeps the phone stable while a text field is active', () =
   assert.ok(!bindPanel.includes('writeOperationPanelNote(noteInput.value, { emit: true })'));
 });
 
+test('turn input exposes hypnosis text and grows downward from a 50px double-size field', () => {
+  const details = functionBody('operationPanelItemDetailsHtml');
+  const resize = functionBody('resizeOperationNoteInput');
+  const prepare = functionBody('prepareOperationNoteDownwardGrowth');
+  const bindPanel = functionBody('bindOperationSidePanel');
+  assert.ok(html.includes('record.details?.["催眠指令"] ?? record.details?.["功能列表"]'));
+  assert.ok(html.includes('["完整催眠指令", commandText]'));
+  assert.ok(html.includes('detailLabel: isHypnosisCommand ? "查看完整催眠指令" : "查看完整内容"'));
+  assert.ok(details.includes('item?.detailLabel || "查看完整内容"'));
+  assert.ok(html.includes('height:50px;min-height:50px;max-height:none;resize:none;overflow-y:hidden'));
+  assert.ok(html.includes('font:22px/1.65'));
+  assert.ok(resize.includes('Math.max(50, Math.ceil(Number(input.scrollHeight || 0)))'));
+  assert.ok(prepare.includes('list.style.flex = "0 0 " + listHeight + "px"'));
+  assert.ok(prepare.includes('panel.style.setProperty("height", "auto", "important")'));
+  assert.ok(bindPanel.includes('resizeOperationNoteInput(noteInput)'));
+  assert.ok(bindPanel.includes('panel.addEventListener("pointerdown"'));
+  assert.ok(bindPanel.includes('operationPanelOpenDetailIds.add(detailId)'));
+});
+
 test('model connector explains SiliconFlow balance failures', () => {
   assert.ok(html.includes('function normalizeConnectorProviderError(value)'));
   assert.ok(html.includes('硅基流动账户余额不足，请充值当前 API 密钥所属账户，或更换有余额的 API 密钥。'));
@@ -316,7 +335,7 @@ test('hypnosis commands wait in phone input before host write or direct send', (
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__(block, { append: false })'));
   assert.ok(html.includes('globalThis.__ST_HYPNOOS_DIRECT_SEND__(block)'));
   assert.ok(floatingHost.includes('globalThis.__ST_HYPNOOS_WRITE_INPUT__'));
-  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-chat-save-ready-v1'"));
+  assert.ok(floatingCore.includes("const FRONTEND_REVISION = 'hypnoos3-1.0.0-turn-input-readable-v2'"));
   assert.ok(floatingHost.includes('overflow:visible;z-index:5;display:none'));
   assert.ok(floatingCore.includes("scriptUrl.searchParams.set('revision', FRONTEND_REVISION)"));
   assert.ok(floatingCore.includes('script.dataset.revision = FRONTEND_REVISION'));

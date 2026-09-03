@@ -1727,7 +1727,15 @@ html.st-hypnoos-booting.st-hypnoos-boot-failed .st-hypnoos-phone-preboot::after{
 	      const record = normalizeOperationPayload(payload);
 	      const key = entry?.key || operationRecordKey(payload);
 	      const ownership = operationVariableOwnership(record);
-	      const details = operationVisibleDetailEntries(record, "panel")
+	      let visibleDetails = operationVisibleDetailEntries(record, "panel");
+	      const isHypnosisCommand = /^催眠APP$/.test(cleanOperationText(record.source || "")) && /^(启动催眠|追加催眠)$/.test(cleanOperationText(record.action || ""));
+	      if (isHypnosisCommand) {
+	        const commandValue = record.details?.["催眠指令"] ?? record.details?.["功能列表"];
+	        const commandText = operationVisibleValueToDenseText(commandValue);
+	        visibleDetails = visibleDetails.filter(([name]) => cleanOperationText(name) !== "催眠指令");
+	        if (commandText) visibleDetails.unshift(["完整催眠指令", commandText]);
+	      }
+	      const details = visibleDetails
 	        .map(([name, value]) => {
 	          const text = operationVisibleValueToDenseText(value);
 	          return text ? { label: cleanOperationText(name), value: text } : null;
@@ -1766,7 +1774,8 @@ html.st-hypnoos-booting.st-hypnoos-boot-failed .st-hypnoos-phone-preboot::after{
 	        stateLabel: visual.state,
 	        stateHelp: visual.stateHelp,
 	        ownershipMode: ownership.mode,
-	        ownershipLabel: ownership.label
+	        ownershipLabel: ownership.label,
+	        detailLabel: isHypnosisCommand ? "查看完整催眠指令" : "查看完整内容"
 	      };
 	    };
 	    const operationRoleFieldSection = (field) => {
@@ -5575,7 +5584,7 @@ label.st-encounter-role-image-slot-preview{cursor:pointer}
 .st-operation-panel-advice.is-event strong{color:#fbcfe8}
 .st-operation-note{flex:0 0 auto;margin:0 9px 8px;border:1px solid rgba(148,163,184,.14);border-radius:12px;background:rgba(15,23,42,.32);display:grid;gap:5px;padding:7px 8px}
 .st-operation-note span{color:rgba(203,213,225,.64);font-size:10px;font-weight:900;line-height:1}
-.st-operation-note textarea{width:100%;min-height:46px;max-height:92px;resize:vertical;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(2,6,23,.46);color:rgba(241,245,249,.9);outline:none;padding:7px 8px;font:11px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.st-operation-note textarea{box-sizing:border-box;width:100%;height:50px;min-height:50px;max-height:none;resize:none;overflow-y:hidden;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(2,6,23,.46);color:rgba(241,245,249,.9);outline:none;padding:7px 8px;font:22px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 .st-operation-note textarea:focus{border-color:rgba(56,189,248,.5);box-shadow:0 0 0 3px rgba(56,189,248,.12)}
 .st-operation-note textarea::placeholder{color:rgba(148,163,184,.48)}
 .st-operation-item{--op-accent:#94a3b8;--op-soft:rgba(148,163,184,.1);min-width:0;position:relative;border:1px solid color-mix(in srgb,var(--op-accent) 24%,transparent);border-radius:16px;background:linear-gradient(135deg,var(--op-soft),rgba(255,255,255,.035) 62%);padding:10px;box-shadow:0 10px 24px rgba(0,0,0,.18),inset 0 1px rgba(255,255,255,.055);display:grid;grid-template-columns:30px minmax(0,1fr);gap:9px;overflow:hidden}.st-operation-item:before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--op-accent);opacity:.82}.st-operation-item.tone-hypnosis{--op-accent:#c084fc;--op-soft:rgba(168,85,247,.13)}.st-operation-item.tone-reward{--op-accent:#fbbf24;--op-soft:rgba(245,158,11,.12)}.st-operation-item.tone-schedule{--op-accent:#22d3ee;--op-soft:rgba(6,182,212,.11)}.st-operation-item.tone-location{--op-accent:#60a5fa;--op-soft:rgba(59,130,246,.11)}.st-operation-item.tone-profile{--op-accent:#f472b6;--op-soft:rgba(236,72,153,.11)}.st-operation-item.tone-activity{--op-accent:#34d399;--op-soft:rgba(16,185,129,.1)}.st-operation-item.tone-inventory{--op-accent:#fb923c;--op-soft:rgba(249,115,22,.1)}.st-operation-item.is-locked{border-color:rgba(125,211,252,.34);background:linear-gradient(135deg,rgba(14,165,233,.13),rgba(30,41,59,.34) 64%);box-shadow:0 11px 25px rgba(2,132,199,.09),inset 0 1px rgba(255,255,255,.07)}.st-operation-item.is-locked:before{background:#38bdf8}
@@ -5712,14 +5721,14 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
 }
 @media (max-width:500px){#st-operation-side-panel{border-radius:6px!important}.st-operation-item{grid-template-columns:28px minmax(0,1fr)!important;padding:8px!important}.st-operation-item-icon{width:28px!important;height:28px!important}}
 .st-operation-phone-app{background:linear-gradient(180deg,#111a36,#050919);color:#f7f1dc}
-.st-operation-phone-app .st-lite-body{min-height:0;padding:8px 9px 12px;overflow:hidden}
+.st-operation-phone-app .st-lite-body{min-height:0;padding:8px 9px 12px;overflow-y:auto;overflow-x:hidden}
 .st-operation-phone-app #st-operation-side-panel{position:relative!important;width:100%!important;min-width:0!important;height:100%!important;max-height:none!important;border-radius:6px!important;box-shadow:inset 0 0 0 1px #070b16!important}
 .st-operation-phone-app .st-operation-panel-head{padding:9px 9px 7px!important}
 .st-operation-phone-app .st-operation-panel-list{padding:7px!important}
 .st-operation-phone-app .st-operation-item{grid-template-columns:28px minmax(0,1fr)!important;padding:8px!important}
 .st-operation-phone-app .st-operation-item-icon{width:28px!important;height:28px!important}
 .st-operation-phone-app .st-operation-note{margin:0 7px 7px!important}
-.st-operation-phone-app .st-operation-note textarea{min-height:64px!important;max-height:112px!important;resize:none!important}
+.st-operation-phone-app .st-operation-note textarea{height:50px!important;min-height:50px!important;max-height:none!important;resize:none!important;overflow-y:hidden!important}
 .st-operation-phone-app .st-operation-panel-preview{max-height:82px;overflow:auto}
 .st-operation-phone-app .st-operation-keep{margin:0 7px 7px!important}
 .st-operation-phone-app .st-operation-panel-actions{padding:8px!important}
@@ -43178,16 +43187,38 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     return shorten(cleaned, 72);
   }
 
+  const operationPanelOpenDetailIds = new Set();
+
   function operationPanelItemDetailsHtml(item) {
     const details = Array.isArray(item?.details) ? item.details.filter((entry) => entry?.label && entry?.value) : [];
     if (!details.length) return "";
+    const detailId = String(item?.id || item?.key || "");
     const rows = details.map((entry) =>
       '<div class="st-operation-item-detail-row"><dt>' + escapeHtml(entry.label) + '</dt><dd>' + escapeHtml(entry.value) + '</dd></div>'
     ).join("");
-    return '<details class="st-operation-item-detail">' +
-      '<summary><span>查看完整内容</span><i>' + String(details.length) + ' 项</i></summary>' +
+    return '<details class="st-operation-item-detail" data-operation-detail-id="' + escapeAttr(detailId) + '"' + (operationPanelOpenDetailIds.has(detailId) ? ' open' : '') + '>' +
+      '<summary><span>' + escapeHtml(item?.detailLabel || "查看完整内容") + '</span><i>' + String(details.length) + ' 项</i></summary>' +
       '<dl>' + rows + '</dl>' +
     '</details>';
+  }
+
+  function resizeOperationNoteInput(input) {
+    if (!input) return;
+    input.style.setProperty("height", "50px", "important");
+    const nextHeight = Math.max(50, Math.ceil(Number(input.scrollHeight || 0)));
+    input.style.setProperty("height", nextHeight + "px", "important");
+  }
+
+  function prepareOperationNoteDownwardGrowth(panel) {
+    if (!panel?.closest?.(".st-operation-phone-app")) return;
+    panel.style.setProperty("height", "100%", "important");
+    panel.style.setProperty("min-height", "0", "important");
+    const panelHeight = Math.max(1, Math.ceil(panel.getBoundingClientRect?.().height || 0));
+    const list = panel.querySelector(".st-operation-panel-list");
+    const listHeight = Math.max(0, Math.ceil(list?.getBoundingClientRect?.().height || 0));
+    if (list && listHeight) list.style.flex = "0 0 " + listHeight + "px";
+    panel.style.setProperty("height", "auto", "important");
+    panel.style.setProperty("min-height", panelHeight + "px", "important");
   }
 
   function operationPanelAdviceHtml(items, block) {
@@ -43239,7 +43270,7 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
     const floatMode = readOperationFloatMode();
     const resources = operationPanelResourceSnapshot();
     const context = operationPanelContextSnapshot();
-    const signature = JSON.stringify(items.map((item) => [item.id, item.key, item.source, item.action, item.summary, item.details, item.line, item.at, item.locked, item.tone, item.icon, item.typeLabel, item.stateLabel, item.stateHelp, item.ownershipMode, item.ownershipLabel])) + "\n" + block + "\nnote=" + note + "\nkeep=" + String(keepAfterFlush) + "\nfloat=" + String(floatMode) + "\nres=" + JSON.stringify(resources) + "\nctx=" + JSON.stringify(context);
+    const signature = JSON.stringify(items.map((item) => [item.id, item.key, item.source, item.action, item.summary, item.details, item.line, item.at, item.locked, item.tone, item.icon, item.typeLabel, item.stateLabel, item.stateHelp, item.ownershipMode, item.ownershipLabel, item.detailLabel])) + "\n" + block + "\nnote=" + note + "\nkeep=" + String(keepAfterFlush) + "\nfloat=" + String(floatMode) + "\nres=" + JSON.stringify(resources) + "\nctx=" + JSON.stringify(context);
     if (panel.dataset.signature === signature) return;
     panel.dataset.signature = signature;
     const lockedCount = items.filter((item) => Boolean(item.locked)).length;
@@ -43293,16 +43324,51 @@ html.st-hypnoos-phone-port #st-operation-float-ball,html.st-hypnoos-phone-port .
         '<button class="primary" type="button" data-operation-panel-action="flush" ' + (hasContent ? "" : "disabled") + '>写入输入框</button>' +
         '<button class="primary st-operation-direct-send" type="button" data-operation-panel-action="direct-send" ' + (hasContent ? "" : "disabled") + '>直接发送</button>' +
       '</div>';
+    prepareOperationNoteDownwardGrowth(panel);
+    resizeOperationNoteInput(panel.querySelector("[data-operation-note]"));
     syncOperationFloatBall();
   }
 
   function bindOperationSidePanel(panel) {
     if (!panel || panel.dataset.bound === "true") return;
     panel.dataset.bound = "true";
+    const toggleOperationDetail = (event) => {
+      const summary = event.target?.closest?.(".st-operation-item-detail > summary");
+      if (!summary || !panel.contains(summary)) return false;
+      event.preventDefault();
+      event.stopPropagation();
+      const detail = summary.parentElement;
+      detail.open = !detail.open;
+      const detailId = String(detail.dataset.operationDetailId || "");
+      if (detailId) {
+        if (detail.open) operationPanelOpenDetailIds.add(detailId);
+        else operationPanelOpenDetailIds.delete(detailId);
+      }
+      return true;
+    };
+    panel.addEventListener("pointerdown", (event) => {
+      toggleOperationDetail(event);
+    }, true);
+    panel.addEventListener("click", (event) => {
+      const summary = event.target?.closest?.(".st-operation-item-detail > summary");
+      if (!summary || !panel.contains(summary)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (Number(event.detail || 0) === 0) toggleOperationDetail(event);
+    }, true);
+    panel.addEventListener("toggle", (event) => {
+      const detail = event.target?.closest?.("[data-operation-detail-id]");
+      if (!detail || !panel.contains(detail)) return;
+      const detailId = String(detail.dataset.operationDetailId || "");
+      if (!detailId) return;
+      if (detail.open) operationPanelOpenDetailIds.add(detailId);
+      else operationPanelOpenDetailIds.delete(detailId);
+    }, true);
     panel.addEventListener("input", (event) => {
       const noteInput = event.target?.closest?.("[data-operation-note]");
       if (!noteInput) return;
       writeOperationPanelNote(noteInput.value, { emit: false });
+      resizeOperationNoteInput(noteInput);
       const count = pendingOperationCount();
       const hasContent = count > 0 || Boolean(noteInput.value.trim());
       panel.querySelectorAll('[data-operation-panel-action="clear"],[data-operation-panel-action="flush"],[data-operation-panel-action="direct-send"]').forEach((button) => {

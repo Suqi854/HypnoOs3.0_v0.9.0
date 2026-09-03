@@ -26,10 +26,52 @@ try {
     globalThis.__ST_QA_SAVED_HYPNOSIS_DRAFTS__ = Object.fromEntries(
       Object.keys(localStorage).filter((key) => key.startsWith('hypnoos.hypnosis-lite.v1:')).map((key) => [key, localStorage.getItem(key)]),
     );
+    globalThis.__ST_APPEND_OPERATION_TO_INPUT__?.({
+      来源: '催眠APP',
+      操作: '启动催眠',
+      功能列表: [{ 指令ID: 'vip3_hypnosis_trigger', 指令: '催眠扳机', 备注: '真实酒馆完整催眠原文' }],
+      催眠指令: [{ 指令: '催眠扳机', 备注: '真实酒馆完整催眠原文' }],
+      MC能量消耗: '1000点',
+    });
     globalThis.__ST_OPEN_PENDING_INPUT_APP__();
   });
   const note = frame.locator('[data-operation-note]');
   await note.waitFor({ state: 'visible' });
+  const hypnosisDetail = frame.locator('.st-operation-item-detail').first();
+  assert.match(await hypnosisDetail.locator('summary').innerText(), /查看完整催眠指令/);
+  if (!await hypnosisDetail.evaluate((element) => element.open)) {
+    await hypnosisDetail.locator('summary').dispatchEvent('pointerdown', { pointerId: 1, button: 0 });
+  }
+  const hypnosisDetailState = await hypnosisDetail.evaluate((element) => ({
+    open: element.open,
+    innerText: element.innerText,
+    textContent: element.textContent,
+    detailsDisplay: getComputedStyle(element.querySelector('dl')).display,
+  }));
+  assert.equal(hypnosisDetailState.open, true);
+  assert.match(hypnosisDetailState.textContent, /真实酒馆完整催眠原文/);
+  assert.notEqual(hypnosisDetailState.detailsDisplay, 'none');
+  const initialInputMetrics = await frame.evaluate(() => {
+    const input = document.querySelector('[data-operation-note]');
+    const header = document.querySelector('.st-operation-panel-head');
+    const item = document.querySelector('.st-operation-item');
+    const style = getComputedStyle(input);
+    return { height: input.getBoundingClientRect().height, top: input.getBoundingClientRect().top, headerTop: header.getBoundingClientRect().top, itemTop: item.getBoundingClientRect().top, fontSize: style.fontSize };
+  });
+  assert.equal(initialInputMetrics.height, 50);
+  assert.equal(initialInputMetrics.fontSize, '22px');
+  await note.fill(Array.from({ length: 9 }, (_, index) => `真实酒馆输入第${index + 1}行`).join('\n'));
+  const expandedInputMetrics = await frame.evaluate(() => {
+    const input = document.querySelector('[data-operation-note]');
+    const header = document.querySelector('.st-operation-panel-head');
+    const item = document.querySelector('.st-operation-item');
+    return { height: input.getBoundingClientRect().height, top: input.getBoundingClientRect().top, headerTop: header.getBoundingClientRect().top, itemTop: item.getBoundingClientRect().top };
+  });
+  assert.ok(expandedInputMetrics.height > initialInputMetrics.height, '输入框没有随输入向下增高');
+  assert.ok(Math.abs(expandedInputMetrics.top - initialInputMetrics.top) <= 1, '输入框顶边在增高时发生移动');
+  assert.ok(Math.abs(expandedInputMetrics.headerTop - initialInputMetrics.headerTop) <= 1, '上方标题在输入时发生移动');
+  assert.ok(Math.abs(expandedInputMetrics.itemTop - initialInputMetrics.itemTop) <= 1, '上方暂存指令在输入时发生移动');
+  await note.fill('');
   await note.focus();
   await note.pressSequentially('拿起水杯', { delay: 30 });
   assert.equal(await note.inputValue(), '拿起水杯');
@@ -70,6 +112,9 @@ try {
     input.checked = true;
     input.dispatchEvent(new Event('change', { bubbles: true }));
   });
+  const featureId = await feature.getAttribute('data-hypnosis-feature');
+  const featureNote = hypnosis.locator(`[data-hypnosis-feature-note="${featureId}"]`);
+  if (await featureNote.count()) await featureNote.fill('真实酒馆触摸启动测试');
   await hypnosis.locator('[data-hypnosis-start]').dispatchEvent('touchstart');
   await page.waitForTimeout(1000);
   const mobileStartState = await frame.evaluate(() => ({
